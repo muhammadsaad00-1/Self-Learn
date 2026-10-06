@@ -35,6 +35,10 @@ Python + FastAPI · LangGraph + LangChain · PostgreSQL + pgvector · Redis · S
 - Write tools follow this order: authenticate → authorize tenant/role → validate args → policy → idempotency → execute → typed `ToolResult` → audit/telemetry.
 - Run tool authorization again at execution time, even after an approval.
 
+## Commands
+`make help` lists all of them. Key ones: `make install` (deps + git hooks) · `make up`/`down` (Docker stack) · `make run` (API with reload) · `make test` · `make check` (everything CI runs).
+uv lives at `~/.local/bin/uv` (official installer; the Intel Homebrew at /usr/local builds from source and is too slow).
+
 ## Conventions
 - Conventional commits. One feature per branch/PR.
 - Every non-trivial logic path ships with a test. Integration tests run against real Postgres (Compose), not mocks.
@@ -43,7 +47,7 @@ Python + FastAPI · LangGraph + LangChain · PostgreSQL + pgvector · Redis · S
 ## Local environment notes (2026-10-06)
 - macOS. Docker, Node 22, git, and psql are installed.
 - System Python is 3.8, which is too old. Python is managed with `uv` (Python 3.12 is installed by uv).
-- `uv` is installed via brew. Not installed: `gh`, `codex`.
+- `uv` 0.12 is in `~/.local/bin`. Not installed: `gh`, `codex`.
 
 ## Decisions
 - **Purpose is learning.** Build the full spec, including every AWS service, IaC, MCP, evals and the frontend. Don't skip components as "not needed yet". Order still follows the roadmap phases.
@@ -59,7 +63,7 @@ Python + FastAPI · LangGraph + LangChain · PostgreSQL + pgvector · Redis · S
 
 ## Build status
 Roadmap phases are in spec 05. Mark items `[x]` as they land.
-- [ ] Phase 0 — Repo foundation: git, uv, ruff/mypy, pre-commit, Compose (Postgres+pgvector, Redis), config, CI, ADR template
+- [x] Phase 0 — Repo foundation: git, uv, ruff/mypy, pre-commit, Compose (Postgres+pgvector, Redis), config, CI, ADR template (branch `feat/phase-0-foundation`)
 - [ ] Phase 1 — Core SaaS: orgs/users/memberships/roles, schema + migrations, auth middleware, tenant-scoped repos, audit foundation, dashboard
 - [ ] Phase 2 — First agent: model adapter, structured output, triage agent, LangGraph workflow, trace IDs, node tests
 - [ ] Phase 3 — Knowledge: upload, async ingestion, chunking, embeddings, pgvector, hybrid retrieval, citations, RAG eval set

@@ -1,0 +1,45 @@
+[project]
+name = "agentflow"
+version = "0.1.0"
+description = "AgentFlow — multi-tenant AI business operations platform"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi>=0.142.2",
+    "pydantic-settings>=2.15.0",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.12,<0.13"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+# E/F/W: pycodestyle+pyflakes, I: imports, B: bugbear, UP: pyupgrade, S: bandit security,
+# ASYNC: async pitfalls, RUF: ruff-specific, PT: pytest style, SIM: simplifications.
+select = ["E", "F", "W", "I", "B", "UP", "S", "ASYNC", "RUF", "PT", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]  # assert is how pytest works
+
+[tool.mypy]
+strict = true
+plugins = ["pydantic.mypy"]
+mypy_path = "src"
+files = ["src", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.13.1",
+    "mypy>=2.4.0",
+    "pre-commit>=4.6.2",
+    "pytest>=9.1.1",
+    "ruff>=0.16.10",
+]
