@@ -6,7 +6,7 @@ UV := uv --directory backend
 -include .env
 export
 
-.PHONY: help install up down logs run test lint fmt typecheck check hooks-update
+.PHONY: help install up down logs run migrate migration test lint fmt typecheck check hooks-update
 
 help: ## Show this help
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -27,7 +27,13 @@ logs: ## Tail stack logs
 run: ## Run API locally with auto-reload (needs `make up` for postgres/redis)
 	$(UV) run uvicorn agentflow.main:create_app --factory --reload --port 8000
 
-test: ## Run tests
+migrate: ## Apply all pending DB migrations
+	$(UV) run alembic -c pyproject.toml upgrade head
+
+migration: ## Autogenerate a migration from model changes: make migration m="add x" (then REVIEW it)
+	$(UV) run alembic -c pyproject.toml revision --autogenerate -m "$(m)"
+
+test: ## Run tests (needs `make up` for postgres/redis)
 	$(UV) run pytest
 
 lint: ## Lint + format check

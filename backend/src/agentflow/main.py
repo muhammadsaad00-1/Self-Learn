@@ -5,17 +5,38 @@ A factory (instead of a module-level `app`) lets tests build apps with
 their own settings, and avoids side effects at import time.
 """
 
-from fastapi import FastAPI
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+from redis.asyncio import Redis
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from agentflow import __version__
 from agentflow.config import Settings, get_settings
+from agentflow.db import create_engine
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
+
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+        # Pools are created once per process and shared by all requests.
+        engine = create_engine(str(settings.database_url))
+        app.state.engine = engine
+        app.state.sessionmaker = async_sessionmaker(engine, expire_on_commit=False)
+        app.state.redis = Redis.from_url(str(settings.redis_url))
+        yield
+        await app.state.redis.aclose()
+        await engine.dispose()
+
     app = FastAPI(
         title="AgentFlow",
         version=__version__,
+        lifespan=lifespan,
         # Interactive docs only outside production.
         docs_url=None if settings.env == "prod" else "/docs",
         redoc_url=None,
@@ -24,7 +45,30 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/health", tags=["ops"])
     async def health() -> dict[str, str]:
-        """Liveness probe: the process is up. Readiness (DB/Redis) lands in Phase 1."""
+        """Liveness: the process is up. Never checks dependencies, so a DB outage
+        doesn't make the orchestrator kill healthy containers in a restart loop."""
         return {"status": "ok", "version": __version__}
+
+    @app.get("/ready", tags=["ops"])
+    async def ready(request: Request) -> JSONResponse:
+        """Readiness: can this instance serve traffic? The load balancer stops routing to it
+        (503) while Postgres or Redis is unreachable."""
+        checks: dict[str, str] = {}
+        try:
+            async with request.app.state.engine.connect() as conn:
+                await conn.execute(text("SELECT 1"))
+            checks["database"] = "ok"
+        except Exception:
+            checks["database"] = "unavailable"
+        try:
+            await request.app.state.redis.ping()
+            checks["redis"] = "ok"
+        except Exception:
+            checks["redis"] = "unavailable"
+        healthy = all(v == "ok" for v in checks.values())
+        return JSONResponse(
+            {"status": "ok" if healthy else "unavailable", "checks": checks},
+            status_code=200 if healthy else 503,
+        )
 
     return app

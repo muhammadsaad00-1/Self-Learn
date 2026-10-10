@@ -36,7 +36,7 @@ Python + FastAPI · LangGraph + LangChain · PostgreSQL + pgvector · Redis · S
 - Run tool authorization again at execution time, even after an approval.
 
 ## Commands
-`make help` lists all of them. Key ones: `make install` (deps + git hooks) · `make up`/`down` (Docker stack) · `make run` (API with reload) · `make test` · `make check` (everything CI runs).
+`make help` lists all of them. Key ones: `make install` (deps + git hooks) · `make up`/`down` (Docker stack) · `make run` (API with reload) · `make test` · `make check` (everything CI runs) · `make migrate` · `make migration m="..."` (autogenerate, then review: ADR 0006).
 uv lives at `~/.local/bin/uv` (official installer; the Intel Homebrew at /usr/local builds from source and is too slow).
 
 ## Conventions
@@ -65,7 +65,12 @@ uv lives at `~/.local/bin/uv` (official installer; the Intel Homebrew at /usr/lo
 ## Build status
 Roadmap phases are in spec 05. Mark items `[x]` as they land.
 - [x] Phase 0 — Repo foundation: git, uv, ruff/mypy, pre-commit, Compose (Postgres+pgvector, Redis), config, CI, ADR template (branch `feat/phase-0-foundation`)
-- [ ] Phase 1 — Core SaaS: orgs/users/memberships/roles, schema + migrations, auth middleware, tenant-scoped repos, audit foundation, dashboard
+- [ ] Phase 1 — Core SaaS (split into PRs):
+  - [x] 1a DB foundation: async SQLAlchemy, Alembic, identity tables, /ready, test DB fixtures (`feat/phase-1a-database`)
+  - [ ] 1b Auth: signup/login/me, argon2, JWT
+  - [ ] 1c Tenancy: org context, membership/role checks, RLS, cross-tenant tests, member invites
+  - [ ] 1d Audit: append-only audit_events, same-transaction writes, GET /v1/audit/events
+  - [ ] 1e Angular dashboard
 - [ ] Phase 2 — First agent: model adapter, structured output, triage agent, LangGraph workflow, trace IDs, node tests
 - [ ] Phase 3 — Knowledge: upload, async ingestion, chunking, embeddings, pgvector, hybrid retrieval, citations, RAG eval set
 - [ ] Phase 4 — Multi-agent: supervisor, research, knowledge, resolution, verifier, budgets

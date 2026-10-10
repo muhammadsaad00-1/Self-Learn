@@ -19,6 +19,22 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    # Real Postgres (with pgvector) and Redis for integration tests, same images as compose.
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: agentflow
+          POSTGRES_PASSWORD: agentflow
+          POSTGRES_DB: agentflow
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U agentflow" --health-interval 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping" --health-interval 5s --health-retries 10
     steps:
       - uses: actions/checkout@v7
         with:
