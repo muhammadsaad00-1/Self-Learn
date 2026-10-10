@@ -41,13 +41,14 @@ uv lives at `~/.local/bin/uv` (official installer; the Intel Homebrew at /usr/lo
 
 ## Conventions
 - Conventional commits. One feature per branch/PR.
+- **Review flow:** write files with the Edit/Write tools (the IDE shows inline diffs). Before every push, show the user the full `git diff` (+/- lines) grouped by concern with a one-line "why" per file, then **wait for approval**. Then push and open the PR with `gh pr create`.
 - Every non-trivial logic path ships with a test. Integration tests run against real Postgres (Compose), not mocks.
 - Keep this file current: update **Build status** when a feature lands and **Decisions** when an ADR is written.
 
 ## Local environment notes (2026-10-06)
 - macOS. Docker, Node 22, git, and psql are installed.
 - System Python is 3.8, which is too old. Python is managed with `uv` (Python 3.12 is installed by uv).
-- `uv` 0.12 is in `~/.local/bin`. Not installed: `gh`, `codex`.
+- `uv` 0.12 and `gh` 2.102 are in `~/.local/bin`. `codex` is not installed.
 
 ## Decisions
 - **Purpose is learning.** Build the full spec, including every AWS service, IaC, MCP, evals and the frontend. Don't skip components as "not needed yet". Order still follows the roadmap phases.
