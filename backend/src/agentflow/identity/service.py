@@ -8,11 +8,13 @@ import asyncio
 import re
 import secrets
 import uuid
+from dataclasses import dataclass
 
 from sqlalchemy import exists, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agentflow.audit import service as audit
 from agentflow.db import set_tenant_context
 from agentflow.identity.models import Membership, Organization, Role, User, UserStatus
 from agentflow.identity.schemas import MemberOut, MembershipOut, SignupRequest
@@ -80,6 +82,14 @@ async def signup(session: AsyncSession, data: SignupRequest) -> tuple[User, Orga
     session.add(user)
     await _insert_org_with_unique_slug(session, org)
     session.add(Membership(org_id=org.id, user_id=user.id, role=Role.OWNER))
+    await audit.record(
+        session,
+        org_id=org.id,
+        actor_user_id=user.id,
+        action="org.created",
+        target_type="organization",
+        target_id=org.id,
+    )
     # ponytail: two simultaneous signups with one email both pass the check above; the
     # UNIQUE constraint still blocks the second (500, nothing saved). Map to 409 if ever seen.
     return user, org
@@ -182,39 +192,74 @@ async def list_members(session: AsyncSession, org_id: uuid.UUID) -> list[MemberO
     ]
 
 
+@dataclass(frozen=True)
+class Actor:
+    """Who is making a membership change, and with which role in the org."""
+
+    user_id: uuid.UUID
+    role: Role
+
+
 async def add_member(
-    session: AsyncSession, org_id: uuid.UUID, actor: Role, email: str, role: Role
+    session: AsyncSession, org_id: uuid.UUID, actor: Actor, email: str, role: Role
 ) -> MemberOut:
-    check_can_manage(actor, None, role)
+    check_can_manage(actor.role, None, role)
     user_id = await session.scalar(select(User.id).where(User.email == email))
     if user_id is None:
         raise MemberNotFoundError
     if await session.get(Membership, (org_id, user_id)):
         raise AlreadyMemberError
     session.add(Membership(org_id=org_id, user_id=user_id, role=role))
+    await audit.record(
+        session,
+        org_id=org_id,
+        actor_user_id=actor.user_id,
+        action="member.added",
+        target_type="user",
+        target_id=user_id,
+        details={"role": role},
+    )
     await session.flush()
     return await _member_out(session, org_id, user_id)
 
 
 async def change_role(
-    session: AsyncSession, org_id: uuid.UUID, actor: Role, user_id: uuid.UUID, role: Role
+    session: AsyncSession, org_id: uuid.UUID, actor: Actor, user_id: uuid.UUID, role: Role
 ) -> MemberOut:
     await _lock_org(session, org_id)
     membership = await _get_membership(session, org_id, user_id)
-    check_can_manage(actor, membership.role, role)
+    check_can_manage(actor.role, membership.role, role)
     if membership.role == Role.OWNER and role != Role.OWNER:
         await _ensure_another_owner(session, org_id, user_id)
-    membership.role = role
+    previous, membership.role = membership.role, role
+    await audit.record(
+        session,
+        org_id=org_id,
+        actor_user_id=actor.user_id,
+        action="member.role_changed",
+        target_type="user",
+        target_id=user_id,
+        details={"from": previous, "to": role},
+    )
     await session.flush()
     return await _member_out(session, org_id, user_id)
 
 
 async def remove_member(
-    session: AsyncSession, org_id: uuid.UUID, actor: Role, user_id: uuid.UUID
+    session: AsyncSession, org_id: uuid.UUID, actor: Actor, user_id: uuid.UUID
 ) -> None:
     await _lock_org(session, org_id)
     membership = await _get_membership(session, org_id, user_id)
-    check_can_manage(actor, membership.role, None)
+    check_can_manage(actor.role, membership.role, None)
     if membership.role == Role.OWNER:
         await _ensure_another_owner(session, org_id, user_id)
     await session.delete(membership)
+    await audit.record(
+        session,
+        org_id=org_id,
+        actor_user_id=actor.user_id,
+        action="member.removed",
+        target_type="user",
+        target_id=user_id,
+        details={"role": membership.role},
+    )

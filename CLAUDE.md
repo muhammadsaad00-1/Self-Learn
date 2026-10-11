@@ -22,7 +22,7 @@ Python + FastAPI · LangGraph + LangChain · PostgreSQL + pgvector · Redis · S
 
 ## Architecture stance
 - **Modular monolith first.** One FastAPI app plus one worker process. Domain modules have clear boundaries; split into services only with a measured reason (spec rule).
-- Domain modules (spec 02 §3): identity, workflow, knowledge, agent, tooling, policy, approval, automation, audit, evaluation, usage.
+- Domain modules (spec 02 §3): identity ✅, audit ✅, workflow, knowledge, agent, tooling, policy, approval, automation, audit, evaluation, usage.
 - Modules talk to each other only through their public service functions, never by reaching into another module's tables or models.
 - Add AWS managed services (Step Functions, EventBridge, AgentCore) only when they solve a concrete problem. Locally, everything runs in Docker Compose.
 
@@ -42,7 +42,7 @@ uv lives at `~/.local/bin/uv` (official installer; the Intel Homebrew at /usr/lo
 
 ## Conventions
 - Conventional commits. One feature per branch/PR.
-- **Review flow:** write files with the Edit/Write tools (the IDE shows inline diffs). Before every push, show the user the full `git diff` (+/- lines) grouped by concern with a one-line "why" per file, then **wait for approval**. Then push and open the PR with `gh pr create`.
+- **Review flow:** one branch + one GitHub PR per phase (sub-features as separate commits); the user reviews on GitHub, never merge to main yourself. After a phase, summarize in chat: what was built, how to test it, what's next. Small one-off changes: show the +/- diff in chat and wait for OK before pushing.
 - Every non-trivial logic path ships with a test. Integration tests run against real Postgres (Compose), not mocks.
 - Keep this file current: update **Build status** when a feature lands and **Decisions** when an ADR is written.
 
@@ -70,7 +70,7 @@ Roadmap phases are in spec 05. Mark items `[x]` as they land.
   - [x] 1a DB foundation: async SQLAlchemy, Alembic, identity tables, /ready, test DB fixtures (`feat/phase-1a-database`)
   - [x] 1b Auth: signup/login/me, argon2, JWT, login rate limit, commit-before-response fix (`feat/phase-1b-auth`, ADR 0007)
   - [x] 1c Tenancy: X-Org-Id org context, roles, members API, Postgres RLS via `agentflow_app` role, cross-tenant tests (`feat/phase-1c-tenancy`, ADR 0008)
-  - [ ] 1d Audit: append-only audit_events, same-transaction writes, GET /v1/audit/events
+  - [x] 1d Audit: append-only audit_events (grants + RLS + trigger), same-transaction `audit.service.record()`, GET /v1/audit/events (ADR 0009)
   - [ ] 1e Angular dashboard
 - [ ] Phase 2 — First agent: model adapter, structured output, triage agent, LangGraph workflow, trace IDs, node tests
 - [ ] Phase 3 — Knowledge: upload, async ingestion, chunking, embeddings, pgvector, hybrid retrieval, citations, RAG eval set

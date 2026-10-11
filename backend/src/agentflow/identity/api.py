@@ -10,7 +10,13 @@ from redis.asyncio import Redis
 from agentflow.config import Settings
 from agentflow.db import SessionDep
 from agentflow.identity import service
-from agentflow.identity.deps import AdminContextDep, CurrentUser, OrgContextDep, SettingsDep
+from agentflow.identity.deps import (
+    AdminContextDep,
+    CurrentUser,
+    OrgContext,
+    OrgContextDep,
+    SettingsDep,
+)
 from agentflow.identity.models import User
 from agentflow.identity.schemas import (
     AddMemberRequest,
@@ -102,6 +108,10 @@ _MEMBER_ERRORS: dict[type[Exception], tuple[int, str]] = {
 }
 
 
+def _actor(ctx: OrgContext) -> service.Actor:
+    return service.Actor(user_id=ctx.user.id, role=ctx.role)
+
+
 def _member_http_error(e: Exception) -> HTTPException:
     code, detail = _MEMBER_ERRORS[type(e)]
     return HTTPException(code, detail)
@@ -118,7 +128,7 @@ async def add_member(
     body: AddMemberRequest, ctx: AdminContextDep, session: SessionDep
 ) -> MemberOut:
     try:
-        return await service.add_member(session, ctx.org_id, ctx.role, body.email, body.role)
+        return await service.add_member(session, ctx.org_id, _actor(ctx), body.email, body.role)
     except tuple(_MEMBER_ERRORS) as e:
         raise _member_http_error(e) from None
 
@@ -128,7 +138,7 @@ async def change_member_role(
     user_id: uuid.UUID, body: ChangeRoleRequest, ctx: AdminContextDep, session: SessionDep
 ) -> MemberOut:
     try:
-        return await service.change_role(session, ctx.org_id, ctx.role, user_id, body.role)
+        return await service.change_role(session, ctx.org_id, _actor(ctx), user_id, body.role)
     except tuple(_MEMBER_ERRORS) as e:
         raise _member_http_error(e) from None
 
@@ -137,7 +147,7 @@ async def change_member_role(
 async def remove_member(user_id: uuid.UUID, ctx: AdminContextDep, session: SessionDep) -> Response:
     """Access ends on the member's next request (membership is checked every time)."""
     try:
-        await service.remove_member(session, ctx.org_id, ctx.role, user_id)
+        await service.remove_member(session, ctx.org_id, _actor(ctx), user_id)
     except tuple(_MEMBER_ERRORS) as e:
         raise _member_http_error(e) from None
     return Response(status_code=status.HTTP_204_NO_CONTENT)
