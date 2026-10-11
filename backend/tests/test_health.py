@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+from pydantic import SecretStr
 
 from agentflow.config import Settings
 from agentflow.main import create_app
@@ -12,7 +13,8 @@ def test_health_ok() -> None:
 
 
 def test_docs_disabled_in_prod() -> None:
-    client = TestClient(create_app(Settings(env="prod")))
+    prod = Settings(env="prod", jwt_secret=SecretStr("a-real-secret-from-secrets-manager"))
+    client = TestClient(create_app(prod))
     assert client.get("/docs").status_code == 404
 
 

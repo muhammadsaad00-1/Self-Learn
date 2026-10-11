@@ -67,7 +67,7 @@ Roadmap phases are in spec 05. Mark items `[x]` as they land.
 - [x] Phase 0 — Repo foundation: git, uv, ruff/mypy, pre-commit, Compose (Postgres+pgvector, Redis), config, CI, ADR template (branch `feat/phase-0-foundation`)
 - [ ] Phase 1 — Core SaaS (split into PRs):
   - [x] 1a DB foundation: async SQLAlchemy, Alembic, identity tables, /ready, test DB fixtures (`feat/phase-1a-database`)
-  - [ ] 1b Auth: signup/login/me, argon2, JWT
+  - [x] 1b Auth: signup/login/me, argon2, JWT, login rate limit, commit-before-response fix (`feat/phase-1b-auth`, ADR 0007)
   - [ ] 1c Tenancy: org context, membership/role checks, RLS, cross-tenant tests, member invites
   - [ ] 1d Audit: append-only audit_events, same-transaction writes, GET /v1/audit/events
   - [ ] 1e Angular dashboard

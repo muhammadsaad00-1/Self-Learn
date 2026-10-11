@@ -80,4 +80,7 @@ async def get_session(request: Request) -> AsyncGenerator[AsyncSession]:
         yield session
 
 
-SessionDep = Annotated[AsyncSession, Depends(get_session)]
+# scope="function": run the COMMIT before the response is sent. FastAPI's default runs
+# yield-dependency cleanup *after* sending, so a failed commit would still reach the
+# client as 201 Created for data that was never saved.
+SessionDep = Annotated[AsyncSession, Depends(get_session, scope="function")]

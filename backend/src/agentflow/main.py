@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from agentflow import __version__
 from agentflow.config import Settings, get_settings
 from agentflow.db import create_engine
+from agentflow.identity import api as identity_api
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -42,6 +43,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         redoc_url=None,
     )
     app.state.settings = settings
+    app.include_router(identity_api.router)
 
     @app.get("/health", tags=["ops"])
     async def health() -> dict[str, str]:

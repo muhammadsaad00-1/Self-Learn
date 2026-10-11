@@ -6,8 +6,12 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "alembic>=1.20.0",
     "asyncpg>=0.32.0",
+    "email-validator>=2.3.0",
     "fastapi>=0.142.2",
+    "pwdlib[argon2]>=0.3.1",
     "pydantic-settings>=2.15.0",
+    "pyjwt>=2.15.1",
+    "python-multipart>=0.0.32",
     "redis>=8.1.0",
     "sqlalchemy[asyncio]>=2.1.4",
     "uvicorn[standard]>=0.54.0",
@@ -27,7 +31,7 @@ target-version = "py312"
 select = ["E", "F", "W", "I", "B", "UP", "S", "ASYNC", "RUF", "PT", "SIM"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "S106"]  # assert is how pytest works; fake credentials are fine
+"tests/**" = ["S101", "S105", "S106"]  # assert is how pytest works; fake credentials are fine
 
 [tool.mypy]
 strict = true
