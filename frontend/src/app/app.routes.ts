@@ -1,0 +1,36 @@
+import { Routes } from '@angular/router';
+
+import { adminGuard, authGuard } from './core/guards';
+
+// Pages are lazy-loaded (loadComponent): each becomes its own small JS chunk,
+// downloaded only when first visited.
+export const routes: Routes = [
+  {
+    path: 'login',
+    loadComponent: () => import('./pages/auth-page').then((m) => m.AuthPage),
+    data: { mode: 'login' },
+  },
+  {
+    path: 'signup',
+    loadComponent: () => import('./pages/auth-page').then((m) => m.AuthPage),
+    data: { mode: 'signup' },
+  },
+  {
+    path: '',
+    loadComponent: () => import('./layout/shell').then((m) => m.Shell),
+    canActivate: [authGuard],
+    children: [
+      { path: '', pathMatch: 'full', redirectTo: 'members' },
+      {
+        path: 'members',
+        loadComponent: () => import('./pages/members-page').then((m) => m.MembersPage),
+      },
+      {
+        path: 'audit',
+        loadComponent: () => import('./pages/audit-page').then((m) => m.AuditPage),
+        canActivate: [adminGuard],
+      },
+    ],
+  },
+  { path: '**', redirectTo: '' },
+];
