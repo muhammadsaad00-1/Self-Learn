@@ -15,7 +15,7 @@ Python + FastAPI · LangGraph + LangChain · PostgreSQL + pgvector · Redis · S
 
 ## Repo layout
 - `backend/`: Python 3.12 / uv project. Package `agentflow` lives in `backend/src/agentflow/`, with one subpackage per domain module as each phase lands. Tests are in `backend/tests/`.
-- `frontend/`: Angular app (Phase 1).
+- `frontend/`: Angular 22 app (standalone components, zoneless, signals, Vitest). `src/app/core/` auth + interceptor + guards, `pages/`, `layout/`, `api/` (generated `schema.ts` from `openapi.json`, never hand-edited). Dev server proxies `/v1` to :8000 (`proxy.conf.json`).
 - `infra/`: Terraform (Phase 7).
 - `docs/spec/`: spec text. `docs/adr/`: architecture decision records.
 - `docker-compose.yml`: local stack. `Makefile`: common commands (`make help`).
@@ -37,7 +37,7 @@ Python + FastAPI · LangGraph + LangChain · PostgreSQL + pgvector · Redis · S
 - Run tool authorization again at execution time, even after an approval.
 
 ## Commands
-`make help` lists all of them. Key ones: `make install` (deps + git hooks) · `make up`/`down` (Docker stack) · `make run` (API with reload) · `make test` · `make check` (everything CI runs) · `make migrate` · `make migration m="..."` (autogenerate, then review: ADR 0006).
+`make help` lists all of them. Key ones: `make install` (deps + git hooks) · `make up`/`down` (Docker stack) · `make run` (API with reload) · `make test` · `make check` (everything CI runs) · `make migrate` · `make migration m="..."` (autogenerate, then review: ADR 0006) · `make web` (dashboard on :4200) · `make api-types` (after any API change) · `make db-reset`.
 uv lives at `~/.local/bin/uv` (official installer; the Intel Homebrew at /usr/local builds from source and is too slow).
 
 ## Conventions
@@ -47,7 +47,7 @@ uv lives at `~/.local/bin/uv` (official installer; the Intel Homebrew at /usr/lo
 - Keep this file current: update **Build status** when a feature lands and **Decisions** when an ADR is written.
 
 ## Local environment notes (2026-10-06)
-- macOS. Docker, Node 22, git, and psql are installed.
+- macOS. Docker, git and psql are installed. Node 24 via nvm (`source ~/.nvm/nvm.sh && nvm use 24`; Angular 22 needs ≥ 22.22, system default is 22.17).
 - System Python is 3.8, which is too old. Python is managed with `uv` (Python 3.12 is installed by uv).
 - `uv` 0.12 and `gh` 2.102 are in `~/.local/bin`. `codex` is not installed.
 
@@ -66,12 +66,12 @@ uv lives at `~/.local/bin/uv` (official installer; the Intel Homebrew at /usr/lo
 ## Build status
 Roadmap phases are in spec 05. Mark items `[x]` as they land.
 - [x] Phase 0 — Repo foundation: git, uv, ruff/mypy, pre-commit, Compose (Postgres+pgvector, Redis), config, CI, ADR template (branch `feat/phase-0-foundation`)
-- [ ] Phase 1 — Core SaaS (split into PRs):
+- [x] Phase 1 — Core SaaS (one PR: `feat/phase-1-core-saas`):
   - [x] 1a DB foundation: async SQLAlchemy, Alembic, identity tables, /ready, test DB fixtures (`feat/phase-1a-database`)
   - [x] 1b Auth: signup/login/me, argon2, JWT, login rate limit, commit-before-response fix (`feat/phase-1b-auth`, ADR 0007)
   - [x] 1c Tenancy: X-Org-Id org context, roles, members API, Postgres RLS via `agentflow_app` role, cross-tenant tests (`feat/phase-1c-tenancy`, ADR 0008)
   - [x] 1d Audit: append-only audit_events (grants + RLS + trigger), same-transaction `audit.service.record()`, GET /v1/audit/events (ADR 0009)
-  - [ ] 1e Angular dashboard
+  - [x] 1e Angular dashboard: login/signup, org switcher, members, audit log; typed API client from OpenAPI (`make api-types`), CI contract check
 - [ ] Phase 2 — First agent: model adapter, structured output, triage agent, LangGraph workflow, trace IDs, node tests
 - [ ] Phase 3 — Knowledge: upload, async ingestion, chunking, embeddings, pgvector, hybrid retrieval, citations, RAG eval set
 - [ ] Phase 4 — Multi-agent: supervisor, research, knowledge, resolution, verifier, budgets

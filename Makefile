@@ -6,13 +6,14 @@ UV := uv --directory backend
 -include .env
 export
 
-.PHONY: help install up down db-reset logs run migrate migration test lint fmt typecheck check hooks-update
+.PHONY: help install up down db-reset logs run web api-types migrate migration test lint fmt typecheck check hooks-update
 
 help: ## Show this help
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
 
 install: ## Install deps + git hooks
 	$(UV) sync
+	cd frontend && npm ci
 	$(UV) run pre-commit install --hook-type pre-commit --hook-type commit-msg
 
 up: ## Start local stack (postgres, redis, api) in Docker
@@ -32,6 +33,13 @@ logs: ## Tail stack logs
 run: ## Run API locally with auto-reload (needs `make up` for postgres/redis)
 	$(UV) run uvicorn agentflow.main:create_app --factory --reload --port 8000
 
+web: ## Run the Angular dashboard on http://localhost:4200 (needs `make run` or `make up` for the API)
+	cd frontend && npm start
+
+api-types: ## Regenerate frontend API types from the backend's OpenAPI schema (run after API changes)
+	$(UV) run python -c "import json; from agentflow.main import create_app; print(json.dumps(create_app().openapi(), indent=2))" > frontend/src/app/api/openapi.json
+	cd frontend && npm run api-types
+
 migrate: ## Apply all pending DB migrations
 	$(UV) run alembic -c pyproject.toml upgrade head
 
@@ -50,8 +58,9 @@ fmt: ## Auto-fix lint + format
 typecheck: ## mypy --strict
 	$(UV) run mypy
 
-check: ## Everything CI runs
+check: ## Everything CI runs (backend + frontend)
 	$(UV) run pre-commit run --all-files && $(MAKE) test
+	cd frontend && npx prettier --check "src/**/*.{ts,css,html}" && npm run build && npm test
 
 hooks-update: ## Bump pre-commit hook versions
 	$(UV) run pre-commit autoupdate

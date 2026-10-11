@@ -46,6 +46,30 @@ jobs:
       # Lint, format, types, secrets — identical to the local pre-commit hooks.
       - run: uv run pre-commit run --all-files --show-diff-on-failure
       - run: uv run pytest
+      # The committed OpenAPI schema must match the code; the frontend's types are built from it.
+      - name: OpenAPI contract is up to date (run `make api-types` if this fails)
+        run: |
+          uv run python -c "import json; from agentflow.main import create_app; print(json.dumps(create_app().openapi(), indent=2))" > /tmp/openapi.json
+          diff -u ../frontend/src/app/api/openapi.json /tmp/openapi.json
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Generated API types match the OpenAPI schema
+        run: npm run api-types && git diff --exit-code src/app/api/schema.ts
+      - run: npx prettier --check "src/**/*.{ts,css,html}"
+      - run: npm run build
+      - run: npm test
 
   docker:
     runs-on: ubuntu-latest

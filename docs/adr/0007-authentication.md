@@ -15,7 +15,7 @@ Phase 1 needs login. The spec targets Cognito or an enterprise IdP, but that req
 - `AGENTFLOW_JWT_SECRET` is mandatory outside local/test; Settings refuses to start otherwise.
 
 ## Consequences
-- **No refresh tokens yet.** Users log in again after 30 minutes. Revisit with the Angular dashboard (1e), likely with an httpOnly refresh cookie.
+- **No refresh tokens yet.** Users log in again after 30 minutes. *Update (1e):* the dashboard keeps the access token in `sessionStorage` (survives reload, cleared with the tab) and logs out on any 401. Any script on the page can read it, which is acceptable at a 30-minute TTL with no third-party scripts. Upgrade path: an httpOnly, SameSite refresh cookie plus an in-memory access token.
 - Tokens can't be revoked before expiry except by disabling the user. Acceptable at a 30-minute TTL.
 - Cognito later: swap `decode_access_token` to verify Cognito's RS256 tokens via JWKS; `CurrentUser` and every endpoint stay the same.
 
