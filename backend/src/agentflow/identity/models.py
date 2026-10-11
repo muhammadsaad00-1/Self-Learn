@@ -28,6 +28,13 @@ class Role(StrEnum):
     ADMIN = "admin"  # manage members, tools, policies, knowledge
     MEMBER = "member"  # run workflows, act on approvals they're assigned
 
+    def at_least(self, minimum: "Role") -> bool:
+        """Role hierarchy: OWNER > ADMIN > MEMBER."""
+        return _ROLE_RANK[self] >= _ROLE_RANK[minimum]
+
+
+_ROLE_RANK = {Role.MEMBER: 1, Role.ADMIN: 2, Role.OWNER: 3}
+
 
 class Organization(TimestampMixin, Base):
     __tablename__ = "organizations"

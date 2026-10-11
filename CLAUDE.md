@@ -1,6 +1,6 @@
 # AgentFlow — Project Context
 
-Multi-tenant AI business-operations platform for SMBs. Requests come in, get triaged and planned by agents, are grounded in RAG, and lead to proposed actions. Deterministic policy decides whether an action is allowed, blocked, or needs human approval. Governed tools execute it, and everything is audited.
+Multi-tenant AI business-operations platform, pitched first as **governed AI agents for financial operations** (fintech), then for other services. Requests come in, get triaged and planned by agents, are grounded in RAG, and lead to proposed actions. Deterministic policy decides whether an action is allowed, blocked, or needs human approval. Governed tools execute it, and everything is audited.
 
 **Core rule: the model proposes, the system decides.** LLM output is never the authority for permissions, tenant boundaries, money, irreversible actions, or workflow state transitions.
 
@@ -28,6 +28,7 @@ Python + FastAPI · LangGraph + LangChain · PostgreSQL + pgvector · Redis · S
 
 ## Non-negotiable engineering rules (spec 05 §15 + 02 §5)
 - Every tenant-owned row has `org_id`. Every repository query is tenant-scoped. Postgres RLS is defense in depth. Cross-tenant tests are required for every sensitive repository.
+  - Tenant endpoints take `OrgContextDep` / `AdminContextDep` (`identity/deps.py`). New tenant table → its migration must `ENABLE ROW LEVEL SECURITY`, add a policy on `app_current_org_id()`, and `GRANT` to `agentflow_app` explicitly (ADR 0008). Workers must call `db.set_tenant_context` first.
 - Every external mutation accepts an `Idempotency-Key`. Tool side effects use `action_key = sha256(workflow_id + tool + logical_target + action_version)`.
 - Agent-to-agent contracts are typed Pydantic. Never parse prose to decide whether to execute.
 - Agent loops are bounded: steps, tool calls, tokens, cost, wall-clock, retries, and delegation depth.
@@ -59,7 +60,7 @@ uv lives at `~/.local/bin/uv` (official installer; the Intel Homebrew at /usr/lo
 - **Frontend: Angular + TypeScript**, replacing the spec's Next.js (ADR 0004).
 - **Workflow:** Claude writes all code and the user reviews everything. Work happens on one branch per feature (`feat/...`), pushed to GitHub where the user reviews before merge. Keep diffs reviewable, and explain the design and the reason for each piece in the PR description.
 - **AWS: free-tier account.** Terraform must support spin-up/tear-down per session. Avoid always-on cost such as NAT gateways and idle Fargate tasks.
-- **Domain:** local businesses. The first vertical template is a **bus travel agency** support desk (booking lookup, cancellations/refunds, schedule/route queries, baggage policy). The core stays domain-agnostic, and verticals are data/config (tools, policies, knowledge, eval sets), not forks of the code.
+- **Domain (updated 2026-10-11): AI in fintech first, other services after.** The first vertical is **financial operations** (transaction disputes, duplicate charges, refunds/reversals with maker-checker approval, failed payments, bank-statement document checks) for payment providers, wallets, microfinance and digital lenders. Bus travel agencies and other local businesses come later as further verticals. The core stays domain-agnostic: verticals are data/config (tools, policies, knowledge, eval sets), not code forks. Synthetic data only, never real PII. Hackathon pitch: `docs/PROPOSAL.md`.
 - Repo: https://github.com/muhammadsaad00-1/Self-Learn (`main` is protected by convention; never push directly after the initial commit).
 
 ## Build status
@@ -68,7 +69,7 @@ Roadmap phases are in spec 05. Mark items `[x]` as they land.
 - [ ] Phase 1 — Core SaaS (split into PRs):
   - [x] 1a DB foundation: async SQLAlchemy, Alembic, identity tables, /ready, test DB fixtures (`feat/phase-1a-database`)
   - [x] 1b Auth: signup/login/me, argon2, JWT, login rate limit, commit-before-response fix (`feat/phase-1b-auth`, ADR 0007)
-  - [ ] 1c Tenancy: org context, membership/role checks, RLS, cross-tenant tests, member invites
+  - [x] 1c Tenancy: X-Org-Id org context, roles, members API, Postgres RLS via `agentflow_app` role, cross-tenant tests (`feat/phase-1c-tenancy`, ADR 0008)
   - [ ] 1d Audit: append-only audit_events, same-transaction writes, GET /v1/audit/events
   - [ ] 1e Angular dashboard
 - [ ] Phase 2 — First agent: model adapter, structured output, triage agent, LangGraph workflow, trace IDs, node tests

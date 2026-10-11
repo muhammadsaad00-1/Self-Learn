@@ -21,7 +21,12 @@ class Settings(BaseSettings):
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     # Defaults match docker-compose.yml so `make run` works with zero setup.
     # Non-local environments must set these explicitly.
+    # The app connects as `agentflow_app` (no superuser, no BYPASSRLS) so row-level security
+    # applies; migrations connect as the schema owner. See infra/postgres/app-role.sql.
     database_url: PostgresDsn = PostgresDsn(
+        "postgresql+asyncpg://agentflow_app:agentflow_app@localhost:5432/agentflow"
+    )
+    migration_database_url: PostgresDsn = PostgresDsn(
         "postgresql+asyncpg://agentflow:agentflow@localhost:5432/agentflow"
     )
     redis_url: RedisDsn = RedisDsn("redis://localhost:6379/0")

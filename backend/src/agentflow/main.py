@@ -44,6 +44,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.settings = settings
     app.include_router(identity_api.router)
+    app.include_router(identity_api.members_router)
 
     @app.get("/health", tags=["ops"])
     async def health() -> dict[str, str]:

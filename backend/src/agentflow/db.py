@@ -1,12 +1,13 @@
 """Database plumbing shared by every domain module: ORM base, engine, per-request session."""
 
+import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime
 from enum import StrEnum
 from typing import Annotated
 
 from fastapi import Depends, Request
-from sqlalchemy import CheckConstraint, DateTime, Enum, MetaData, func
+from sqlalchemy import CheckConstraint, DateTime, Enum, MetaData, func, text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -78,6 +79,22 @@ async def get_session(request: Request) -> AsyncGenerator[AsyncSession]:
     sessionmaker: async_sessionmaker[AsyncSession] = request.app.state.sessionmaker
     async with sessionmaker() as session, session.begin():
         yield session
+
+
+async def set_tenant_context(
+    session: AsyncSession, *, user_id: uuid.UUID | None = None, org_id: uuid.UUID | None = None
+) -> None:
+    """Tell Postgres who is acting, for the row-level security policies (see the RLS migration).
+
+    `set_config(..., is_local => true)` lasts only until the current transaction ends, so a
+    pooled connection never carries one request's tenant into the next request.
+    """
+    for name, value in (("app.current_user_id", user_id), ("app.current_org_id", org_id)):
+        if value is not None:
+            await session.execute(
+                text("SELECT set_config(:name, :value, true)"),
+                {"name": name, "value": str(value)},
+            )
 
 
 # scope="function": run the COMMIT before the response is sent. FastAPI's default runs

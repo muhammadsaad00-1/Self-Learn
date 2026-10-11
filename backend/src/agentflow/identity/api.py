@@ -1,58 +1,31 @@
-"""HTTP endpoints for authentication, plus the `CurrentUser` dependency other modules use."""
+"""HTTP endpoints for authentication and organization membership."""
 
+import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi.security import OAuth2PasswordRequestForm
 from redis.asyncio import Redis
 
 from agentflow.config import Settings
 from agentflow.db import SessionDep
 from agentflow.identity import service
-from agentflow.identity.models import User, UserStatus
+from agentflow.identity.deps import AdminContextDep, CurrentUser, OrgContextDep, SettingsDep
+from agentflow.identity.models import User
 from agentflow.identity.schemas import (
+    AddMemberRequest,
+    ChangeRoleRequest,
+    MemberOut,
     MeResponse,
     SignupRequest,
     SignupResponse,
     TokenResponse,
     UserOut,
 )
-from agentflow.identity.security import create_access_token, decode_access_token
+from agentflow.identity.security import create_access_token
 
 router = APIRouter(prefix="/v1", tags=["auth"])
-
-# Reads "Authorization: Bearer <token>" and tells Swagger where to log in.
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/v1/auth/login")
-
-
-def get_settings(request: Request) -> Settings:
-    settings: Settings = request.app.state.settings
-    return settings
-
-
-SettingsDep = Annotated[Settings, Depends(get_settings)]
-
-
-async def get_current_user(
-    token: Annotated[str, Depends(oauth2_scheme)], session: SessionDep, settings: SettingsDep
-) -> User:
-    """Resolve the bearer token to an active user, or answer 401.
-
-    The user is reloaded from the database on every request, so disabling an account takes
-    effect immediately instead of when its token expires.
-    """
-    user_id = decode_access_token(token, settings)
-    user = await session.get(User, user_id) if user_id else None
-    if user is None or user.status != UserStatus.ACTIVE:
-        raise HTTPException(
-            status.HTTP_401_UNAUTHORIZED,
-            "Invalid or expired token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    return user
-
-
-CurrentUser = Annotated[User, Depends(get_current_user)]
+members_router = APIRouter(prefix="/v1/members", tags=["members"])
 
 
 def _token_response(user: User, settings: Settings) -> TokenResponse:
@@ -114,3 +87,57 @@ async def me(user: CurrentUser, session: SessionDep) -> MeResponse:
     """The logged-in user and the organizations they belong to (for the org switcher)."""
     memberships = await service.memberships_of(session, user)
     return MeResponse(user=UserOut.model_validate(user), memberships=memberships)
+
+
+# --- Organization members (X-Org-Id header selects the org) ----------------------------
+
+_MEMBER_ERRORS: dict[type[Exception], tuple[int, str]] = {
+    service.MemberNotFoundError: (status.HTTP_404_NOT_FOUND, "No such member or account"),
+    service.AlreadyMemberError: (status.HTTP_409_CONFLICT, "Already a member"),
+    service.RoleChangeForbiddenError: (
+        status.HTTP_403_FORBIDDEN,
+        "Only owners can grant, change or remove the owner role",
+    ),
+    service.LastOwnerError: (status.HTTP_409_CONFLICT, "An organization must keep an owner"),
+}
+
+
+def _member_http_error(e: Exception) -> HTTPException:
+    code, detail = _MEMBER_ERRORS[type(e)]
+    return HTTPException(code, detail)
+
+
+@members_router.get("")
+async def list_members(ctx: OrgContextDep, session: SessionDep) -> list[MemberOut]:
+    """Everyone in the organization, with their role. Any member can see this."""
+    return await service.list_members(session, ctx.org_id)
+
+
+@members_router.post("", status_code=status.HTTP_201_CREATED)
+async def add_member(
+    body: AddMemberRequest, ctx: AdminContextDep, session: SessionDep
+) -> MemberOut:
+    try:
+        return await service.add_member(session, ctx.org_id, ctx.role, body.email, body.role)
+    except tuple(_MEMBER_ERRORS) as e:
+        raise _member_http_error(e) from None
+
+
+@members_router.patch("/{user_id}")
+async def change_member_role(
+    user_id: uuid.UUID, body: ChangeRoleRequest, ctx: AdminContextDep, session: SessionDep
+) -> MemberOut:
+    try:
+        return await service.change_role(session, ctx.org_id, ctx.role, user_id, body.role)
+    except tuple(_MEMBER_ERRORS) as e:
+        raise _member_http_error(e) from None
+
+
+@members_router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_member(user_id: uuid.UUID, ctx: AdminContextDep, session: SessionDep) -> Response:
+    """Access ends on the member's next request (membership is checked every time)."""
+    try:
+        await service.remove_member(session, ctx.org_id, ctx.role, user_id)
+    except tuple(_MEMBER_ERRORS) as e:
+        raise _member_http_error(e) from None
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

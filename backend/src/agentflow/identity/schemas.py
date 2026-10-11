@@ -2,6 +2,7 @@
 database can gain columns (e.g. password_hash) without them leaking into API responses."""
 
 import uuid
+from datetime import datetime
 from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, Field
@@ -50,3 +51,23 @@ class MeResponse(BaseModel):
 class SignupResponse(TokenResponse):
     user: UserOut
     org_id: uuid.UUID
+
+
+class MemberOut(BaseModel):
+    user_id: uuid.UUID
+    email: str
+    full_name: str
+    role: Role
+    joined_at: datetime
+
+
+class AddMemberRequest(BaseModel):
+    """Add an existing account to the org. Email invitations for people without an account
+    arrive with the email tool (Phase 5)."""
+
+    email: Email
+    role: Role = Role.MEMBER
+
+
+class ChangeRoleRequest(BaseModel):
+    role: Role

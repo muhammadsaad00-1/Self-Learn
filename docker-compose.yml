@@ -9,7 +9,10 @@ services:
       POSTGRES_PASSWORD: agentflow   # local-only credential
       POSTGRES_DB: agentflow
     ports: ["127.0.0.1:5432:5432"]
-    volumes: [pgdata:/var/lib/postgresql/data]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Scripts here run once, when the data volume is first created (`make db-reset` to rerun).
+      - ./infra/postgres/app-role.sql:/docker-entrypoint-initdb.d/01-app-role.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U agentflow -d agentflow"]
       interval: 5s
@@ -28,7 +31,8 @@ services:
     environment:
       AGENTFLOW_ENV: local
       # Inside the compose network, services are reached by name, not localhost.
-      AGENTFLOW_DATABASE_URL: postgresql+asyncpg://agentflow:agentflow@postgres:5432/agentflow
+      # The app connects as the low-privilege role so row-level security applies to it.
+      AGENTFLOW_DATABASE_URL: postgresql+asyncpg://agentflow_app:agentflow_app@postgres:5432/agentflow
       AGENTFLOW_REDIS_URL: redis://redis:6379/0
     ports: ["127.0.0.1:8000:8000"]
     depends_on:

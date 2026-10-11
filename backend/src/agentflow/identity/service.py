@@ -1,4 +1,4 @@
-"""Identity use cases: signup, authentication, membership lookup.
+"""Identity use cases: signup, authentication, membership management.
 
 Plain functions taking a session. No HTTP concepts here (status codes belong to api.py), so
 the same logic can later be called from workers, CLIs or tests.
@@ -7,16 +7,35 @@ the same logic can later be called from workers, CLIs or tests.
 import asyncio
 import re
 import secrets
+import uuid
 
-from sqlalchemy import exists, select
+from sqlalchemy import exists, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agentflow.db import set_tenant_context
 from agentflow.identity.models import Membership, Organization, Role, User, UserStatus
-from agentflow.identity.schemas import MembershipOut, SignupRequest
+from agentflow.identity.schemas import MemberOut, MembershipOut, SignupRequest
 from agentflow.identity.security import hash_password, verify_password
 
 
 class EmailAlreadyRegisteredError(Exception):
+    pass
+
+
+class MemberNotFoundError(Exception):
+    pass
+
+
+class AlreadyMemberError(Exception):
+    pass
+
+
+class RoleChangeForbiddenError(Exception):
+    pass
+
+
+class LastOwnerError(Exception):
     pass
 
 
@@ -25,11 +44,24 @@ def slugify(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:50] or "org"
 
 
-async def _unique_slug(session: AsyncSession, name: str) -> str:
-    base = slug = slugify(name)
-    while await session.scalar(select(exists().where(Organization.slug == slug))):
-        slug = f"{base}-{secrets.token_hex(3)}"
-    return slug
+async def _insert_org_with_unique_slug(session: AsyncSession, org: Organization) -> None:
+    """INSERT the org, adding a random suffix to its slug until it is unique.
+
+    We can't SELECT first to find a free slug: row-level security hides other tenants'
+    organizations, so every slug would look free. Instead try the INSERT inside a SAVEPOINT
+    and let the UNIQUE constraint (which RLS doesn't affect) answer. A failed attempt rolls
+    back only to the savepoint, not the whole signup transaction.
+    """
+    base = org.slug
+    while True:
+        try:
+            async with session.begin_nested():  # SAVEPOINT ... RELEASE / ROLLBACK TO
+                session.add(org)
+            return
+        except IntegrityError as e:
+            if "uq_organizations_slug" not in str(e.orig):
+                raise
+            org.slug = f"{base}-{secrets.token_hex(3)}"
 
 
 async def signup(session: AsyncSession, data: SignupRequest) -> tuple[User, Organization]:
@@ -39,13 +71,17 @@ async def signup(session: AsyncSession, data: SignupRequest) -> tuple[User, Orga
     # Argon2 takes ~50 ms of CPU on purpose. Run it in a worker thread: calling it directly
     # in async code would freeze the event loop, and every other request with it.
     password_hash = await asyncio.to_thread(hash_password, data.password)
-    user = User(email=data.email, full_name=data.full_name, password_hash=password_hash)
-    org = Organization(name=data.org_name, slug=await _unique_slug(session, data.org_name))
-    session.add_all([user, org])
-    await session.flush()  # INSERT now so the rows exist before the membership references them
+    user = User(
+        id=uuid.uuid4(), email=data.email, full_name=data.full_name, password_hash=password_hash
+    )
+    org = Organization(id=uuid.uuid4(), name=data.org_name, slug=slugify(data.org_name))
+    # Act inside the tenant being created, so the RLS policies' WITH CHECK accepts its rows.
+    await set_tenant_context(session, user_id=user.id, org_id=org.id)
+    session.add(user)
+    await _insert_org_with_unique_slug(session, org)
     session.add(Membership(org_id=org.id, user_id=user.id, role=Role.OWNER))
-    # ponytail: two simultaneous signups with one email pass the check above; the UNIQUE
-    # constraint still blocks the second (500, nothing saved). Map IntegrityError to 409 if seen.
+    # ponytail: two simultaneous signups with one email both pass the check above; the
+    # UNIQUE constraint still blocks the second (500, nothing saved). Map to 409 if ever seen.
     return user, org
 
 
@@ -77,3 +113,108 @@ async def memberships_of(session: AsyncSession, user: User) -> list[MembershipOu
         MembershipOut(role=role, org_id=org_id, org_name=name, org_slug=slug)
         for role, org_id, name, slug in rows
     ]
+
+
+# --- Membership management -------------------------------------------------------------
+# Every function filters by org_id explicitly. Row-level security would also hide other
+# orgs' rows, but it is the safety net, not the mechanism: queries must be correct without it.
+
+
+def check_can_manage(actor: Role, current: Role | None, new: Role | None) -> None:
+    """Admins and owners manage members; anything involving the OWNER role (granting it,
+    or changing or removing an owner) needs an owner."""
+    if not actor.at_least(Role.ADMIN):
+        raise RoleChangeForbiddenError
+    if Role.OWNER in (current, new) and actor != Role.OWNER:
+        raise RoleChangeForbiddenError
+
+
+async def _lock_org(session: AsyncSession, org_id: uuid.UUID) -> None:
+    """Serialize membership changes within one org until this transaction ends.
+
+    Without it, two owners demoting each other at the same moment would each see "another
+    owner exists" and both succeed, leaving the org with no owner.
+    """
+    await session.execute(
+        select(Organization.id).where(Organization.id == org_id).with_for_update()
+    )
+
+
+async def _ensure_another_owner(
+    session: AsyncSession, org_id: uuid.UUID, user_id: uuid.UUID
+) -> None:
+    owners = await session.scalar(
+        select(func.count())
+        .select_from(Membership)
+        .where(
+            Membership.org_id == org_id,
+            Membership.role == Role.OWNER,
+            Membership.user_id != user_id,
+        )
+    )
+    if not owners:
+        raise LastOwnerError
+
+
+async def _get_membership(
+    session: AsyncSession, org_id: uuid.UUID, user_id: uuid.UUID
+) -> Membership:
+    membership = await session.get(Membership, (org_id, user_id))
+    if membership is None:
+        raise MemberNotFoundError
+    return membership
+
+
+async def _member_out(session: AsyncSession, org_id: uuid.UUID, user_id: uuid.UUID) -> MemberOut:
+    return next(m for m in await list_members(session, org_id) if m.user_id == user_id)
+
+
+async def list_members(session: AsyncSession, org_id: uuid.UUID) -> list[MemberOut]:
+    rows = await session.execute(
+        select(User.id, User.email, User.full_name, Membership.role, Membership.created_at)
+        .join(Membership, Membership.user_id == User.id)
+        .where(Membership.org_id == org_id)
+        .order_by(Membership.created_at)
+    )
+    return [
+        MemberOut(user_id=uid, email=email, full_name=name, role=role, joined_at=joined)
+        for uid, email, name, role, joined in rows
+    ]
+
+
+async def add_member(
+    session: AsyncSession, org_id: uuid.UUID, actor: Role, email: str, role: Role
+) -> MemberOut:
+    check_can_manage(actor, None, role)
+    user_id = await session.scalar(select(User.id).where(User.email == email))
+    if user_id is None:
+        raise MemberNotFoundError
+    if await session.get(Membership, (org_id, user_id)):
+        raise AlreadyMemberError
+    session.add(Membership(org_id=org_id, user_id=user_id, role=role))
+    await session.flush()
+    return await _member_out(session, org_id, user_id)
+
+
+async def change_role(
+    session: AsyncSession, org_id: uuid.UUID, actor: Role, user_id: uuid.UUID, role: Role
+) -> MemberOut:
+    await _lock_org(session, org_id)
+    membership = await _get_membership(session, org_id, user_id)
+    check_can_manage(actor, membership.role, role)
+    if membership.role == Role.OWNER and role != Role.OWNER:
+        await _ensure_another_owner(session, org_id, user_id)
+    membership.role = role
+    await session.flush()
+    return await _member_out(session, org_id, user_id)
+
+
+async def remove_member(
+    session: AsyncSession, org_id: uuid.UUID, actor: Role, user_id: uuid.UUID
+) -> None:
+    await _lock_org(session, org_id)
+    membership = await _get_membership(session, org_id, user_id)
+    check_can_manage(actor, membership.role, None)
+    if membership.role == Role.OWNER:
+        await _ensure_another_owner(session, org_id, user_id)
+    await session.delete(membership)

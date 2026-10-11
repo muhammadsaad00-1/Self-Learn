@@ -6,7 +6,7 @@ UV := uv --directory backend
 -include .env
 export
 
-.PHONY: help install up down logs run migrate migration test lint fmt typecheck check hooks-update
+.PHONY: help install up down db-reset logs run migrate migration test lint fmt typecheck check hooks-update
 
 help: ## Show this help
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -20,6 +20,11 @@ up: ## Start local stack (postgres, redis, api) in Docker
 
 down: ## Stop local stack (keeps data volume)
 	docker compose down
+
+db-reset: ## Wipe the local database volume and recreate it (reruns infra/postgres init scripts)
+	docker compose down -v
+	docker compose up -d --wait postgres
+	$(MAKE) migrate
 
 logs: ## Tail stack logs
 	docker compose logs -f

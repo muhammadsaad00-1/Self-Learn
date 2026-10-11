@@ -1,7 +1,7 @@
 """Alembic migration environment.
 
 The database URL comes from `config.attributes["database_url"]` when set in code (tests), otherwise
-from AgentFlow settings, i.e. the same AGENTFLOW_DATABASE_URL the app uses.
+from AGENTFLOW_MIGRATION_DATABASE_URL: the schema owner, not the app's low-privilege role.
 """
 
 import asyncio
@@ -24,7 +24,7 @@ if not logging.getLogger().handlers:  # CLI run: show "Running upgrade ..." line
 
 def database_url() -> str:
     url: str | None = config.attributes.get("database_url")
-    return url or str(get_settings().database_url)
+    return url or str(get_settings().migration_database_url)
 
 
 def run_migrations_offline() -> None:

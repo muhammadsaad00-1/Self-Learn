@@ -21,6 +21,16 @@ from agentflow.main import create_app
 from agentflow.models import Base
 
 BACKEND_DIR = Path(__file__).parents[1]
+APP_ROLE_SQL = BACKEND_DIR.parent / "infra" / "postgres" / "app-role.sql"
+
+
+def _test_db(dsn: object) -> str:
+    """Same server and credentials, but the `<db>_test` database.
+
+    Takes the settings value, never a SQLAlchemy URL: str(URL) masks the password as ***.
+    """
+    parsed = make_url(str(dsn))
+    return parsed.set(database=f"{parsed.database}_test").render_as_string(hide_password=False)
 
 
 def alembic_config(database_url: str) -> Config:
@@ -31,18 +41,20 @@ def alembic_config(database_url: str) -> Config:
 
 @pytest.fixture(scope="session")
 def database_url() -> str:
-    """URL of a fresh test database: dropped, recreated and migrated once per test run.
+    """Owner (migration) URL of a fresh test database: dropped, recreated, migrated per run.
 
     Built by the real migrations (not `metadata.create_all`), so every run also proves the
-    migrations produce a working schema.
+    migrations produce a working schema. Connections with this URL bypass row-level security
+    (it owns the tables), which suits setup and invariant tests; see `app_database_url`.
     """
-    base = make_url(str(Settings().database_url))
-    test = base.set(database=f"{base.database}_test")
+    owner_dsn = str(Settings().migration_database_url)
+    owner, test = make_url(owner_dsn), make_url(_test_db(owner_dsn))
 
     async def recreate() -> None:
         # CREATE/DROP DATABASE can't run inside a transaction, hence AUTOCOMMIT.
-        engine = create_async_engine(base, isolation_level="AUTOCOMMIT")
+        engine = create_async_engine(owner, isolation_level="AUTOCOMMIT")
         async with engine.connect() as conn:
+            await conn.execute(text(APP_ROLE_SQL.read_text()))  # roles are server-wide
             await conn.execute(text(f'DROP DATABASE IF EXISTS "{test.database}" WITH (FORCE)'))
             await conn.execute(text(f'CREATE DATABASE "{test.database}"'))
         await engine.dispose()
@@ -51,6 +63,12 @@ def database_url() -> str:
     url = test.render_as_string(hide_password=False)
     command.upgrade(alembic_config(url), "head")
     return url
+
+
+@pytest.fixture(scope="session")
+def app_database_url(database_url: str) -> str:
+    """The test database as the app's low-privilege role: row-level security applies."""
+    return _test_db(Settings().database_url)
 
 
 @pytest.fixture
@@ -73,10 +91,21 @@ async def db_session(database_url: str) -> AsyncGenerator[AsyncSession]:
 
 
 @pytest.fixture
-def settings(database_url: str) -> Iterator[Settings]:
+async def app_session(app_database_url: str) -> AsyncGenerator[AsyncSession]:
+    """Like `db_session`, but connected as the app role, so row-level security applies."""
+    engine = create_async_engine(app_database_url, poolclass=NullPool)
+    async with engine.connect() as conn:
+        outer = await conn.begin()
+        yield AsyncSession(bind=conn, join_transaction_mode="create_savepoint")
+        await outer.rollback()
+    await engine.dispose()
+
+
+@pytest.fixture
+def settings(database_url: str, app_database_url: str) -> Iterator[Settings]:
     """Settings for tests that go through the real app, which really commits. Afterwards every
     table is emptied, so committed rows never leak into the next test."""
-    yield Settings(env="test", database_url=database_url)
+    yield Settings(env="test", database_url=app_database_url, migration_database_url=database_url)
 
     async def truncate() -> None:
         tables = ", ".join(t.name for t in Base.metadata.sorted_tables)
