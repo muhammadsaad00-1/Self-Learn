@@ -20,7 +20,11 @@ export const routes: Routes = [
     loadComponent: () => import('./layout/shell').then((m) => m.Shell),
     canActivate: [authGuard],
     children: [
-      { path: '', pathMatch: 'full', redirectTo: 'members' },
+      { path: '', pathMatch: 'full', redirectTo: 'workflows' },
+      {
+        path: 'workflows',
+        loadComponent: () => import('./pages/workflows-page').then((m) => m.WorkflowsPage),
+      },
       {
         path: 'members',
         loadComponent: () => import('./pages/members-page').then((m) => m.MembersPage),

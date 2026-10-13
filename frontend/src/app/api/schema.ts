@@ -126,6 +126,51 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/v1/workflows': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * List Workflows
+     * @description The 50 most recent workflows in the organization.
+     */
+    get: operations['list_workflows_v1_workflows_get'];
+    put?: never;
+    /**
+     * Create Workflow
+     * @description Queue a customer request for the agents. 202: accepted, processing happens in the
+     *     worker; poll GET /v1/workflows/{id}. A replay of the same key answers 200.
+     */
+    post: operations['create_workflow_v1_workflows_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v1/workflows/{workflow_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Workflow
+     * @description Status, triage result and every executed step with its model, tokens and latency.
+     */
+    get: operations['get_workflow_v1_workflows__workflow_id__get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/health': {
     parameters: {
       query?: never;
@@ -241,9 +286,65 @@ export interface components {
        */
       client_secret?: string | null;
     };
+    /**
+     * Category
+     * @enum {string}
+     */
+    Category:
+      | 'duplicate_charge'
+      | 'failed_payment'
+      | 'refund_request'
+      | 'unauthorized_transaction'
+      | 'card_or_account_blocked'
+      | 'kyc_document'
+      | 'account_access'
+      | 'general_inquiry'
+      | 'other';
     /** ChangeRoleRequest */
     ChangeRoleRequest: {
       role: components['schemas']['Role'];
+    };
+    /**
+     * CreateWorkflowRequest
+     * @description A customer request entering the system (from a support inbox, chat, or the dashboard).
+     */
+    CreateWorkflowRequest: {
+      /** Message */
+      message: string;
+      /**
+       * Channel
+       * @default web
+       * @enum {string}
+       */
+      channel: 'web' | 'email' | 'chat' | 'phone';
+      /** Customer Ref */
+      customer_ref?: string | null;
+    };
+    /**
+     * Details
+     * @description Facts copied from the message. Null when the customer didn't state them.
+     */
+    Details: {
+      /**
+       * Amount
+       * @description Amount in dispute, as written by the customer
+       */
+      amount: string | null;
+      /**
+       * Currency
+       * @description ISO 4217 code, e.g. PKR, USD
+       */
+      currency: string | null;
+      /**
+       * Transaction Reference
+       * @description Transaction/reference id if given
+       */
+      transaction_reference: string | null;
+      /**
+       * Transaction Date
+       * @description Date of the transaction if given
+       */
+      transaction_date: string | null;
     };
     /** HTTPValidationError */
     HTTPValidationError: {
@@ -324,6 +425,11 @@ export interface components {
        */
       org_id: string;
     };
+    /**
+     * StepStatus
+     * @enum {string}
+     */
+    StepStatus: 'completed' | 'failed';
     /** TokenResponse */
     TokenResponse: {
       /** Access Token */
@@ -336,6 +442,34 @@ export interface components {
       /** Expires In */
       expires_in: number;
     };
+    /** TriageResult */
+    TriageResult: {
+      category: components['schemas']['Category'];
+      urgency: components['schemas']['Urgency'];
+      /**
+       * Summary
+       * @description One neutral sentence for an operations agent
+       */
+      summary: string;
+      details: components['schemas']['Details'];
+      /**
+       * Confidence
+       * @description How sure you are of the category
+       */
+      confidence: number;
+      /** Needs Human Review */
+      needs_human_review: boolean;
+      /**
+       * Reasoning
+       * @description Short justification an auditor can read
+       */
+      reasoning: string;
+    };
+    /**
+     * Urgency
+     * @enum {string}
+     */
+    Urgency: 'low' | 'normal' | 'high' | 'critical';
     /** UserOut */
     UserOut: {
       /**
@@ -360,6 +494,102 @@ export interface components {
       input?: unknown;
       /** Context */
       ctx?: Record<string, never>;
+    };
+    /** WorkflowOut */
+    WorkflowOut: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      status: components['schemas']['WorkflowStatus'];
+      /** Input */
+      input: {
+        [key: string]: unknown;
+      };
+      result: components['schemas']['WorkflowResult'] | null;
+      /** Error */
+      error: string | null;
+      /** Attempts */
+      attempts: number;
+      /** Request Id */
+      request_id: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /** Started At */
+      started_at: string | null;
+      /** Ended At */
+      ended_at: string | null;
+      /**
+       * Steps
+       * @default []
+       */
+      steps: components['schemas']['WorkflowStepOut'][];
+    };
+    /**
+     * WorkflowResult
+     * @description What the agents concluded. Grows a field per phase (resolution, actions, ...).
+     */
+    WorkflowResult: {
+      triage?: components['schemas']['TriageResult'] | null;
+    };
+    /**
+     * WorkflowStatus
+     * @enum {string}
+     */
+    WorkflowStatus: 'queued' | 'running' | 'completed' | 'failed';
+    /** WorkflowStepOut */
+    WorkflowStepOut: {
+      /** Node */
+      node: string;
+      /** Attempt */
+      attempt: number;
+      status: components['schemas']['StepStatus'];
+      /** Output */
+      output: {
+        [key: string]: unknown;
+      } | null;
+      /** Error */
+      error: string | null;
+      /** Model */
+      model: string | null;
+      /** Input Tokens */
+      input_tokens: number | null;
+      /** Output Tokens */
+      output_tokens: number | null;
+      /** Latency Ms */
+      latency_ms: number | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+    };
+    /**
+     * WorkflowSummary
+     * @description One row in the workflow list: the triage headline without the step details.
+     */
+    WorkflowSummary: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      status: components['schemas']['WorkflowStatus'];
+      /** Message Preview */
+      message_preview: string;
+      category: components['schemas']['Category'] | null;
+      urgency: components['schemas']['Urgency'] | null;
+      /** Needs Human Review */
+      needs_human_review: boolean | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
     };
   };
   responses: never;
@@ -617,6 +847,110 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['AuditPage'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  list_workflows_v1_workflows_get: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description Organization this request acts in */
+        'x-org-id': string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WorkflowSummary'][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  create_workflow_v1_workflows_post: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description Unique per logical request (e.g. a UUID). Retrying with the same key and body returns the original workflow instead of creating another. */
+        'Idempotency-Key': string;
+        /** @description Organization this request acts in */
+        'x-org-id': string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateWorkflowRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WorkflowOut'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_workflow_v1_workflows__workflow_id__get: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description Organization this request acts in */
+        'x-org-id': string;
+      };
+      path: {
+        workflow_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WorkflowOut'];
         };
       };
       /** @description Validation Error */

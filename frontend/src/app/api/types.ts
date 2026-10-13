@@ -15,6 +15,10 @@ export type Member = Schemas['MemberOut'];
 export type AddMemberRequest = Schemas['AddMemberRequest'];
 export type AuditEvent = Schemas['AuditEventOut'];
 export type AuditPage = Schemas['AuditPage'];
+export type Workflow = Schemas['WorkflowOut'];
+export type WorkflowSummary = Schemas['WorkflowSummary'];
+export type WorkflowStatus = Schemas['WorkflowStatus'];
+export type TriageResult = Schemas['TriageResult'];
 
 /** Error body FastAPI returns for HTTPException: {"detail": "..."} */
 export interface ApiError {

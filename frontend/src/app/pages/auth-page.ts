@@ -85,7 +85,7 @@ export class AuthPage {
       } else {
         await this.auth.login(email, password);
       }
-      await this.router.navigateByUrl('/members');
+      await this.router.navigateByUrl('/workflows');
     } catch (err) {
       this.error.set(errorMessage(err));
     } finally {

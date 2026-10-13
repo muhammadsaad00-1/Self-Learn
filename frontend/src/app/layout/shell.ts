@@ -25,6 +25,7 @@ import { Auth } from '../core/auth';
       </label>
 
       <nav>
+        <a routerLink="/workflows" routerLinkActive="active">Workflows</a>
         <a routerLink="/members" routerLinkActive="active">Members</a>
         @if (auth.isAdmin()) {
           <a routerLink="/audit" routerLinkActive="active">Audit log</a>
