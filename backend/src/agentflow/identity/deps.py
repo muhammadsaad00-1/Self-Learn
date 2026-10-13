@@ -19,6 +19,7 @@ from agentflow.config import Settings
 from agentflow.db import SessionDep, set_tenant_context
 from agentflow.identity.models import Membership, Organization, OrgStatus, Role, User, UserStatus
 from agentflow.identity.security import decode_access_token
+from agentflow.observability import org_id_var
 
 # Reads "Authorization: Bearer <token>" and tells Swagger where to log in.
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/v1/auth/login")
@@ -85,6 +86,7 @@ async def get_org_context(
     if row is None or row.status != OrgStatus.ACTIVE:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Not a member of this organization")
     await set_tenant_context(session, org_id=x_org_id)
+    org_id_var.set(str(x_org_id))  # every later log line of this request carries the org
     return OrgContext(org_id=x_org_id, user=user, role=row.role)
 
 

@@ -7,7 +7,7 @@ on AWS they come from the ECS task definition and Secrets Manager.
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import PostgresDsn, RedisDsn, SecretStr, model_validator
+from pydantic import AliasChoices, Field, PostgresDsn, RedisDsn, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Only valid for local/test; Settings refuses to start elsewhere while it's still in use.
@@ -37,6 +37,23 @@ class Settings(BaseSettings):
     access_token_ttl_minutes: int = 30
     login_max_attempts: int = 10  # per email, per window
     login_window_seconds: int = 15 * 60
+
+    # --- LLM (ADR 0002: Groq first, behind our own router) ---
+    # Read from GROQ_API_KEY (the provider's conventional name) as well as the prefixed form.
+    groq_api_key: SecretStr | None = Field(
+        default=None, validation_alias=AliasChoices("AGENTFLOW_GROQ_API_KEY", "GROQ_API_KEY")
+    )
+    # Models tried in order for classification: the next one is used when the previous is
+    # rate-limited or down. Both enforce our JSON schema strictly on Groq (others only try to)
+    # and have separate rate-limit budgets. They share one provider, so surviving a Groq
+    # outage needs a second provider (Bedrock, Phase 7).
+    llm_classification_models: list[str] = ["openai/gpt-oss-20b", "openai/gpt-oss-120b"]
+    llm_timeout_seconds: float = 30
+
+    # --- Workflow worker ---
+    workflow_max_attempts: int = 3  # then the workflow is failed (dead-lettered)
+    workflow_lease_seconds: int = 120  # a crashed worker's job is reclaimed after this
+    workflow_timeout_seconds: float = 90  # wall-clock budget for one graph run
 
     @model_validator(mode="after")
     def _no_dev_secrets_outside_local(self) -> "Settings":

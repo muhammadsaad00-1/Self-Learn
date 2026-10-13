@@ -22,7 +22,7 @@ Python + FastAPI · LangGraph + LangChain · PostgreSQL + pgvector · Redis · S
 
 ## Architecture stance
 - **Modular monolith first.** One FastAPI app plus one worker process. Domain modules have clear boundaries; split into services only with a measured reason (spec rule).
-- Domain modules (spec 02 §3): identity ✅, audit ✅, workflow, knowledge, agent, tooling, policy, approval, automation, audit, evaluation, usage.
+- Domain modules (spec 02 §3): identity ✅, audit ✅, workflow ✅ (+ `agents/`, `llm.py`), knowledge, agent, tooling, policy, approval, automation, audit, evaluation, usage.
 - Modules talk to each other only through their public service functions, never by reaching into another module's tables or models.
 - Add AWS managed services (Step Functions, EventBridge, AgentCore) only when they solve a concrete problem. Locally, everything runs in Docker Compose.
 
@@ -37,8 +37,14 @@ Python + FastAPI · LangGraph + LangChain · PostgreSQL + pgvector · Redis · S
 - Run tool authorization again at execution time, even after an approval.
 
 ## Commands
-`make help` lists all of them. Key ones: `make install` (deps + git hooks) · `make up`/`down` (Docker stack) · `make run` (API with reload) · `make test` · `make check` (everything CI runs) · `make migrate` · `make migration m="..."` (autogenerate, then review: ADR 0006) · `make web` (dashboard on :4200) · `make api-types` (after any API change) · `make db-reset`.
+`make help` lists all of them. Key ones: `make install` (deps + git hooks) · `make up`/`down` (Docker stack) · `make run` (API with reload) · `make test` · `make check` (everything CI runs) · `make migrate` · `make migration m="..."` (autogenerate, then review: ADR 0006) · `make worker` (runs workflows; also a compose service) · `make eval` (triage vs real Groq; spends tokens) · `make web` (dashboard on :4200) · `make api-types` (after any API change) · `make db-reset`.
 uv lives at `~/.local/bin/uv` (official installer; the Intel Homebrew at /usr/local builds from source and is too slow).
+
+## Agents and LLM rules
+- Agents never import a provider SDK: call `StructuredLLM.generate(TaskType, Schema, system=..., user=...)`. Customer/document text goes only in `user`, wrapped in `<<< >>>` delimiters.
+- Every agent output passes deterministic rules in code before use (e.g. `triage.apply_rules`).
+- Tests use `tests/fakes.FakeLLM`; never call Groq in `pytest`. Real-model checks live in `backend/evals/` (`make eval`); add a case for every model bug found.
+- Workers: never hold a DB transaction across a model call; call `set_tenant_context` before tenant data.
 
 ## Conventions
 - Conventional commits. One feature per branch/PR.
@@ -72,7 +78,7 @@ Roadmap phases are in spec 05. Mark items `[x]` as they land.
   - [x] 1c Tenancy: X-Org-Id org context, roles, members API, Postgres RLS via `agentflow_app` role, cross-tenant tests (`feat/phase-1c-tenancy`, ADR 0008)
   - [x] 1d Audit: append-only audit_events (grants + RLS + trigger), same-transaction `audit.service.record()`, GET /v1/audit/events (ADR 0009)
   - [x] 1e Angular dashboard: login/signup, org switcher, members, audit log; typed API client from OpenAPI (`make api-types`), CI contract check
-- [ ] Phase 2 — First agent: model adapter, structured output, triage agent, LangGraph workflow, trace IDs, node tests
+- [x] Phase 2 — First agent (`feat/phase-2-first-agent`, ADR 0010): JSON logs + request/org/workflow ids (`observability.py`), LLM router with fallback + schema output (`llm.py`), triage agent + rules (`agents/triage.py`), idempotent `POST /v1/workflows`, Postgres-queue worker (`worker.py`, `claim_next_workflow()`), LangGraph intake→triage, evals (`make eval`), dashboard Workflows page
 - [ ] Phase 3 — Knowledge: upload, async ingestion, chunking, embeddings, pgvector, hybrid retrieval, citations, RAG eval set
 - [ ] Phase 4 — Multi-agent: supervisor, research, knowledge, resolution, verifier, budgets
 - [ ] Phase 5 — Tools: registry, permission model, CRM/ticket/email/calendar/db tools, MCP, SQS/EventBridge automation

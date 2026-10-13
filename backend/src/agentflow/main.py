@@ -19,10 +19,13 @@ from agentflow.audit import api as audit_api
 from agentflow.config import Settings, get_settings
 from agentflow.db import create_engine
 from agentflow.identity import api as identity_api
+from agentflow.observability import configure_logging, request_context_middleware
+from agentflow.workflow import api as workflow_api
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
+    configure_logging(settings.log_level)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
@@ -44,9 +47,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         redoc_url=None,
     )
     app.state.settings = settings
+    app.middleware("http")(request_context_middleware)
     app.include_router(identity_api.router)
     app.include_router(identity_api.members_router)
     app.include_router(audit_api.router)
+    app.include_router(workflow_api.router)
 
     @app.get("/health", tags=["ops"])
     async def health() -> dict[str, str]:

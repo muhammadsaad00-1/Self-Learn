@@ -5,7 +5,7 @@ CI) in a separate `<db>_test` database, so your local dev data is never touched.
 """
 
 import asyncio
-from collections.abc import AsyncGenerator, Callable, Iterator
+from collections.abc import AsyncGenerator, Awaitable, Callable, Iterator
 from pathlib import Path
 
 import pytest
@@ -140,5 +140,18 @@ def run_sql(database_url: str) -> Callable[[str, dict[str, object]], None]:
             await engine.dispose()
 
         asyncio.run(go())
+
+    return run
+
+
+@pytest.fixture
+def exec_sql(database_url: str) -> Callable[[str, dict[str, object]], Awaitable[None]]:
+    """Async twin of `run_sql`, for async tests (asyncio.run can't nest in a running loop)."""
+
+    async def run(sql: str, params: dict[str, object]) -> None:
+        engine = create_async_engine(database_url, poolclass=NullPool)
+        async with engine.begin() as conn:
+            await conn.execute(text(sql), params)
+        await engine.dispose()
 
     return run

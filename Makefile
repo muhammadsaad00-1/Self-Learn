@@ -6,7 +6,7 @@ UV := uv --directory backend
 -include .env
 export
 
-.PHONY: help install up down db-reset logs run web api-types migrate migration test lint fmt typecheck check hooks-update
+.PHONY: help install up down db-reset logs run worker eval web api-types migrate migration test lint fmt typecheck check hooks-update
 
 help: ## Show this help
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -16,8 +16,9 @@ install: ## Install deps + git hooks
 	cd frontend && npm ci
 	$(UV) run pre-commit install --hook-type pre-commit --hook-type commit-msg
 
-up: ## Start local stack (postgres, redis, api) in Docker
-	docker compose up -d --build --wait
+up: ## Start local stack (postgres, redis, api, worker) in Docker
+	docker compose up -d --build --wait postgres redis api
+	docker compose up -d --build worker
 
 down: ## Stop local stack (keeps data volume)
 	docker compose down
@@ -32,6 +33,12 @@ logs: ## Tail stack logs
 
 run: ## Run API locally with auto-reload (needs `make up` for postgres/redis)
 	$(UV) run uvicorn agentflow.main:create_app --factory --reload --port 8000
+
+worker: ## Run the workflow worker locally (needs `make up` and GROQ_API_KEY in .env)
+	$(UV) run python -m agentflow.worker
+
+eval: ## Evaluate the triage agent against the real model (uses Groq tokens)
+	$(UV) run python evals/run_triage.py
 
 web: ## Run the Angular dashboard on http://localhost:4200 (needs `make run` or `make up` for the API)
 	cd frontend && npm start

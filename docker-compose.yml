@@ -39,5 +39,20 @@ services:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
 
+  # Same image as the API, different command: runs queued workflows (agents) in the background.
+  worker:
+    build: ./backend
+    command: ["python", "-m", "agentflow.worker"]
+    environment:
+      AGENTFLOW_ENV: local
+      AGENTFLOW_DATABASE_URL: postgresql+asyncpg://agentflow_app:agentflow_app@postgres:5432/agentflow
+      AGENTFLOW_REDIS_URL: redis://redis:6379/0
+      # Read from your .env by docker compose; never baked into the image.
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+    healthcheck:
+      disable: true  # no HTTP server in the worker; the image's /health check doesn't apply
+    depends_on:
+      postgres: { condition: service_healthy }
+
 volumes:
   pgdata:
