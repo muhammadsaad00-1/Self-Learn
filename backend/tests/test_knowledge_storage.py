@@ -8,7 +8,7 @@ import math
 import uuid
 
 import pytest
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,7 +25,9 @@ def axis(*weights: float) -> list[float]:
 
 
 async def new_org_with_document(
-    session: AsyncSession, chunks: list[tuple[str, list[float]]]
+    session: AsyncSession,
+    chunks: list[tuple[str, list[float]]],
+    sections: list[str | None] | None = None,
 ) -> uuid.UUID:
     org_id = uuid.uuid4()
     await set_tenant_context(session, org_id=org_id)
@@ -47,6 +49,7 @@ async def new_org_with_document(
                 org_id=org_id,
                 document_id=doc.id,
                 ordinal=i,
+                section=sections[i] if sections else None,
                 content=content,
                 embedding=embedding,
                 embedding_model="test",
@@ -88,6 +91,29 @@ async def test_keyword_search_matches_word_forms(app_session: AsyncSession) -> N
         )
     )
     assert hits.all() == ["Duplicate debits are refunded in full."]
+
+
+async def test_heading_words_are_searchable_and_outrank_body_words(
+    app_session: AsyncSession,
+) -> None:
+    """Regression for the retrieval demo: "charged twice" missed the chunk headed "Duplicate
+    charges" because only the body was indexed, and its body never says "charge"."""
+    await new_org_with_document(
+        app_session,
+        [
+            ("If a payment is debited more than once, it is reversed.", axis(1)),
+            ("Cash withdrawal charges at partner ATMs are PKR 25.", axis(0, 1)),
+            ("Report a lost card in the app.", axis(0, 0, 1)),
+        ],
+        sections=["Duplicate charges", "Fees", "Lost cards"],
+    )
+    query = text("plainto_tsquery('english', 'charges')")
+    rank = func.ts_rank(Chunk.search, query)
+    hits = await app_session.execute(
+        select(Chunk.section, rank).where(Chunk.search.op("@@")(query)).order_by(rank.desc())
+    )
+    # Both match "charges", but the heading match (weight A) ranks above the body match (B).
+    assert [row.section for row in hits] == ["Duplicate charges", "Fees"]
 
 
 async def test_chunks_of_another_org_are_invisible(app_session: AsyncSession) -> None:

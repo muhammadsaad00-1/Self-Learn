@@ -32,6 +32,12 @@ from agentflow.db import Base, TimestampMixin, enum_check, str_enum
 # column size and re-embedding every chunk, so the model name is stored on each row too.
 EMBEDDING_DIMENSIONS = 384
 
+# Keyword-search document for a chunk: heading words weighted A, body words weighted B.
+SEARCH_EXPRESSION = (
+    "setweight(to_tsvector('english', coalesce(section, '')), 'A') || "
+    "setweight(to_tsvector('english', content), 'B')"
+)
+
 
 class DocumentStatus(StrEnum):
     PENDING = "pending"  # uploaded, waiting for the ingestion job
@@ -93,8 +99,8 @@ class Chunk(Base):
     content: Mapped[str] = mapped_column(Text)
     embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIMENSIONS))
     embedding_model: Mapped[str] = mapped_column(String(100))
-    # Computed by Postgres from `content` on every insert/update, never written by us.
-    search: Mapped[str] = mapped_column(
-        TSVECTOR, Computed("to_tsvector('english', content)", persisted=True)
-    )
+    # Computed by Postgres on every insert/update, never written by us. The section heading is
+    # indexed too, with weight A (body text: B), so ts_rank scores a match in the heading
+    # higher: "Duplicate charges" is a stronger signal than "charges" in passing.
+    search: Mapped[str] = mapped_column(TSVECTOR, Computed(SEARCH_EXPRESSION, persisted=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
