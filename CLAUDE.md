@@ -46,6 +46,9 @@ uv lives at `~/.local/bin/uv` (official installer; the Intel Homebrew at /usr/lo
 - Tests use `tests/fakes.FakeLLM`; never call Groq in `pytest`. Real-model checks live in `backend/evals/` (`make eval`); add a case for every model bug found.
 - Workers: never hold a DB transaction across a model call; call `set_tenant_context` before tenant data.
 
+## Working mode (since Phase 3)
+The user pastes the project code to learn it; Claude creates the empty files first. Claude explains each concept, hands over code in small verified steps (file path + code + how to check), then reviews the user's file and runs tests. Claude doesn't edit source files directly unless asked.
+
 ## Conventions
 - Conventional commits. One feature per branch/PR.
 - **Review flow:** one branch + one GitHub PR per phase (sub-features as separate commits); the user reviews on GitHub, never merge to main yourself. After a phase, summarize in chat: what was built, how to test it, what's next. Small one-off changes: show the +/- diff in chat and wait for OK before pushing.
@@ -79,7 +82,8 @@ Roadmap phases are in spec 05. Mark items `[x]` as they land.
   - [x] 1d Audit: append-only audit_events (grants + RLS + trigger), same-transaction `audit.service.record()`, GET /v1/audit/events (ADR 0009)
   - [x] 1e Angular dashboard: login/signup, org switcher, members, audit log; typed API client from OpenAPI (`make api-types`), CI contract check
 - [x] Phase 2 — First agent (`feat/phase-2-first-agent`, ADR 0010): JSON logs + request/org/workflow ids (`observability.py`), LLM router with fallback + schema output (`llm.py`), triage agent + rules (`agents/triage.py`), idempotent `POST /v1/workflows`, Postgres-queue worker (`worker.py`, `claim_next_workflow()`), LangGraph intake→triage, evals (`make eval`), dashboard Workflows page
-- [ ] Phase 3 — Knowledge: upload, async ingestion, chunking, embeddings, pgvector, hybrid retrieval, citations, RAG eval set
+- [ ] Feature (parked 2026-10-18): **Add company** — one login, many orgs; `POST /v1/orgs` (password re-confirm, shares login rate limit), shared `_create_org_with_owner`, Chrome-style profile menu, profile page. Fully built + tested in scratch; Part 1 (backend) handed over, not yet pasted. UI request: compact Account section with "Add company" directly below it.
+- [ ] Phase 3 — Knowledge (in progress, user-pasted steps): upload, async ingestion, chunking, embeddings, pgvector, hybrid retrieval, citations, RAG eval set
 - [ ] Phase 4 — Multi-agent: supervisor, research, knowledge, resolution, verifier, budgets
 - [ ] Phase 5 — Tools: registry, permission model, CRM/ticket/email/calendar/db tools, MCP, SQS/EventBridge automation
 - [ ] Phase 6 — Approval: policy engine, approval entity + UI, pause/resume, expiry, double authorization
