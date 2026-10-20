@@ -111,4 +111,26 @@ describe('Auth + apiInterceptor', () => {
     });
     expect(TestBed.inject(Auth).isLoggedIn()).toBe(false);
   });
+
+  it('adds a company, then switches to it', async () => {
+    await logIn();
+    const done = auth.addCompany('EasyPay Lending', 'pw');
+    const req = backend.expectOne('/v1/orgs');
+    expect(req.request.body).toEqual({ org_name: 'EasyPay Lending', password: 'pw' });
+    expect(req.request.headers.get('Authorization')).toBe('Bearer tok');
+    const created = {
+      org_id: 'org-c',
+      org_name: 'EasyPay Lending',
+      org_slug: 'easypay-lending',
+      role: 'owner',
+    } as const;
+    req.flush(created);
+    await Promise.resolve();
+    backend.expectOne('/v1/me').flush({ ...ME, memberships: [...ME.memberships, created] });
+    await done;
+
+    expect(auth.orgId()).toBe('org-c');
+    expect(auth.membership()?.org_name).toBe('EasyPay Lending');
+    expect(auth.role()).toBe('owner');
+  });
 });

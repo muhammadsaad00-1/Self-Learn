@@ -4,1426 +4,1484 @@
  */
 
 export interface paths {
-  '/v1/auth/signup': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/v1/auth/signup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Signup
+         * @description Create an account and its first organization; returns a token so the user is logged in.
+         */
+        post: operations["signup_v1_auth_signup_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /**
-     * Signup
-     * @description Create an account and its first organization; returns a token so the user is logged in.
-     */
-    post: operations['signup_v1_auth_signup_post'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/v1/auth/login': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/v1/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Login
+         * @description OAuth2 password flow: form fields `username` (the email) and `password`.
+         */
+        post: operations["login_v1_auth_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /**
-     * Login
-     * @description OAuth2 password flow: form fields `username` (the email) and `password`.
-     */
-    post: operations['login_v1_auth_login_post'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/v1/me': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/v1/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Me
+         * @description The logged-in user and the organizations they belong to (for the org switcher).
+         */
+        get: operations["me_v1_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * Me
-     * @description The logged-in user and the organizations they belong to (for the org switcher).
-     */
-    get: operations['me_v1_me_get'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/v1/members': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/v1/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Members
+         * @description Everyone in the organization, with their role. Any member can see this.
+         */
+        get: operations["list_members_v1_members_get"];
+        put?: never;
+        /** Add Member */
+        post: operations["add_member_v1_members_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * List Members
-     * @description Everyone in the organization, with their role. Any member can see this.
-     */
-    get: operations['list_members_v1_members_get'];
-    put?: never;
-    /** Add Member */
-    post: operations['add_member_v1_members_post'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/v1/members/{user_id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/v1/members/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Member
+         * @description Access ends on the member's next request (membership is checked every time).
+         */
+        delete: operations["remove_member_v1_members__user_id__delete"];
+        options?: never;
+        head?: never;
+        /** Change Member Role */
+        patch: operations["change_member_role_v1_members__user_id__patch"];
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    post?: never;
-    /**
-     * Remove Member
-     * @description Access ends on the member's next request (membership is checked every time).
-     */
-    delete: operations['remove_member_v1_members__user_id__delete'];
-    options?: never;
-    head?: never;
-    /** Change Member Role */
-    patch: operations['change_member_role_v1_members__user_id__patch'];
-    trace?: never;
-  };
-  '/v1/audit/events': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/v1/orgs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Company
+         * @description Create another company owned by the logged-in user, after re-checking their password.
+         *
+         *     The client switches to it by sending the returned org_id as X-Org-Id. Nothing is copied
+         *     from the user's other companies.
+         */
+        post: operations["add_company_v1_orgs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * List Audit Events
-     * @description The organization's audit trail, newest first. Admins and owners only.
-     */
-    get: operations['list_audit_events_v1_audit_events_get'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/v1/workflows': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/v1/audit/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Audit Events
+         * @description The organization's audit trail, newest first. Admins and owners only.
+         */
+        get: operations["list_audit_events_v1_audit_events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * List Workflows
-     * @description The 50 most recent workflows in the organization.
-     */
-    get: operations['list_workflows_v1_workflows_get'];
-    put?: never;
-    /**
-     * Create Workflow
-     * @description Queue a customer request for the agents. 202: accepted, processing happens in the
-     *     worker; poll GET /v1/workflows/{id}. A replay of the same key answers 200.
-     */
-    post: operations['create_workflow_v1_workflows_post'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/v1/workflows/{workflow_id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/v1/workflows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Workflows
+         * @description The 50 most recent workflows in the organization.
+         */
+        get: operations["list_workflows_v1_workflows_get"];
+        put?: never;
+        /**
+         * Create Workflow
+         * @description Queue a customer request for the agents. 202: accepted, processing happens in the
+         *     worker; poll GET /v1/workflows/{id}. A replay of the same key answers 200.
+         */
+        post: operations["create_workflow_v1_workflows_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * Get Workflow
-     * @description Status, triage result and every executed step with its model, tokens and latency.
-     */
-    get: operations['get_workflow_v1_workflows__workflow_id__get'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/v1/knowledge/documents': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/v1/workflows/{workflow_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Workflow
+         * @description Status, triage result and every executed step with its model, tokens and latency.
+         */
+        get: operations["get_workflow_v1_workflows__workflow_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /** List Documents */
-    get: operations['list_documents_v1_knowledge_documents_get'];
-    put?: never;
-    /**
-     * Upload Document
-     * @description Upload a policy document (admins and owners). 202: stored and queued for ingestion;
-     *     poll the list until it is `ready`. Uploading the same bytes again answers 200 with the
-     *     existing document.
-     */
-    post: operations['upload_document_v1_knowledge_documents_post'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/v1/knowledge/documents/{document_id}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/v1/knowledge/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Documents */
+        get: operations["list_documents_v1_knowledge_documents_get"];
+        put?: never;
+        /**
+         * Upload Document
+         * @description Upload a policy document (admins and owners). 202: stored and queued for ingestion;
+         *     poll the list until it is `ready`. Uploading the same bytes again answers 200 with the
+         *     existing document.
+         */
+        post: operations["upload_document_v1_knowledge_documents_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /** Get Document */
-    get: operations['get_document_v1_knowledge_documents__document_id__get'];
-    put?: never;
-    post?: never;
-    /** Delete Document */
-    delete: operations['delete_document_v1_knowledge_documents__document_id__delete'];
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/v1/knowledge/search': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/v1/knowledge/documents/{document_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Document */
+        get: operations["get_document_v1_knowledge_documents__document_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Document */
+        delete: operations["delete_document_v1_knowledge_documents__document_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /**
-     * Search
-     * @description Raw retrieval (no LLM): the reranked top chunks with every stage's rank and score.
-     *     For debugging retrieval quality and for the dashboard's search box.
-     */
-    post: operations['search_v1_knowledge_search_post'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/v1/knowledge/ask': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/v1/knowledge/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Search
+         * @description Raw retrieval (no LLM): the reranked top chunks with every stage's rank and score.
+         *     For debugging retrieval quality and for the dashboard's search box.
+         */
+        post: operations["search_v1_knowledge_search_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /**
-     * Ask
-     * @description Ask the knowledge agents a question: query planner -> hybrid retrieval + rerank ->
-     *     answer agent -> verifier. Answers only from this organization's documents, with
-     *     citations; abstains when they don't cover the question.
-     */
-    post: operations['ask_v1_knowledge_ask_post'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/health': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/v1/knowledge/ask": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask
+         * @description Ask the knowledge agents a question: query planner -> hybrid retrieval + rerank ->
+         *     answer agent -> verifier. Answers only from this organization's documents, with
+         *     citations; abstains when they don't cover the question.
+         */
+        post: operations["ask_v1_knowledge_ask_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * Health
-     * @description Liveness: the process is up. Never checks dependencies, so a DB outage
-     *     doesn't make the orchestrator kill healthy containers in a restart loop.
-     */
-    get: operations['health_health_get'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/ready': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Health
+         * @description Liveness: the process is up. Never checks dependencies, so a DB outage
+         *     doesn't make the orchestrator kill healthy containers in a restart loop.
+         */
+        get: operations["health_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * Ready
-     * @description Readiness: can this instance serve traffic? The load balancer stops routing to it
-     *     (503) while Postgres or Redis is unreachable.
-     */
-    get: operations['ready_ready_get'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
+    "/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ready
+         * @description Readiness: can this instance serve traffic? The load balancer stops routing to it
+         *     (503) while Postgres or Redis is unreachable.
+         */
+        get: operations["ready_ready_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
-  schemas: {
-    /**
-     * AddMemberRequest
-     * @description Add an existing account to the org. Email invitations for people without an account
-     *     arrive with the email tool (Phase 5).
-     */
-    AddMemberRequest: {
-      /**
-       * Email
-       * Format: email
-       */
-      email: string;
-      /** @default member */
-      role: components['schemas']['Role'];
+    schemas: {
+        /**
+         * AddCompanyRequest
+         * @description Create another company for the logged-in user. Name, email and password stay the same;
+         *     the password is asked again to confirm it's really them.
+         */
+        AddCompanyRequest: {
+            /** Org Name */
+            org_name: string;
+            /** Password */
+            password: string;
+        };
+        /**
+         * AddMemberRequest
+         * @description Add an existing account to the org. Email invitations for people without an account
+         *     arrive with the email tool (Phase 5).
+         */
+        AddMemberRequest: {
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+            /** @default member */
+            role: components["schemas"]["Role"];
+        };
+        /** AskRequest */
+        AskRequest: {
+            /** Question */
+            question: string;
+        };
+        /** AuditEventOut */
+        AuditEventOut: {
+            /** Id */
+            id: number;
+            /** Actor User Id */
+            actor_user_id: string | null;
+            /** Actor Email */
+            actor_email: string | null;
+            /** Action */
+            action: string;
+            /** Target Type */
+            target_type: string;
+            /** Target Id */
+            target_id: string;
+            /** Details */
+            details: {
+                [key: string]: unknown;
+            };
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+        };
+        /** AuditPage */
+        AuditPage: {
+            /** Events */
+            events: components["schemas"]["AuditEventOut"][];
+            /** Next Before Id */
+            next_before_id: number | null;
+        };
+        /** Body_login_v1_auth_login_post */
+        Body_login_v1_auth_login_post: {
+            /** Grant Type */
+            grant_type?: string | null;
+            /** Username */
+            username: string;
+            /**
+             * Password
+             * Format: password
+             */
+            password: string;
+            /**
+             * Scope
+             * @default
+             */
+            scope: string;
+            /** Client Id */
+            client_id?: string | null;
+            /**
+             * Client Secret
+             * Format: password
+             */
+            client_secret?: string | null;
+        };
+        /** Body_upload_document_v1_knowledge_documents_post */
+        Body_upload_document_v1_knowledge_documents_post: {
+            /**
+             * File
+             * @description .md, .txt or .pdf, up to 10 MB
+             */
+            file: string;
+            /** Title */
+            title?: string | null;
+        };
+        /**
+         * Category
+         * @enum {string}
+         */
+        Category: "duplicate_charge" | "failed_payment" | "refund_request" | "unauthorized_transaction" | "card_or_account_blocked" | "kyc_document" | "account_access" | "general_inquiry" | "other";
+        /** ChangeRoleRequest */
+        ChangeRoleRequest: {
+            role: components["schemas"]["Role"];
+        };
+        /** Citation */
+        Citation: {
+            /** Number */
+            number: number;
+            /**
+             * Chunk Id
+             * Format: uuid
+             */
+            chunk_id: string;
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Document Title */
+            document_title: string;
+            /** Section */
+            section: string | null;
+            /** Excerpt */
+            excerpt: string;
+        };
+        /**
+         * CreateWorkflowRequest
+         * @description A customer request entering the system (from a support inbox, chat, or the dashboard).
+         */
+        CreateWorkflowRequest: {
+            /** Message */
+            message: string;
+            /**
+             * Channel
+             * @default web
+             * @enum {string}
+             */
+            channel: "web" | "email" | "chat" | "phone";
+            /** Customer Ref */
+            customer_ref?: string | null;
+        };
+        /**
+         * Details
+         * @description Facts copied from the message. Null when the customer didn't state them.
+         */
+        Details: {
+            /**
+             * Amount
+             * @description Amount in dispute, as written by the customer
+             */
+            amount: string | null;
+            /**
+             * Currency
+             * @description ISO 4217 code, e.g. PKR, USD
+             */
+            currency: string | null;
+            /**
+             * Transaction Reference
+             * @description Transaction/reference id if given
+             */
+            transaction_reference: string | null;
+            /**
+             * Transaction Date
+             * @description Date of the transaction if given
+             */
+            transaction_date: string | null;
+        };
+        /** DocumentOut */
+        DocumentOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /** Filename */
+            filename: string;
+            /** Content Type */
+            content_type: string;
+            /** Size Bytes */
+            size_bytes: number;
+            status: components["schemas"]["DocumentStatus"];
+            /** Error */
+            error: string | null;
+            /** Chunk Count */
+            chunk_count: number;
+            /** Quarantined Chunks */
+            quarantined_chunks: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * DocumentStatus
+         * @enum {string}
+         */
+        DocumentStatus: "pending" | "processing" | "ready" | "failed";
+        /** HTTPValidationError */
+        HTTPValidationError: {
+            /** Detail */
+            detail?: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * KnowledgeAnswer
+         * @description Outcome of the knowledge agents for one question.
+         *
+         *     answered:   the answer passed citation checks and the verifier.
+         *     abstained:  no good-enough sources (decided by code), or the answer agent declined.
+         *     unverified: an answer exists but failed verification twice; a human must check it.
+         */
+        KnowledgeAnswer: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "answered" | "abstained" | "unverified";
+            /** Answer */
+            answer: string | null;
+            /** Citations */
+            citations: components["schemas"]["Citation"][];
+            /** Queries */
+            queries: string[];
+            /** Reason */
+            reason?: string | null;
+        };
+        /** MeResponse */
+        MeResponse: {
+            user: components["schemas"]["UserOut"];
+            /** Memberships */
+            memberships: components["schemas"]["MembershipOut"][];
+        };
+        /** MemberOut */
+        MemberOut: {
+            /**
+             * User Id
+             * Format: uuid
+             */
+            user_id: string;
+            /** Email */
+            email: string;
+            /** Full Name */
+            full_name: string;
+            role: components["schemas"]["Role"];
+            /**
+             * Joined At
+             * Format: date-time
+             */
+            joined_at: string;
+        };
+        /** MembershipOut */
+        MembershipOut: {
+            /**
+             * Org Id
+             * Format: uuid
+             */
+            org_id: string;
+            /** Org Name */
+            org_name: string;
+            /** Org Slug */
+            org_slug: string;
+            role: components["schemas"]["Role"];
+        };
+        /**
+         * Role
+         * @enum {string}
+         */
+        Role: "owner" | "admin" | "member";
+        /** SearchHit */
+        SearchHit: {
+            /**
+             * Chunk Id
+             * Format: uuid
+             */
+            chunk_id: string;
+            /**
+             * Document Id
+             * Format: uuid
+             */
+            document_id: string;
+            /** Document Title */
+            document_title: string;
+            /** Section */
+            section: string | null;
+            /** Content */
+            content: string;
+            /** Vector Rank */
+            vector_rank: number | null;
+            /** Keyword Rank */
+            keyword_rank: number | null;
+            /** Fused Score */
+            fused_score: number;
+            /** Rerank Score */
+            rerank_score: number | null;
+        };
+        /** SearchRequest */
+        SearchRequest: {
+            /** Query */
+            query: string;
+        };
+        /** SignupRequest */
+        SignupRequest: {
+            /**
+             * Email
+             * Format: email
+             */
+            email: string;
+            /** Password */
+            password: string;
+            /** Full Name */
+            full_name: string;
+            /** Org Name */
+            org_name: string;
+        };
+        /** SignupResponse */
+        SignupResponse: {
+            /** Access Token */
+            access_token: string;
+            /**
+             * Token Type
+             * @default bearer
+             */
+            token_type: string;
+            /** Expires In */
+            expires_in: number;
+            user: components["schemas"]["UserOut"];
+            /**
+             * Org Id
+             * Format: uuid
+             */
+            org_id: string;
+        };
+        /**
+         * StepStatus
+         * @enum {string}
+         */
+        StepStatus: "completed" | "failed";
+        /** TokenResponse */
+        TokenResponse: {
+            /** Access Token */
+            access_token: string;
+            /**
+             * Token Type
+             * @default bearer
+             */
+            token_type: string;
+            /** Expires In */
+            expires_in: number;
+        };
+        /** TriageResult */
+        TriageResult: {
+            category: components["schemas"]["Category"];
+            urgency: components["schemas"]["Urgency"];
+            /**
+             * Summary
+             * @description One neutral sentence for an operations agent
+             */
+            summary: string;
+            details: components["schemas"]["Details"];
+            /**
+             * Confidence
+             * @description How sure you are of the category
+             */
+            confidence: number;
+            /** Needs Human Review */
+            needs_human_review: boolean;
+            /**
+             * Reasoning
+             * @description Short justification an auditor can read
+             */
+            reasoning: string;
+        };
+        /**
+         * Urgency
+         * @enum {string}
+         */
+        Urgency: "low" | "normal" | "high" | "critical";
+        /** UserOut */
+        UserOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Email */
+            email: string;
+            /** Full Name */
+            full_name: string;
+        };
+        /** ValidationError */
+        ValidationError: {
+            /** Location */
+            loc: (string | number)[];
+            /** Message */
+            msg: string;
+            /** Error Type */
+            type: string;
+            /** Input */
+            input?: unknown;
+            /** Context */
+            ctx?: Record<string, never>;
+        };
+        /** WorkflowOut */
+        WorkflowOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            status: components["schemas"]["WorkflowStatus"];
+            /** Input */
+            input: {
+                [key: string]: unknown;
+            };
+            result: components["schemas"]["WorkflowResult"] | null;
+            /** Error */
+            error: string | null;
+            /** Attempts */
+            attempts: number;
+            /** Request Id */
+            request_id: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Started At */
+            started_at: string | null;
+            /** Ended At */
+            ended_at: string | null;
+            /**
+             * Steps
+             * @default []
+             */
+            steps: components["schemas"]["WorkflowStepOut"][];
+        };
+        /**
+         * WorkflowResult
+         * @description What the agents concluded. Grows a field per phase (resolution, actions, ...).
+         */
+        WorkflowResult: {
+            triage?: components["schemas"]["TriageResult"] | null;
+            knowledge?: components["schemas"]["KnowledgeAnswer"] | null;
+        };
+        /**
+         * WorkflowStatus
+         * @enum {string}
+         */
+        WorkflowStatus: "queued" | "running" | "completed" | "failed";
+        /** WorkflowStepOut */
+        WorkflowStepOut: {
+            /** Node */
+            node: string;
+            /** Attempt */
+            attempt: number;
+            status: components["schemas"]["StepStatus"];
+            /** Output */
+            output: {
+                [key: string]: unknown;
+            } | null;
+            /** Error */
+            error: string | null;
+            /** Model */
+            model: string | null;
+            /** Input Tokens */
+            input_tokens: number | null;
+            /** Output Tokens */
+            output_tokens: number | null;
+            /** Latency Ms */
+            latency_ms: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * WorkflowSummary
+         * @description One row in the workflow list: the triage headline without the step details.
+         */
+        WorkflowSummary: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            status: components["schemas"]["WorkflowStatus"];
+            /** Message Preview */
+            message_preview: string;
+            category: components["schemas"]["Category"] | null;
+            urgency: components["schemas"]["Urgency"] | null;
+            /** Needs Human Review */
+            needs_human_review: boolean | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
     };
-    /** AskRequest */
-    AskRequest: {
-      /** Question */
-      question: string;
-    };
-    /** AuditEventOut */
-    AuditEventOut: {
-      /** Id */
-      id: number;
-      /** Actor User Id */
-      actor_user_id: string | null;
-      /** Actor Email */
-      actor_email: string | null;
-      /** Action */
-      action: string;
-      /** Target Type */
-      target_type: string;
-      /** Target Id */
-      target_id: string;
-      /** Details */
-      details: {
-        [key: string]: unknown;
-      };
-      /**
-       * Occurred At
-       * Format: date-time
-       */
-      occurred_at: string;
-    };
-    /** AuditPage */
-    AuditPage: {
-      /** Events */
-      events: components['schemas']['AuditEventOut'][];
-      /** Next Before Id */
-      next_before_id: number | null;
-    };
-    /** Body_login_v1_auth_login_post */
-    Body_login_v1_auth_login_post: {
-      /** Grant Type */
-      grant_type?: string | null;
-      /** Username */
-      username: string;
-      /**
-       * Password
-       * Format: password
-       */
-      password: string;
-      /**
-       * Scope
-       * @default
-       */
-      scope: string;
-      /** Client Id */
-      client_id?: string | null;
-      /**
-       * Client Secret
-       * Format: password
-       */
-      client_secret?: string | null;
-    };
-    /** Body_upload_document_v1_knowledge_documents_post */
-    Body_upload_document_v1_knowledge_documents_post: {
-      /**
-       * File
-       * @description .md, .txt or .pdf, up to 10 MB
-       */
-      file: string;
-      /** Title */
-      title?: string | null;
-    };
-    /**
-     * Category
-     * @enum {string}
-     */
-    Category:
-      | 'duplicate_charge'
-      | 'failed_payment'
-      | 'refund_request'
-      | 'unauthorized_transaction'
-      | 'card_or_account_blocked'
-      | 'kyc_document'
-      | 'account_access'
-      | 'general_inquiry'
-      | 'other';
-    /** ChangeRoleRequest */
-    ChangeRoleRequest: {
-      role: components['schemas']['Role'];
-    };
-    /** Citation */
-    Citation: {
-      /** Number */
-      number: number;
-      /**
-       * Chunk Id
-       * Format: uuid
-       */
-      chunk_id: string;
-      /**
-       * Document Id
-       * Format: uuid
-       */
-      document_id: string;
-      /** Document Title */
-      document_title: string;
-      /** Section */
-      section: string | null;
-      /** Excerpt */
-      excerpt: string;
-    };
-    /**
-     * CreateWorkflowRequest
-     * @description A customer request entering the system (from a support inbox, chat, or the dashboard).
-     */
-    CreateWorkflowRequest: {
-      /** Message */
-      message: string;
-      /**
-       * Channel
-       * @default web
-       * @enum {string}
-       */
-      channel: 'web' | 'email' | 'chat' | 'phone';
-      /** Customer Ref */
-      customer_ref?: string | null;
-    };
-    /**
-     * Details
-     * @description Facts copied from the message. Null when the customer didn't state them.
-     */
-    Details: {
-      /**
-       * Amount
-       * @description Amount in dispute, as written by the customer
-       */
-      amount: string | null;
-      /**
-       * Currency
-       * @description ISO 4217 code, e.g. PKR, USD
-       */
-      currency: string | null;
-      /**
-       * Transaction Reference
-       * @description Transaction/reference id if given
-       */
-      transaction_reference: string | null;
-      /**
-       * Transaction Date
-       * @description Date of the transaction if given
-       */
-      transaction_date: string | null;
-    };
-    /** DocumentOut */
-    DocumentOut: {
-      /**
-       * Id
-       * Format: uuid
-       */
-      id: string;
-      /** Title */
-      title: string;
-      /** Filename */
-      filename: string;
-      /** Content Type */
-      content_type: string;
-      /** Size Bytes */
-      size_bytes: number;
-      status: components['schemas']['DocumentStatus'];
-      /** Error */
-      error: string | null;
-      /** Chunk Count */
-      chunk_count: number;
-      /** Quarantined Chunks */
-      quarantined_chunks: number;
-      /**
-       * Created At
-       * Format: date-time
-       */
-      created_at: string;
-      /**
-       * Updated At
-       * Format: date-time
-       */
-      updated_at: string;
-    };
-    /**
-     * DocumentStatus
-     * @enum {string}
-     */
-    DocumentStatus: 'pending' | 'processing' | 'ready' | 'failed';
-    /** HTTPValidationError */
-    HTTPValidationError: {
-      /** Detail */
-      detail?: components['schemas']['ValidationError'][];
-    };
-    /**
-     * KnowledgeAnswer
-     * @description Outcome of the knowledge agents for one question.
-     *
-     *     answered:   the answer passed citation checks and the verifier.
-     *     abstained:  no good-enough sources (decided by code), or the answer agent declined.
-     *     unverified: an answer exists but failed verification twice; a human must check it.
-     */
-    KnowledgeAnswer: {
-      /**
-       * Status
-       * @enum {string}
-       */
-      status: 'answered' | 'abstained' | 'unverified';
-      /** Answer */
-      answer: string | null;
-      /** Citations */
-      citations: components['schemas']['Citation'][];
-      /** Queries */
-      queries: string[];
-      /** Reason */
-      reason?: string | null;
-    };
-    /** MeResponse */
-    MeResponse: {
-      user: components['schemas']['UserOut'];
-      /** Memberships */
-      memberships: components['schemas']['MembershipOut'][];
-    };
-    /** MemberOut */
-    MemberOut: {
-      /**
-       * User Id
-       * Format: uuid
-       */
-      user_id: string;
-      /** Email */
-      email: string;
-      /** Full Name */
-      full_name: string;
-      role: components['schemas']['Role'];
-      /**
-       * Joined At
-       * Format: date-time
-       */
-      joined_at: string;
-    };
-    /** MembershipOut */
-    MembershipOut: {
-      /**
-       * Org Id
-       * Format: uuid
-       */
-      org_id: string;
-      /** Org Name */
-      org_name: string;
-      /** Org Slug */
-      org_slug: string;
-      role: components['schemas']['Role'];
-    };
-    /**
-     * Role
-     * @enum {string}
-     */
-    Role: 'owner' | 'admin' | 'member';
-    /** SearchHit */
-    SearchHit: {
-      /**
-       * Chunk Id
-       * Format: uuid
-       */
-      chunk_id: string;
-      /**
-       * Document Id
-       * Format: uuid
-       */
-      document_id: string;
-      /** Document Title */
-      document_title: string;
-      /** Section */
-      section: string | null;
-      /** Content */
-      content: string;
-      /** Vector Rank */
-      vector_rank: number | null;
-      /** Keyword Rank */
-      keyword_rank: number | null;
-      /** Fused Score */
-      fused_score: number;
-      /** Rerank Score */
-      rerank_score: number | null;
-    };
-    /** SearchRequest */
-    SearchRequest: {
-      /** Query */
-      query: string;
-    };
-    /** SignupRequest */
-    SignupRequest: {
-      /**
-       * Email
-       * Format: email
-       */
-      email: string;
-      /** Password */
-      password: string;
-      /** Full Name */
-      full_name: string;
-      /** Org Name */
-      org_name: string;
-    };
-    /** SignupResponse */
-    SignupResponse: {
-      /** Access Token */
-      access_token: string;
-      /**
-       * Token Type
-       * @default bearer
-       */
-      token_type: string;
-      /** Expires In */
-      expires_in: number;
-      user: components['schemas']['UserOut'];
-      /**
-       * Org Id
-       * Format: uuid
-       */
-      org_id: string;
-    };
-    /**
-     * StepStatus
-     * @enum {string}
-     */
-    StepStatus: 'completed' | 'failed';
-    /** TokenResponse */
-    TokenResponse: {
-      /** Access Token */
-      access_token: string;
-      /**
-       * Token Type
-       * @default bearer
-       */
-      token_type: string;
-      /** Expires In */
-      expires_in: number;
-    };
-    /** TriageResult */
-    TriageResult: {
-      category: components['schemas']['Category'];
-      urgency: components['schemas']['Urgency'];
-      /**
-       * Summary
-       * @description One neutral sentence for an operations agent
-       */
-      summary: string;
-      details: components['schemas']['Details'];
-      /**
-       * Confidence
-       * @description How sure you are of the category
-       */
-      confidence: number;
-      /** Needs Human Review */
-      needs_human_review: boolean;
-      /**
-       * Reasoning
-       * @description Short justification an auditor can read
-       */
-      reasoning: string;
-    };
-    /**
-     * Urgency
-     * @enum {string}
-     */
-    Urgency: 'low' | 'normal' | 'high' | 'critical';
-    /** UserOut */
-    UserOut: {
-      /**
-       * Id
-       * Format: uuid
-       */
-      id: string;
-      /** Email */
-      email: string;
-      /** Full Name */
-      full_name: string;
-    };
-    /** ValidationError */
-    ValidationError: {
-      /** Location */
-      loc: (string | number)[];
-      /** Message */
-      msg: string;
-      /** Error Type */
-      type: string;
-      /** Input */
-      input?: unknown;
-      /** Context */
-      ctx?: Record<string, never>;
-    };
-    /** WorkflowOut */
-    WorkflowOut: {
-      /**
-       * Id
-       * Format: uuid
-       */
-      id: string;
-      status: components['schemas']['WorkflowStatus'];
-      /** Input */
-      input: {
-        [key: string]: unknown;
-      };
-      result: components['schemas']['WorkflowResult'] | null;
-      /** Error */
-      error: string | null;
-      /** Attempts */
-      attempts: number;
-      /** Request Id */
-      request_id: string | null;
-      /**
-       * Created At
-       * Format: date-time
-       */
-      created_at: string;
-      /** Started At */
-      started_at: string | null;
-      /** Ended At */
-      ended_at: string | null;
-      /**
-       * Steps
-       * @default []
-       */
-      steps: components['schemas']['WorkflowStepOut'][];
-    };
-    /**
-     * WorkflowResult
-     * @description What the agents concluded. Grows a field per phase (resolution, actions, ...).
-     */
-    WorkflowResult: {
-      triage?: components['schemas']['TriageResult'] | null;
-      knowledge?: components['schemas']['KnowledgeAnswer'] | null;
-    };
-    /**
-     * WorkflowStatus
-     * @enum {string}
-     */
-    WorkflowStatus: 'queued' | 'running' | 'completed' | 'failed';
-    /** WorkflowStepOut */
-    WorkflowStepOut: {
-      /** Node */
-      node: string;
-      /** Attempt */
-      attempt: number;
-      status: components['schemas']['StepStatus'];
-      /** Output */
-      output: {
-        [key: string]: unknown;
-      } | null;
-      /** Error */
-      error: string | null;
-      /** Model */
-      model: string | null;
-      /** Input Tokens */
-      input_tokens: number | null;
-      /** Output Tokens */
-      output_tokens: number | null;
-      /** Latency Ms */
-      latency_ms: number | null;
-      /**
-       * Created At
-       * Format: date-time
-       */
-      created_at: string;
-    };
-    /**
-     * WorkflowSummary
-     * @description One row in the workflow list: the triage headline without the step details.
-     */
-    WorkflowSummary: {
-      /**
-       * Id
-       * Format: uuid
-       */
-      id: string;
-      status: components['schemas']['WorkflowStatus'];
-      /** Message Preview */
-      message_preview: string;
-      category: components['schemas']['Category'] | null;
-      urgency: components['schemas']['Urgency'] | null;
-      /** Needs Human Review */
-      needs_human_review: boolean | null;
-      /**
-       * Created At
-       * Format: date-time
-       */
-      created_at: string;
-    };
-  };
-  responses: never;
-  parameters: never;
-  requestBodies: never;
-  headers: never;
-  pathItems: never;
+    responses: never;
+    parameters: never;
+    requestBodies: never;
+    headers: never;
+    pathItems: never;
 }
 export type $defs = Record<string, never>;
 export interface operations {
-  signup_v1_auth_signup_post: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    signup_v1_auth_signup_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignupRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignupResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
     };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['SignupRequest'];
-      };
+    login_v1_auth_login_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/x-www-form-urlencoded": components["schemas"]["Body_login_v1_auth_login_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
     };
-    responses: {
-      /** @description Successful Response */
-      201: {
-        headers: {
-          [name: string]: unknown;
+    me_v1_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-        content: {
-          'application/json': components['schemas']['SignupResponse'];
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeResponse"];
+                };
+            };
         };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['HTTPValidationError'];
-        };
-      };
     };
-  };
-  login_v1_auth_login_post: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    list_members_v1_members_get: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
     };
-    requestBody: {
-      content: {
-        'application/x-www-form-urlencoded': components['schemas']['Body_login_v1_auth_login_post'];
-      };
+    add_member_v1_members_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddMemberRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
     };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
+    remove_member_v1_members__user_id__delete: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
         };
-        content: {
-          'application/json': components['schemas']['TokenResponse'];
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
         };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['HTTPValidationError'];
-        };
-      };
     };
-  };
-  me_v1_me_get: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    change_member_role_v1_members__user_id__patch: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path: {
+                user_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
     };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
+    add_company_v1_orgs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-        content: {
-          'application/json': components['schemas']['MeResponse'];
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddCompanyRequest"];
+            };
         };
-      };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MembershipOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
     };
-  };
-  list_members_v1_members_get: {
-    parameters: {
-      query?: never;
-      header: {
-        /** @description Organization this request acts in */
-        'x-org-id': string;
-      };
-      path?: never;
-      cookie?: never;
+    list_audit_events_v1_audit_events_get: {
+        parameters: {
+            query?: {
+                action?: string | null;
+                before_id?: number | null;
+                limit?: number;
+            };
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditPage"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
     };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
+    list_workflows_v1_workflows_get: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path?: never;
+            cookie?: never;
         };
-        content: {
-          'application/json': components['schemas']['MemberOut'][];
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
         };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['HTTPValidationError'];
-        };
-      };
     };
-  };
-  add_member_v1_members_post: {
-    parameters: {
-      query?: never;
-      header: {
-        /** @description Organization this request acts in */
-        'x-org-id': string;
-      };
-      path?: never;
-      cookie?: never;
+    create_workflow_v1_workflows_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Unique per logical request (e.g. a UUID). Retrying with the same key and body returns the original workflow instead of creating another. */
+                "Idempotency-Key": string;
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateWorkflowRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
     };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['AddMemberRequest'];
-      };
+    get_workflow_v1_workflows__workflow_id__get: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path: {
+                workflow_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkflowOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
     };
-    responses: {
-      /** @description Successful Response */
-      201: {
-        headers: {
-          [name: string]: unknown;
+    list_documents_v1_knowledge_documents_get: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path?: never;
+            cookie?: never;
         };
-        content: {
-          'application/json': components['schemas']['MemberOut'];
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
         };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['HTTPValidationError'];
-        };
-      };
     };
-  };
-  remove_member_v1_members__user_id__delete: {
-    parameters: {
-      query?: never;
-      header: {
-        /** @description Organization this request acts in */
-        'x-org-id': string;
-      };
-      path: {
-        user_id: string;
-      };
-      cookie?: never;
+    upload_document_v1_knowledge_documents_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_document_v1_knowledge_documents_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
     };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      204: {
-        headers: {
-          [name: string]: unknown;
+    get_document_v1_knowledge_documents__document_id__get: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
         };
-        content?: never;
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
         };
-        content: {
-          'application/json': components['schemas']['HTTPValidationError'];
-        };
-      };
     };
-  };
-  change_member_role_v1_members__user_id__patch: {
-    parameters: {
-      query?: never;
-      header: {
-        /** @description Organization this request acts in */
-        'x-org-id': string;
-      };
-      path: {
-        user_id: string;
-      };
-      cookie?: never;
+    delete_document_v1_knowledge_documents__document_id__delete: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
     };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['ChangeRoleRequest'];
-      };
+    search_v1_knowledge_search_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SearchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchHit"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
     };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
+    ask_v1_knowledge_ask_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path?: never;
+            cookie?: never;
         };
-        content: {
-          'application/json': components['schemas']['MemberOut'];
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AskRequest"];
+            };
         };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeAnswer"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
         };
-        content: {
-          'application/json': components['schemas']['HTTPValidationError'];
-        };
-      };
     };
-  };
-  list_audit_events_v1_audit_events_get: {
-    parameters: {
-      query?: {
-        action?: string | null;
-        before_id?: number | null;
-        limit?: number;
-      };
-      header: {
-        /** @description Organization this request acts in */
-        'x-org-id': string;
-      };
-      path?: never;
-      cookie?: never;
+    health_health_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+        };
     };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
+    ready_ready_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
         };
-        content: {
-          'application/json': components['schemas']['AuditPage'];
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
         };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['HTTPValidationError'];
-        };
-      };
     };
-  };
-  list_workflows_v1_workflows_get: {
-    parameters: {
-      query?: never;
-      header: {
-        /** @description Organization this request acts in */
-        'x-org-id': string;
-      };
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['WorkflowSummary'][];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['HTTPValidationError'];
-        };
-      };
-    };
-  };
-  create_workflow_v1_workflows_post: {
-    parameters: {
-      query?: never;
-      header: {
-        /** @description Unique per logical request (e.g. a UUID). Retrying with the same key and body returns the original workflow instead of creating another. */
-        'Idempotency-Key': string;
-        /** @description Organization this request acts in */
-        'x-org-id': string;
-      };
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateWorkflowRequest'];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      202: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['WorkflowOut'];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['HTTPValidationError'];
-        };
-      };
-    };
-  };
-  get_workflow_v1_workflows__workflow_id__get: {
-    parameters: {
-      query?: never;
-      header: {
-        /** @description Organization this request acts in */
-        'x-org-id': string;
-      };
-      path: {
-        workflow_id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['WorkflowOut'];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['HTTPValidationError'];
-        };
-      };
-    };
-  };
-  list_documents_v1_knowledge_documents_get: {
-    parameters: {
-      query?: never;
-      header: {
-        /** @description Organization this request acts in */
-        'x-org-id': string;
-      };
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DocumentOut'][];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['HTTPValidationError'];
-        };
-      };
-    };
-  };
-  upload_document_v1_knowledge_documents_post: {
-    parameters: {
-      query?: never;
-      header: {
-        /** @description Organization this request acts in */
-        'x-org-id': string;
-      };
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'multipart/form-data': components['schemas']['Body_upload_document_v1_knowledge_documents_post'];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      202: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DocumentOut'];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['HTTPValidationError'];
-        };
-      };
-    };
-  };
-  get_document_v1_knowledge_documents__document_id__get: {
-    parameters: {
-      query?: never;
-      header: {
-        /** @description Organization this request acts in */
-        'x-org-id': string;
-      };
-      path: {
-        document_id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DocumentOut'];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['HTTPValidationError'];
-        };
-      };
-    };
-  };
-  delete_document_v1_knowledge_documents__document_id__delete: {
-    parameters: {
-      query?: never;
-      header: {
-        /** @description Organization this request acts in */
-        'x-org-id': string;
-      };
-      path: {
-        document_id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      204: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['HTTPValidationError'];
-        };
-      };
-    };
-  };
-  search_v1_knowledge_search_post: {
-    parameters: {
-      query?: never;
-      header: {
-        /** @description Organization this request acts in */
-        'x-org-id': string;
-      };
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['SearchRequest'];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['SearchHit'][];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['HTTPValidationError'];
-        };
-      };
-    };
-  };
-  ask_v1_knowledge_ask_post: {
-    parameters: {
-      query?: never;
-      header: {
-        /** @description Organization this request acts in */
-        'x-org-id': string;
-      };
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['AskRequest'];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['KnowledgeAnswer'];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['HTTPValidationError'];
-        };
-      };
-    };
-  };
-  health_health_get: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': {
-            [key: string]: string;
-          };
-        };
-      };
-    };
-  };
-  ready_ready_get: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Successful Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': unknown;
-        };
-      };
-    };
-  };
 }

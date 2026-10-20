@@ -286,3 +286,156 @@ tr.selected {
   border-left: 2px solid var(--border);
   padding-left: 0.5rem;
 }
+
+/* Profile menu (Chrome-style company switcher) */
+app-profile-menu {
+  position: relative;
+}
+.profile-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.25rem 0.75rem 0.25rem 0.25rem;
+}
+.avatar {
+  display: inline-grid;
+  place-items: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  flex: none;
+}
+.avatar.large {
+  width: 2.5rem;
+  height: 2.5rem;
+  font-size: 1rem;
+}
+.avatar.org {
+  border-radius: 6px;
+  background: #e3e8ef;
+  color: var(--text);
+}
+.menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.5rem);
+  width: 18rem;
+  padding: 0.5rem;
+  z-index: 10;
+  box-shadow: 0 8px 24px rgb(16 24 40 / 12%);
+}
+.menu-user {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.5rem;
+}
+.menu-user > div {
+  min-width: 0;
+  overflow-wrap: anywhere; /* long emails wrap instead of overflowing the menu */
+}
+.menu-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  padding: 0.5rem 0.5rem 0.25rem;
+}
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.45rem 0.5rem;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+.menu-item:hover {
+  background: #f0f5f3;
+}
+.menu hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 0.4rem 0;
+}
+.grow {
+  flex: 1;
+}
+
+/* Profile page */
+.section {
+  margin-bottom: 1rem;
+}
+.kv {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.35rem 1rem;
+}
+.kv dt {
+  color: var(--muted);
+}
+.kv dd {
+  margin: 0;
+}
+.company-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.company-list li {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.stack {
+  display: grid;
+  gap: 0.8rem;
+  max-width: 24rem;
+}
+.stack label {
+  display: grid;
+  gap: 0.3rem;
+}
+
+/* Profile: compact account strip + inline "Add company" */
+.account {
+  display: grid;
+  gap: 0.75rem;
+}
+.account-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.add-company {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+}
+.add-company input {
+  flex: 1;
+  min-width: 11rem;
+}
+.company-list li {
+  gap: 0.6rem;
+}
+.company-list small {
+  margin-left: 0.4rem; /* role next to the name; template whitespace isn't reliable */
+}

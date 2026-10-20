@@ -71,3 +71,11 @@ class AddMemberRequest(BaseModel):
 
 class ChangeRoleRequest(BaseModel):
     role: Role
+
+
+class AddCompanyRequest(BaseModel):
+    """Create another company for the logged-in user. Name, email and password stay the same;
+    the password is asked again to confirm it's really them."""
+
+    org_name: str = Field(min_length=1, max_length=200)
+    password: str = Field(min_length=1, max_length=128)

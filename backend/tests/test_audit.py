@@ -35,7 +35,7 @@ def test_membership_changes_are_recorded_newest_first(client: TestClient) -> Non
         ("member.removed", {"role": "admin"}),
         ("member.role_changed", {"from": "member", "to": "admin"}),
         ("member.added", {"role": "member"}),
-        ("org.created", {}),
+        ("org.created", {"via": "signup"}),
     ]
     assert {e["actor_email"] for e in trail} == {owner.email}
     assert trail[0]["target_id"] == joiner.user_id

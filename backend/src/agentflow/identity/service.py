@@ -25,6 +25,10 @@ class EmailAlreadyRegisteredError(Exception):
     pass
 
 
+class InvalidPasswordError(Exception):
+    pass
+
+
 class MemberNotFoundError(Exception):
     pass
 
@@ -66,6 +70,31 @@ async def _insert_org_with_unique_slug(session: AsyncSession, org: Organization)
             org.slug = f"{base}-{secrets.token_hex(3)}"
 
 
+async def _create_org_with_owner(
+    session: AsyncSession, user_id: uuid.UUID, org_name: str, *, via: str
+) -> Organization:
+    """A new organization (tenant) with `user_id` as its OWNER, plus the audit event.
+
+    Shared by signup and "Add company": both end in exactly the same state, so the rules for
+    what a new tenant looks like live in one place.
+    """
+    org = Organization(id=uuid.uuid4(), name=org_name, slug=slugify(org_name))
+    # Act inside the tenant being created, so the RLS policies' WITH CHECK accepts its rows.
+    await set_tenant_context(session, user_id=user_id, org_id=org.id)
+    await _insert_org_with_unique_slug(session, org)
+    session.add(Membership(org_id=org.id, user_id=user_id, role=Role.OWNER))
+    await audit.record(
+        session,
+        org_id=org.id,
+        actor_user_id=user_id,
+        action="org.created",
+        target_type="organization",
+        target_id=org.id,
+        details={"via": via},
+    )
+    return org
+
+
 async def signup(session: AsyncSession, data: SignupRequest) -> tuple[User, Organization]:
     """Create a user, their organization, and an OWNER membership, all in one transaction."""
     if await session.scalar(select(exists().where(User.email == data.email))):
@@ -76,23 +105,28 @@ async def signup(session: AsyncSession, data: SignupRequest) -> tuple[User, Orga
     user = User(
         id=uuid.uuid4(), email=data.email, full_name=data.full_name, password_hash=password_hash
     )
-    org = Organization(id=uuid.uuid4(), name=data.org_name, slug=slugify(data.org_name))
-    # Act inside the tenant being created, so the RLS policies' WITH CHECK accepts its rows.
-    await set_tenant_context(session, user_id=user.id, org_id=org.id)
     session.add(user)
-    await _insert_org_with_unique_slug(session, org)
-    session.add(Membership(org_id=org.id, user_id=user.id, role=Role.OWNER))
-    await audit.record(
-        session,
-        org_id=org.id,
-        actor_user_id=user.id,
-        action="org.created",
-        target_type="organization",
-        target_id=org.id,
-    )
+    await session.flush()  # the user row must exist before the membership points at it
+    org = await _create_org_with_owner(session, user.id, data.org_name, via="signup")
     # ponytail: two simultaneous signups with one email both pass the check above; the
     # UNIQUE constraint still blocks the second (500, nothing saved). Map to 409 if ever seen.
     return user, org
+
+
+async def add_company(
+    session: AsyncSession, user: User, password: str, org_name: str
+) -> MembershipOut:
+    """Create another organization owned by an existing user (the "Add company" flow).
+
+    Same login, new tenant: the org gets its own id, members, audit log and workflows, and
+    nothing is copied from the user's other companies. The password is checked again because
+    creating a company is a significant action (protects an unlocked, logged-in laptop).
+    """
+    valid, _ = await asyncio.to_thread(verify_password, password, user.password_hash)
+    if not valid:
+        raise InvalidPasswordError
+    org = await _create_org_with_owner(session, user.id, org_name, via="add_company")
+    return MembershipOut(org_id=org.id, org_name=org.name, org_slug=org.slug, role=Role.OWNER)
 
 
 async def authenticate(session: AsyncSession, email: str, password: str) -> User | None:

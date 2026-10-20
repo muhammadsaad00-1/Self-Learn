@@ -351,6 +351,53 @@
         }
       }
     },
+    "/v1/orgs": {
+      "post": {
+        "tags": [
+          "orgs"
+        ],
+        "summary": "Add Company",
+        "description": "Create another company owned by the logged-in user, after re-checking their password.\n\nThe client switches to it by sending the returned org_id as X-Org-Id. Nothing is copied\nfrom the user's other companies.",
+        "operationId": "add_company_v1_orgs_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddCompanyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MembershipOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
     "/v1/audit/events": {
       "get": {
         "tags": [
@@ -1038,6 +1085,29 @@
   },
   "components": {
     "schemas": {
+      "AddCompanyRequest": {
+        "properties": {
+          "org_name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Org Name"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "org_name",
+          "password"
+        ],
+        "title": "AddCompanyRequest",
+        "description": "Create another company for the logged-in user. Name, email and password stay the same;\nthe password is asked again to confirm it's really them."
+      },
       "AddMemberRequest": {
         "properties": {
           "email": {

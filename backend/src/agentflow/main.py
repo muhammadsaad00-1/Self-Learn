@@ -62,6 +62,7 @@ def create_app(
     app.middleware("http")(request_context_middleware)
     app.include_router(identity_api.router)
     app.include_router(identity_api.members_router)
+    app.include_router(identity_api.orgs_router)
     app.include_router(audit_api.router)
     app.include_router(workflow_api.router)
     app.include_router(knowledge_api.router)

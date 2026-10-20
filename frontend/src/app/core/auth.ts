@@ -3,7 +3,13 @@ import { computed, inject, Injectable, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
-import type { MeResponse, SignupRequest, SignupResponse, TokenResponse } from '../api/types';
+import type {
+  Membership,
+  MeResponse,
+  SignupRequest,
+  SignupResponse,
+  TokenResponse,
+} from '../api/types';
 
 const STORAGE_KEY = 'agentflow.session';
 
@@ -60,6 +66,28 @@ export class Auth {
   selectOrg(orgId: string | null): void {
     const current = this.session();
     if (current) this.save({ ...current, orgId });
+  }
+
+  /**
+   * Switch to another of the user's companies (like switching Chrome profiles). Same token;
+   * from now on every API call carries the new X-Org-Id, and pages reload their data.
+   */
+  switchCompany(orgId: string): void {
+    this.selectOrg(orgId);
+    // The audit log is admin-only: leave it if the role in the new company doesn't allow it.
+    if (this.router.url.startsWith('/audit') && !this.isAdmin()) {
+      void this.router.navigateByUrl('/workflows');
+    }
+  }
+
+  /** Create another company owned by this user, then switch to it. */
+  async addCompany(orgName: string, password: string): Promise<Membership> {
+    const created = await firstValueFrom(
+      this.http.post<Membership>('/v1/orgs', { org_name: orgName, password }),
+    );
+    await this.loadMe(); // the new company now appears in the menu
+    this.switchCompany(created.org_id);
+    return created;
   }
 
   logout(): void {

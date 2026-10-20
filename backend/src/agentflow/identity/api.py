@@ -19,9 +19,11 @@ from agentflow.identity.deps import (
 )
 from agentflow.identity.models import User
 from agentflow.identity.schemas import (
+    AddCompanyRequest,
     AddMemberRequest,
     ChangeRoleRequest,
     MemberOut,
+    MembershipOut,
     MeResponse,
     SignupRequest,
     SignupResponse,
@@ -32,6 +34,7 @@ from agentflow.identity.security import create_access_token
 
 router = APIRouter(prefix="/v1", tags=["auth"])
 members_router = APIRouter(prefix="/v1/members", tags=["members"])
+orgs_router = APIRouter(prefix="/v1/orgs", tags=["orgs"])
 
 
 def _token_response(user: User, settings: Settings) -> TokenResponse:
@@ -151,3 +154,30 @@ async def remove_member(user_id: uuid.UUID, ctx: AdminContextDep, session: Sessi
     except tuple(_MEMBER_ERRORS) as e:
         raise _member_http_error(e) from None
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# --- Companies (organizations) of the logged-in user -------------------------------------
+
+
+@orgs_router.post("", status_code=status.HTTP_201_CREATED)
+async def add_company(
+    body: AddCompanyRequest,
+    user: CurrentUser,
+    request: Request,
+    session: SessionDep,
+    settings: SettingsDep,
+) -> MembershipOut:
+    """Create another company owned by the logged-in user, after re-checking their password.
+
+    The client switches to it by sending the returned org_id as X-Org-Id. Nothing is copied
+    from the user's other companies.
+    """
+    # Shares the login attempt counter: otherwise this endpoint would be a way to guess
+    # passwords without the login rate limit.
+    await _enforce_login_rate_limit(request.app.state.redis, user.email, settings)
+    try:
+        return await service.add_company(session, user, body.password, body.org_name)
+    except service.InvalidPasswordError:
+        # 403, not 401: the session is valid, only this confirmation failed. (A 401 would also
+        # make the dashboard log the user out.)
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Password is incorrect") from None
