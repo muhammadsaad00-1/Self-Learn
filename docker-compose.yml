@@ -26,6 +26,22 @@ services:
       interval: 5s
       retries: 10
 
+  # Local S3: the same API as AWS S3, so the storage code doesn't change in the cloud.
+  # MinIO stopped publishing free images; this is Bitnami's frozen copy, fine for local
+  # development only (production uses AWS S3).
+  minio:
+    image: bitnamilegacy/minio:2025.5.24
+    environment:
+      MINIO_ROOT_USER: agentflow
+      MINIO_ROOT_PASSWORD: agentflow-local-secret   # local-only credential
+      MINIO_DEFAULT_BUCKETS: agentflow-documents    # created on first start
+    ports: ["127.0.0.1:9000:9000", "127.0.0.1:9001:9001"]   # 9001: web console
+    volumes: [miniodata:/bitnami/minio/data]
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      retries: 20
+
   api:
     build: ./backend
     environment:
@@ -34,10 +50,15 @@ services:
       # The app connects as the low-privilege role so row-level security applies to it.
       AGENTFLOW_DATABASE_URL: postgresql+asyncpg://agentflow_app:agentflow_app@postgres:5432/agentflow
       AGENTFLOW_REDIS_URL: redis://redis:6379/0
+      AGENTFLOW_S3_ENDPOINT_URL: http://minio:9000
+      AGENTFLOW_MODEL_CACHE_DIR: /models
+      GROQ_API_KEY: ${GROQ_API_KEY:-}   # for /v1/knowledge/ask
     ports: ["127.0.0.1:8000:8000"]
+    volumes: [models:/models]   # embedding/reranker models, downloaded once
     depends_on:
       postgres: { condition: service_healthy }
       redis: { condition: service_healthy }
+      minio: { condition: service_healthy }
 
   # Same image as the API, different command: runs queued workflows (agents) in the background.
   worker:
@@ -47,12 +68,18 @@ services:
       AGENTFLOW_ENV: local
       AGENTFLOW_DATABASE_URL: postgresql+asyncpg://agentflow_app:agentflow_app@postgres:5432/agentflow
       AGENTFLOW_REDIS_URL: redis://redis:6379/0
+      AGENTFLOW_S3_ENDPOINT_URL: http://minio:9000
+      AGENTFLOW_MODEL_CACHE_DIR: /models
       # Read from your .env by docker compose; never baked into the image.
       GROQ_API_KEY: ${GROQ_API_KEY:-}
+    volumes: [models:/models]
     healthcheck:
       disable: true  # no HTTP server in the worker; the image's /health check doesn't apply
     depends_on:
       postgres: { condition: service_healthy }
+      minio: { condition: service_healthy }
 
 volumes:
   pgdata:
+  miniodata:
+  models:

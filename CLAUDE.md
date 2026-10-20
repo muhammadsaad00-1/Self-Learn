@@ -22,7 +22,7 @@ Python + FastAPI · LangGraph + LangChain · PostgreSQL + pgvector · Redis · S
 
 ## Architecture stance
 - **Modular monolith first.** One FastAPI app plus one worker process. Domain modules have clear boundaries; split into services only with a measured reason (spec rule).
-- Domain modules (spec 02 §3): identity ✅, audit ✅, workflow ✅ (+ `agents/`, `llm.py`), knowledge, agent, tooling, policy, approval, automation, audit, evaluation, usage.
+- Domain modules (spec 02 §3): identity ✅, audit ✅, workflow ✅ (+ `agents/`, `llm.py`), knowledge ✅, knowledge, agent, tooling, policy, approval, automation, audit, evaluation, usage.
 - Modules talk to each other only through their public service functions, never by reaching into another module's tables or models.
 - Add AWS managed services (Step Functions, EventBridge, AgentCore) only when they solve a concrete problem. Locally, everything runs in Docker Compose.
 
@@ -37,14 +37,15 @@ Python + FastAPI · LangGraph + LangChain · PostgreSQL + pgvector · Redis · S
 - Run tool authorization again at execution time, even after an approval.
 
 ## Commands
-`make help` lists all of them. Key ones: `make install` (deps + git hooks) · `make up`/`down` (Docker stack) · `make run` (API with reload) · `make test` · `make check` (everything CI runs) · `make migrate` · `make migration m="..."` (autogenerate, then review: ADR 0006) · `make worker` (runs workflows; also a compose service) · `make eval` (triage vs real Groq; spends tokens) · `make web` (dashboard on :4200) · `make api-types` (after any API change) · `make db-reset`.
+`make help` lists all of them. Key ones: `make install` (deps + git hooks) · `make up`/`down` (Docker stack) · `make run` (API with reload) · `make test` · `make check` (everything CI runs) · `make migrate` · `make migration m="..."` (autogenerate, then review: ADR 0006) · `make worker` (runs workflows; also a compose service) · `make eval` (triage vs real Groq; spends tokens) · `make eval-rag` (retrieval per stage, real models) / `make eval-rag AGENTS=1` (+ agents, tokens) · `make web` (dashboard on :4200) · `make api-types` (after any API change) · `make db-reset`.
 uv lives at `~/.local/bin/uv` (official installer; the Intel Homebrew at /usr/local builds from source and is too slow).
 
 ## Agents and LLM rules
 - Agents never import a provider SDK: call `StructuredLLM.generate(TaskType, Schema, system=..., user=...)`. Customer/document text goes only in `user`, wrapped in `<<< >>>` delimiters.
 - Every agent output passes deterministic rules in code before use (e.g. `triage.apply_rules`).
 - Tests use `tests/fakes.FakeLLM`; never call Groq in `pytest`. Real-model checks live in `backend/evals/` (`make eval`); add a case for every model bug found.
-- Workers: never hold a DB transaction across a model call; call `set_tenant_context` before tenant data.
+- Workers: never hold a DB transaction across a model call (incl. the local reranker); call `set_tenant_context` before tenant data.
+- RAG: retrieval code depends on `Embedder`/`Reranker`/`ObjectStore`/`InjectionScreen` protocols (`knowledge/runtime.py`); tests use `tests/fakes.fake_runtime()`. Tune retrieval settings only with `make eval-rag` numbers; add a question to `evals/rag/questions.jsonl` for every RAG bug.
 
 ## Working mode (since 2026-10-18)
 Claude writes the code into the files, then shows the full code in chat (the user analyzes it) together with the test/run results. Small steps, one concept each; explain design decisions and trade-offs.
@@ -83,7 +84,7 @@ Roadmap phases are in spec 05. Mark items `[x]` as they land.
   - [x] 1e Angular dashboard: login/signup, org switcher, members, audit log; typed API client from OpenAPI (`make api-types`), CI contract check
 - [x] Phase 2 — First agent (`feat/phase-2-first-agent`, ADR 0010): JSON logs + request/org/workflow ids (`observability.py`), LLM router with fallback + schema output (`llm.py`), triage agent + rules (`agents/triage.py`), idempotent `POST /v1/workflows`, Postgres-queue worker (`worker.py`, `claim_next_workflow()`), LangGraph intake→triage, evals (`make eval`), dashboard Workflows page
 - [ ] Feature (parked 2026-10-18): **Add company** — one login, many orgs; `POST /v1/orgs` (password re-confirm, shares login rate limit), shared `_create_org_with_owner`, Chrome-style profile menu, profile page. Fully built + tested in scratch; Part 1 (backend) handed over, not yet pasted. UI request: compact Account section with "Add company" directly below it.
-- [ ] Phase 3 — Knowledge (in progress; reordered plan, quality first): ✅1 embeddings playground ✅2 pgvector schema · 3 heading-aware chunker + weighted tsvector · 4 embed/ingest worker · 5 hybrid retrieval (weighted RRF) · 6 reranker (bge-reranker-v2-m3 int8) · 7 RAG evals per stage · 8 query rewriting (Roman Urdu) · 9 knowledge agent (citations, abstention) · 10 MinIO upload + UI. Original list: upload, async ingestion, chunking, embeddings, pgvector, hybrid retrieval, citations, RAG eval set
+- [x] Phase 3 — Multi-agent RAG (`feat/phase-3-rag`, ADR 0011): upload → MinIO/S3 → worker ingestion (parse md/txt/pdf, heading-aware chunks, bge-small embeddings, prompt-injection screen → quarantine) → hybrid retrieval (pgvector HNSW iterative scan + weighted tsvector, weighted RRF) → bge-reranker-v2-m3 → agents: query planner → answer (citations) → verifier (scope-aware), code-level abstention + citation checks. APIs `/v1/knowledge/{documents,search,ask}`; workflow result includes `knowledge`. Evals: `make eval-rag [AGENTS=1]` (26/26, planner+rerank R@1 100%). Dashboard Knowledge page.
 - [ ] Phase 4 — Multi-agent: supervisor, research, knowledge, resolution, verifier, budgets
 - [ ] Phase 5 — Tools: registry, permission model, CRM/ticket/email/calendar/db tools, MCP, SQS/EventBridge automation
 - [ ] Phase 6 — Approval: policy engine, approval entity + UI, pause/resume, expiry, double authorization

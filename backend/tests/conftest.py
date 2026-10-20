@@ -13,7 +13,7 @@ from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
 from sqlalchemy import make_url, text
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from agentflow.config import Settings
@@ -155,3 +155,11 @@ def exec_sql(database_url: str) -> Callable[[str, dict[str, object]], Awaitable[
         await engine.dispose()
 
     return run
+
+
+@pytest.fixture
+async def sessions(settings: Settings) -> AsyncGenerator[async_sessionmaker[AsyncSession]]:
+    """Session factory as the app role, exactly like the worker process uses."""
+    engine = create_async_engine(str(settings.database_url))
+    yield async_sessionmaker(engine, expire_on_commit=False)
+    await engine.dispose()

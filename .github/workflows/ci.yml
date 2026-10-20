@@ -35,6 +35,17 @@ jobs:
         ports: ["6379:6379"]
         options: >-
           --health-cmd "redis-cli ping" --health-interval 5s --health-retries 10
+      # S3 API for the object-storage integration test (same image as docker compose).
+      minio:
+        image: bitnamilegacy/minio:2025.5.24
+        env:
+          MINIO_ROOT_USER: agentflow
+          MINIO_ROOT_PASSWORD: agentflow-local-secret
+          MINIO_DEFAULT_BUCKETS: agentflow-documents
+        ports: ["9000:9000"]
+        options: >-
+          --health-cmd "curl -fs http://localhost:9000/minio/health/live"
+          --health-interval 5s --health-retries 20
     steps:
       - uses: actions/checkout@v7
         with:

@@ -1,20 +1,22 @@
-"""Workflow worker: a separate process that runs queued workflows.
+"""Background worker: runs queued workflows (agents) and document ingestion jobs.
 
     python -m agentflow.worker        (make worker / the `worker` service in docker compose)
 
-Why not run the agents inside the API request? A model call can take seconds, providers
-rate-limit and fail, and a crash must not lose work. So the API only records the workflow
-(fast, durable) and returns 202; this loop picks it up, runs the graph, and retries with
-backoff. Any number of workers can run side by side: claiming uses FOR UPDATE SKIP LOCKED.
+Why not run this inside the API request? Model calls take seconds, providers rate-limit and
+fail, embedding is CPU-heavy, and a crash must not lose work. So the API only records the
+job (fast, durable) and returns 202; this loop picks it up and retries with backoff. Any
+number of workers can run side by side: claiming uses FOR UPDATE SKIP LOCKED.
 
-Database transactions are kept short and never span a model call: claim (commit), run the
-graph, then save each step and the outcome in their own small transactions.
+Database transactions are kept short and never span a model call: claim (commit), do the
+slow work, then save results in their own small transactions.
 """
 
 import asyncio
 import contextlib
 import logging
 import signal
+import uuid
+from collections.abc import Sequence
 from typing import Any
 
 from langgraph.graph.state import CompiledStateGraph
@@ -22,18 +24,46 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from agentflow.config import Settings, get_settings
 from agentflow.db import create_engine, set_tenant_context
+from agentflow.knowledge import ingestion, retrieval
+from agentflow.knowledge import service as knowledge_service
+from agentflow.knowledge.retrieval import RetrievedChunk
+from agentflow.knowledge.runtime import KnowledgeRuntime, build_runtime
+from agentflow.knowledge.storage import S3ObjectStore
 from agentflow.llm import build_llm
 from agentflow.observability import configure_logging, org_id_var, request_id_var, workflow_id_var
 from agentflow.workflow import service
-from agentflow.workflow.graph import RECURSION_LIMIT, WorkflowState, build_graph
+from agentflow.workflow.graph import RECURSION_LIMIT, SearchFn, WorkflowState, build_graph
 
 log = logging.getLogger("agentflow.worker")
 
 Sessions = async_sessionmaker[AsyncSession]
 
 
+def tenant_search(sessions: Sessions, org_id: uuid.UUID, runtime: KnowledgeRuntime) -> SearchFn:
+    """Knowledge search bound to one tenant. Candidates are fetched in a short transaction;
+    the reranker (CPU, ~1 s) runs after it, so no connection is held during inference."""
+
+    async def search(queries: Sequence[str], rerank_query: str) -> list[RetrievedChunk]:
+        async with sessions() as session, session.begin():
+            await set_tenant_context(session, org_id=org_id)
+            candidates = await retrieval.hybrid_candidates(
+                session, org_id, queries, runtime.embedder, runtime.params
+            )
+        return await retrieval.rerank(
+            runtime.reranker,
+            rerank_query,
+            candidates[: runtime.params.rerank_candidates],
+            runtime.params.top_k,
+        )
+
+    return search
+
+
 async def process_next(
-    sessions: Sessions, graph: CompiledStateGraph[WorkflowState], settings: Settings
+    sessions: Sessions,
+    graph: CompiledStateGraph[WorkflowState],
+    settings: Settings,
+    runtime: KnowledgeRuntime,
 ) -> bool:
     """Claim and run one workflow. Returns False when there was nothing to do."""
     async with sessions() as session, session.begin():
@@ -61,7 +91,13 @@ async def process_next(
             async for update in graph.astream(
                 {"message": message},
                 stream_mode="updates",  # yields {node_name: what that node returned}
-                config={"recursion_limit": RECURSION_LIMIT},
+                config={
+                    "recursion_limit": RECURSION_LIMIT,
+                    "configurable": {
+                        "search": tenant_search(sessions, claim.org_id, runtime),
+                        "min_rerank_score": runtime.min_rerank_score,
+                    },
+                },
             ):
                 for node, output in update.items():
                     meta = output.pop("node_meta", {})
@@ -86,19 +122,71 @@ async def process_next(
     async with sessions() as session, session.begin():
         await set_tenant_context(session, org_id=claim.org_id)
         if locked := await service.lock_if_still_ours(session, claim):
-            await service.complete(session, locked, {"triage": state.get("triage")})
+            result = {"triage": state.get("triage"), "knowledge": state.get("knowledge")}
+            await service.complete(session, locked, result)
             log.info("workflow.completed", extra={"attempt": claim.attempt})
+    return True
+
+
+async def process_next_document(
+    sessions: Sessions, settings: Settings, runtime: KnowledgeRuntime
+) -> bool:
+    """Claim and ingest one document: download, parse, chunk, embed, swap chunks."""
+    async with sessions() as session, session.begin():
+        claim = await knowledge_service.claim_next_document(
+            session,
+            max_attempts=settings.document_max_attempts,
+            lease_seconds=settings.document_lease_seconds,
+        )
+    if claim is None:
+        return False
+
+    org_id_var.set(str(claim.org_id))
+    async with sessions() as session, session.begin():
+        await set_tenant_context(session, org_id=claim.org_id)
+        document = await knowledge_service.get_document(session, claim.org_id, claim.job_id)
+        key, content_type = document.storage_key, document.content_type
+    log.info("document.ingest_started", extra={"document_id": str(claim.job_id)})
+
+    try:
+        data = await runtime.store.get(key)
+        prepared = await ingestion.prepare(data, content_type, runtime.embedder, runtime.screen)
+    except Exception as e:
+        log.exception("document.ingest_failed", extra={"attempt": claim.attempt})
+        async with sessions() as session, session.begin():
+            await set_tenant_context(session, org_id=claim.org_id)
+            if locked := await knowledge_service.lock_if_still_ours(session, claim):
+                await knowledge_service.fail_ingestion_attempt(
+                    session,
+                    locked,
+                    claim,
+                    f"{type(e).__name__}: {e}"[:2000],
+                    max_attempts=settings.document_max_attempts,
+                )
+        return True
+
+    async with sessions() as session, session.begin():
+        await set_tenant_context(session, org_id=claim.org_id)
+        if locked := await knowledge_service.lock_if_still_ours(session, claim):
+            await knowledge_service.complete_ingestion(session, locked, prepared)
+            log.info("document.ingested", extra={"chunks": len(prepared.drafts)})
     return True
 
 
 async def run(settings: Settings, stop: asyncio.Event, poll_seconds: float = 1.0) -> None:
     engine = create_engine(str(settings.database_url))
     sessions = async_sessionmaker(engine, expire_on_commit=False)
+    runtime = build_runtime(settings)
+    if settings.env == "local" and isinstance(runtime.store, S3ObjectStore):
+        await runtime.store.ensure_bucket()
     graph = build_graph(build_llm(settings))
     log.info("worker.started")
     try:
         while not stop.is_set():
-            if not await process_next(sessions, graph, settings):
+            # Ingestion first: an answer can only be as good as the indexed documents.
+            busy = await process_next_document(sessions, settings, runtime)
+            busy = await process_next(sessions, graph, settings, runtime) or busy
+            if not busy:
                 # Idle: wait before polling again, but wake at once on shutdown.
                 with contextlib.suppress(TimeoutError):
                     await asyncio.wait_for(stop.wait(), timeout=poll_seconds)
@@ -114,7 +202,7 @@ def main() -> None:
     async def _main() -> None:
         stop = asyncio.Event()
         loop = asyncio.get_running_loop()
-        # Docker/ECS send SIGTERM on deploy: finish the current workflow, then exit.
+        # Docker/ECS send SIGTERM on deploy: finish the current job, then exit.
         for sig in (signal.SIGTERM, signal.SIGINT):
             loop.add_signal_handler(sig, stop.set)
         await run(settings, stop)

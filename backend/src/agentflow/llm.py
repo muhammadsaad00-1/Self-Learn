@@ -28,7 +28,10 @@ log = logging.getLogger("agentflow.llm")
 
 
 class TaskType(StrEnum):
-    CLASSIFICATION = "classification"
+    CLASSIFICATION = "classification"  # triage
+    QUERY_PLANNING = "query_planning"  # rewrite a request into search queries
+    GROUNDED_ANSWER = "grounded_answer"  # answer only from retrieved sources
+    VERIFICATION = "verification"  # check an answer against its sources
 
 
 class LLMError(Exception):
@@ -141,7 +144,7 @@ def build_llm(settings: Settings) -> RoutedLLM:
         chat = ChatGroq(
             model_name=name,
             api_key=api_key,
-            temperature=0,  # same input, same answer: classification should be repeatable
+            temperature=0,  # same input, same answer: agent output should be repeatable
             # gpt-oss "thinks" before answering; classification needs little of that, and
             # thinking tokens count against rate limits and latency.
             reasoning_effort="low" if name.startswith("openai/gpt-oss") else None,
@@ -153,4 +156,11 @@ def build_llm(settings: Settings) -> RoutedLLM:
         )
         return runnable
 
-    return RoutedLLM({TaskType.CLASSIFICATION: settings.llm_classification_models}, make_model)
+    fast, strong = settings.llm_fast_models, settings.llm_strong_models
+    routes = {
+        TaskType.CLASSIFICATION: fast,
+        TaskType.QUERY_PLANNING: fast,
+        TaskType.GROUNDED_ANSWER: strong,
+        TaskType.VERIFICATION: strong,
+    }
+    return RoutedLLM(routes, make_model)

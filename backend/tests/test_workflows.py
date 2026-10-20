@@ -2,12 +2,11 @@
 dead-lettering, lost leases), against the real database with a fake LLM."""
 
 import uuid
-from collections.abc import AsyncGenerator, Awaitable, Callable
+from collections.abc import Awaitable, Callable
 from typing import Any
 
-import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from agentflow.config import Settings
 from agentflow.db import set_tenant_context
@@ -15,7 +14,7 @@ from agentflow.llm import LLMError
 from agentflow.worker import process_next
 from agentflow.workflow import service
 from agentflow.workflow.graph import build_graph
-from tests.fakes import FakeLLM, triage_result
+from tests.fakes import FakeLLM, fake_runtime, query_plan, triage_result
 from tests.helpers import Account, signup
 
 Sessions = async_sessionmaker[AsyncSession]
@@ -31,16 +30,14 @@ def submit(
     )
 
 
-@pytest.fixture
-async def sessions(settings: Settings) -> AsyncGenerator[Sessions]:
-    """Sessions as the app role, exactly like the worker process uses."""
-    engine = create_async_engine(str(settings.database_url))
-    yield async_sessionmaker(engine, expire_on_commit=False)
-    await engine.dispose()
-
-
 async def run_once(sessions: Sessions, settings: Settings, llm: FakeLLM) -> bool:
-    return await process_next(sessions, build_graph(llm), settings)
+    return await process_next(sessions, build_graph(llm), settings, fake_runtime())
+
+
+def agents() -> FakeLLM:
+    """Triage + query planner. With no documents uploaded, retrieval finds nothing and the
+    workflow ends in an abstention without calling the answer agents."""
+    return FakeLLM(triage_result(), query_plan("duplicate charge refund"))
 
 
 # --- API ------------------------------------------------------------------------------
@@ -86,8 +83,8 @@ async def test_worker_triages_and_records_steps(
     owner = signup(client)
     wf_id = submit(client, owner, "I was charged twice!").json()["id"]
 
-    assert await run_once(sessions, settings, FakeLLM(triage_result())) is True
-    assert await run_once(sessions, settings, FakeLLM(triage_result())) is False  # queue empty
+    assert await run_once(sessions, settings, agents()) is True
+    assert await run_once(sessions, settings, agents()) is False  # queue empty
 
     wf = client.get(f"/v1/workflows/{wf_id}", headers=owner.headers()).json()
     assert wf["status"] == "completed"
@@ -95,6 +92,9 @@ async def test_worker_triages_and_records_steps(
     assert [(s["node"], s["status"]) for s in wf["steps"]] == [
         ("intake", "completed"),
         ("triage", "completed"),
+        ("plan_queries", "completed"),
+        ("retrieve", "completed"),
+        ("abstain", "completed"),
     ]
     assert wf["steps"][1]["model"] == "fake-model"
     assert wf["steps"][1]["input_tokens"] == 100
@@ -143,13 +143,13 @@ async def test_crashed_worker_lease_is_reclaimed(
         claim = await service.claim_next(s, max_attempts=3, lease_seconds=60)
     assert claim is not None
     assert claim.attempt == 1
-    assert await run_once(sessions, settings, FakeLLM(triage_result())) is False  # lease valid
+    assert await run_once(sessions, settings, agents()) is False  # lease valid
 
     await exec_sql(
         "UPDATE workflows SET locked_until = now() - interval '1 second' WHERE id = :i",
         {"i": wf_id},
     )
-    assert await run_once(sessions, settings, FakeLLM(triage_result())) is True
+    assert await run_once(sessions, settings, agents()) is True
     wf = client.get(f"/v1/workflows/{wf_id}", headers=owner.headers()).json()
     assert (wf["status"], wf["attempts"]) == ("completed", 2)
 

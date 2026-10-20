@@ -5,6 +5,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from agentflow.agents.triage import Category, TriageResult, Urgency
+from agentflow.knowledge.schemas import KnowledgeAnswer
 from agentflow.workflow.models import StepStatus, WorkflowStatus
 
 
@@ -36,6 +37,7 @@ class WorkflowResult(BaseModel):
     """What the agents concluded. Grows a field per phase (resolution, actions, ...)."""
 
     triage: TriageResult | None = None
+    knowledge: KnowledgeAnswer | None = None  # policy answer with citations (RAG)
 
 
 class WorkflowOut(BaseModel):

@@ -3,10 +3,8 @@
 import hashlib
 import json
 import logging
-import random
 import uuid
-from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import func, select, text
@@ -14,6 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentflow.audit import service as audit
+from agentflow.jobs import Claim, backoff
 from agentflow.workflow.models import StepStatus, Workflow, WorkflowStatus, WorkflowStep
 from agentflow.workflow.schemas import CreateWorkflowRequest, WorkflowSummary
 
@@ -143,13 +142,6 @@ async def list_recent(
 # --- Worker side ------------------------------------------------------------------------
 
 
-@dataclass(frozen=True)
-class Claim:
-    workflow_id: uuid.UUID
-    org_id: uuid.UUID
-    attempt: int
-
-
 async def claim_next(
     session: AsyncSession, *, max_attempts: int, lease_seconds: int
 ) -> Claim | None:
@@ -212,16 +204,6 @@ async def complete(session: AsyncSession, wf: Workflow, result: dict[str, Any]) 
         target_type="workflow",
         target_id=wf.id,
     )
-
-
-def backoff(attempt: int, base_seconds: float = 5, cap_seconds: float = 300) -> timedelta:
-    """Exponential backoff with jitter: ~5s, ~10s, ~20s ... capped at 5 minutes.
-
-    The random factor ("jitter") spreads retries out, so many workflows that failed together
-    (say, during a provider outage) don't all hit the provider again in the same second.
-    """
-    delay = min(cap_seconds, base_seconds * 2 ** (attempt - 1))
-    return timedelta(seconds=delay * random.uniform(0.5, 1.0))  # noqa: S311 (not crypto)
 
 
 async def fail_attempt(

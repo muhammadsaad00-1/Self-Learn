@@ -19,11 +19,21 @@ from agentflow.audit import api as audit_api
 from agentflow.config import Settings, get_settings
 from agentflow.db import create_engine
 from agentflow.identity import api as identity_api
+from agentflow.knowledge import api as knowledge_api
+from agentflow.knowledge.runtime import KnowledgeRuntime
+from agentflow.llm import StructuredLLM
 from agentflow.observability import configure_logging, request_context_middleware
 from agentflow.workflow import api as workflow_api
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    *,
+    llm: StructuredLLM | None = None,
+    knowledge: KnowledgeRuntime | None = None,
+) -> FastAPI:
+    """`llm` and `knowledge` are injectable for tests; by default they're built on first
+    use (see knowledge.api), so starting the API never loads models or needs a Groq key."""
     settings = settings or get_settings()
     configure_logging(settings.log_level)
 
@@ -47,11 +57,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         redoc_url=None,
     )
     app.state.settings = settings
+    app.state.llm = llm
+    app.state.knowledge = knowledge
     app.middleware("http")(request_context_middleware)
     app.include_router(identity_api.router)
     app.include_router(identity_api.members_router)
     app.include_router(audit_api.router)
     app.include_router(workflow_api.router)
+    app.include_router(knowledge_api.router)
 
     @app.get("/health", tags=["ops"])
     async def health() -> dict[str, str]:

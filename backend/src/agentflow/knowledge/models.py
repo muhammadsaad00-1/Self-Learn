@@ -22,6 +22,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column
@@ -52,6 +53,12 @@ class Document(TimestampMixin, Base):
         enum_check("status", DocumentStatus),
         # Re-uploading the exact same file is a no-op instead of a second copy (idempotency).
         UniqueConstraint("org_id", "checksum"),
+        # The ingestion worker's "next job" query reads only this small partial index.
+        Index(
+            "ix_knowledge_documents_queue",
+            "available_at",
+            postgresql_where=text("status IN ('pending', 'processing')"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -67,7 +74,16 @@ class Document(TimestampMixin, Base):
     )
     error: Mapped[str | None] = mapped_column(Text)
     chunk_count: Mapped[int] = mapped_column(default=0)
+    # Chunks the injection screen quarantined (stored, never retrieved). See screening.py.
+    quarantined_chunks: Mapped[int] = mapped_column(default=0)
     uploaded_by: Mapped[uuid.UUID | None]  # user id; no FK, like audit actors
+    # Ingestion runs as a background job with the same mechanics as workflows (ADR 0010):
+    # attempts + backoff via available_at, and a lease (locked_until) a crashed worker loses.
+    attempts: Mapped[int] = mapped_column(default=0)
+    available_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Chunk(Base):
@@ -99,6 +115,9 @@ class Chunk(Base):
     content: Mapped[str] = mapped_column(Text)
     embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIMENSIONS))
     embedding_model: Mapped[str] = mapped_column(String(100))
+    # Flagged by the injection screen at ingestion: kept for review, excluded from retrieval.
+    quarantined: Mapped[bool] = mapped_column(default=False)
+    quarantine_reason: Mapped[str | None] = mapped_column(String(100))
     # Computed by Postgres on every insert/update, never written by us. The section heading is
     # indexed too, with weight A (body text: B), so ts_rank scores a match in the heading
     # higher: "Duplicate charges" is a stronger signal than "charges" in passing.

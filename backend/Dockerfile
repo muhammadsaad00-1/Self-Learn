@@ -11,7 +11,10 @@ RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked --no-dev --no-edi
 
 # Stage 2: minimal runtime — just Python + the venv, running as non-root.
 FROM python:3.12-slim-bookworm
-RUN useradd --create-home --uid 10001 app
+RUN useradd --create-home --uid 10001 app \
+    # Model cache mount point, owned by the app user: a named volume mounted here copies
+    # this ownership, so the non-root process can download models into it.
+    && mkdir /models && chown app:app /models
 COPY --from=build --chown=app:app /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1
 USER app

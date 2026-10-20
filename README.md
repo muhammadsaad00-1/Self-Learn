@@ -18,10 +18,14 @@ make migrate     # create the tables
 make web         # Angular dashboard                      →  http://localhost:4200
 ```
 
+`GROQ_API_KEY` goes in `.env` (never `.env.example`). The first document upload downloads the embedding and reranker models (~700 MB, cached in a Docker volume). Sample policy documents to upload: `backend/evals/rag/corpus/`.
+
 Sign up at http://localhost:4200/signup. `make help` lists every command. `make down` stops the stack.
 
 ## Test
 
 ```bash
 make check       # everything CI runs: lint, types, secret scan, backend + frontend tests
+make eval        # triage agent vs the real model
+make eval-rag    # RAG retrieval quality per stage; AGENTS=1 adds the multi-agent pipeline
 ```

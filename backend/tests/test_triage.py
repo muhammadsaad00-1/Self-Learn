@@ -6,7 +6,7 @@ import pytest
 
 from agentflow.agents.triage import Category, Details, Urgency, apply_rules, triage
 from agentflow.workflow.graph import build_graph
-from tests.fakes import FakeLLM, triage_result
+from tests.fakes import FakeLLM, query_plan, triage_result
 
 
 def details(**values: object) -> Details:
@@ -72,19 +72,33 @@ async def test_customer_text_is_delimited_data_not_instructions() -> None:
     assert call["user"].startswith("Customer message:\n<<<\n")
 
 
-async def test_graph_runs_intake_then_triage() -> None:
-    llm = FakeLLM(triage_result(category=Category.FAILED_PAYMENT))
+async def test_graph_runs_intake_triage_then_knowledge_agents() -> None:
+    llm = FakeLLM(triage_result(category=Category.FAILED_PAYMENT), query_plan("failed transfer"))
+
+    async def no_documents(queries: object, rerank_query: object) -> list[object]:
+        return []
+
     updates = [
         u
         async for u in build_graph(llm).astream(
-            {"message": "  money   left\n\n my account  "}, stream_mode="updates"
+            {"message": "  money   left\n\n my account  "},
+            stream_mode="updates",
+            config={"configurable": {"search": no_documents}},
         )
     ]
-    assert [next(iter(u)) for u in updates] == ["intake", "triage"]
+    assert [next(iter(u)) for u in updates] == [
+        "intake",
+        "triage",
+        "plan_queries",
+        "retrieve",
+        "abstain",  # no documents: refuse without calling the answer agent
+    ]
     assert updates[0]["intake"]["message"] == "money left my account"  # whitespace normalized
     assert llm.calls[0]["user"].endswith("money left my account\n>>>")
     assert updates[1]["triage"]["triage"]["category"] == "failed_payment"
     assert updates[1]["triage"]["node_meta"]["model"] == "fake-model"
+    # The planner sees the triage category as a hint.
+    assert "Triage category: failed_payment" in llm.calls[1]["user"]
 
 
 async def test_graph_rejects_empty_message() -> None:
