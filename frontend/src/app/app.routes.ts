@@ -26,6 +26,10 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/workflows-page').then((m) => m.WorkflowsPage),
       },
       {
+        path: 'knowledge',
+        loadComponent: () => import('./pages/knowledge-page').then((m) => m.KnowledgePage),
+      },
+      {
         path: 'members',
         loadComponent: () => import('./pages/members-page').then((m) => m.MembersPage),
       },

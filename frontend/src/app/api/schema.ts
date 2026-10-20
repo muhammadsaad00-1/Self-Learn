@@ -171,6 +171,90 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/v1/knowledge/documents': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Documents */
+    get: operations['list_documents_v1_knowledge_documents_get'];
+    put?: never;
+    /**
+     * Upload Document
+     * @description Upload a policy document (admins and owners). 202: stored and queued for ingestion;
+     *     poll the list until it is `ready`. Uploading the same bytes again answers 200 with the
+     *     existing document.
+     */
+    post: operations['upload_document_v1_knowledge_documents_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v1/knowledge/documents/{document_id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Document */
+    get: operations['get_document_v1_knowledge_documents__document_id__get'];
+    put?: never;
+    post?: never;
+    /** Delete Document */
+    delete: operations['delete_document_v1_knowledge_documents__document_id__delete'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v1/knowledge/search': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Search
+     * @description Raw retrieval (no LLM): the reranked top chunks with every stage's rank and score.
+     *     For debugging retrieval quality and for the dashboard's search box.
+     */
+    post: operations['search_v1_knowledge_search_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v1/knowledge/ask': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Ask
+     * @description Ask the knowledge agents a question: query planner -> hybrid retrieval + rerank ->
+     *     answer agent -> verifier. Answers only from this organization's documents, with
+     *     citations; abstains when they don't cover the question.
+     */
+    post: operations['ask_v1_knowledge_ask_post'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/health': {
     parameters: {
       query?: never;
@@ -231,6 +315,11 @@ export interface components {
       /** @default member */
       role: components['schemas']['Role'];
     };
+    /** AskRequest */
+    AskRequest: {
+      /** Question */
+      question: string;
+    };
     /** AuditEventOut */
     AuditEventOut: {
       /** Id */
@@ -286,6 +375,16 @@ export interface components {
        */
       client_secret?: string | null;
     };
+    /** Body_upload_document_v1_knowledge_documents_post */
+    Body_upload_document_v1_knowledge_documents_post: {
+      /**
+       * File
+       * @description .md, .txt or .pdf, up to 10 MB
+       */
+      file: string;
+      /** Title */
+      title?: string | null;
+    };
     /**
      * Category
      * @enum {string}
@@ -303,6 +402,27 @@ export interface components {
     /** ChangeRoleRequest */
     ChangeRoleRequest: {
       role: components['schemas']['Role'];
+    };
+    /** Citation */
+    Citation: {
+      /** Number */
+      number: number;
+      /**
+       * Chunk Id
+       * Format: uuid
+       */
+      chunk_id: string;
+      /**
+       * Document Id
+       * Format: uuid
+       */
+      document_id: string;
+      /** Document Title */
+      document_title: string;
+      /** Section */
+      section: string | null;
+      /** Excerpt */
+      excerpt: string;
     };
     /**
      * CreateWorkflowRequest
@@ -346,10 +466,71 @@ export interface components {
        */
       transaction_date: string | null;
     };
+    /** DocumentOut */
+    DocumentOut: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Title */
+      title: string;
+      /** Filename */
+      filename: string;
+      /** Content Type */
+      content_type: string;
+      /** Size Bytes */
+      size_bytes: number;
+      status: components['schemas']['DocumentStatus'];
+      /** Error */
+      error: string | null;
+      /** Chunk Count */
+      chunk_count: number;
+      /** Quarantined Chunks */
+      quarantined_chunks: number;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string;
+    };
+    /**
+     * DocumentStatus
+     * @enum {string}
+     */
+    DocumentStatus: 'pending' | 'processing' | 'ready' | 'failed';
     /** HTTPValidationError */
     HTTPValidationError: {
       /** Detail */
       detail?: components['schemas']['ValidationError'][];
+    };
+    /**
+     * KnowledgeAnswer
+     * @description Outcome of the knowledge agents for one question.
+     *
+     *     answered:   the answer passed citation checks and the verifier.
+     *     abstained:  no good-enough sources (decided by code), or the answer agent declined.
+     *     unverified: an answer exists but failed verification twice; a human must check it.
+     */
+    KnowledgeAnswer: {
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: 'answered' | 'abstained' | 'unverified';
+      /** Answer */
+      answer: string | null;
+      /** Citations */
+      citations: components['schemas']['Citation'][];
+      /** Queries */
+      queries: string[];
+      /** Reason */
+      reason?: string | null;
     };
     /** MeResponse */
     MeResponse: {
@@ -393,6 +574,38 @@ export interface components {
      * @enum {string}
      */
     Role: 'owner' | 'admin' | 'member';
+    /** SearchHit */
+    SearchHit: {
+      /**
+       * Chunk Id
+       * Format: uuid
+       */
+      chunk_id: string;
+      /**
+       * Document Id
+       * Format: uuid
+       */
+      document_id: string;
+      /** Document Title */
+      document_title: string;
+      /** Section */
+      section: string | null;
+      /** Content */
+      content: string;
+      /** Vector Rank */
+      vector_rank: number | null;
+      /** Keyword Rank */
+      keyword_rank: number | null;
+      /** Fused Score */
+      fused_score: number;
+      /** Rerank Score */
+      rerank_score: number | null;
+    };
+    /** SearchRequest */
+    SearchRequest: {
+      /** Query */
+      query: string;
+    };
     /** SignupRequest */
     SignupRequest: {
       /**
@@ -535,6 +748,7 @@ export interface components {
      */
     WorkflowResult: {
       triage?: components['schemas']['TriageResult'] | null;
+      knowledge?: components['schemas']['KnowledgeAnswer'] | null;
     };
     /**
      * WorkflowStatus
@@ -951,6 +1165,212 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['WorkflowOut'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  list_documents_v1_knowledge_documents_get: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description Organization this request acts in */
+        'x-org-id': string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DocumentOut'][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  upload_document_v1_knowledge_documents_post: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description Organization this request acts in */
+        'x-org-id': string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'multipart/form-data': components['schemas']['Body_upload_document_v1_knowledge_documents_post'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DocumentOut'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  get_document_v1_knowledge_documents__document_id__get: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description Organization this request acts in */
+        'x-org-id': string;
+      };
+      path: {
+        document_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DocumentOut'];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  delete_document_v1_knowledge_documents__document_id__delete: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description Organization this request acts in */
+        'x-org-id': string;
+      };
+      path: {
+        document_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  search_v1_knowledge_search_post: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description Organization this request acts in */
+        'x-org-id': string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SearchRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SearchHit'][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['HTTPValidationError'];
+        };
+      };
+    };
+  };
+  ask_v1_knowledge_ask_post: {
+    parameters: {
+      query?: never;
+      header: {
+        /** @description Organization this request acts in */
+        'x-org-id': string;
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AskRequest'];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['KnowledgeAnswer'];
         };
       };
       /** @description Validation Error */

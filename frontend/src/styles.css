@@ -255,3 +255,34 @@ tr.selected {
   color: var(--danger);
   font-weight: 600;
 }
+
+/* Knowledge answers */
+.answer {
+  border-left: 3px solid var(--border);
+  padding: 0.25rem 0 0.25rem 0.75rem;
+  margin-top: 0.75rem;
+}
+.answer[data-status='answered'] {
+  border-color: var(--accent);
+}
+.answer[data-status='unverified'] {
+  border-color: var(--danger);
+}
+.answer-head {
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.citations {
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+.citations blockquote {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  border-left: 2px solid var(--border);
+  padding-left: 0.5rem;
+}

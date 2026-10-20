@@ -19,6 +19,9 @@ export type Workflow = Schemas['WorkflowOut'];
 export type WorkflowSummary = Schemas['WorkflowSummary'];
 export type WorkflowStatus = Schemas['WorkflowStatus'];
 export type TriageResult = Schemas['TriageResult'];
+export type KnowledgeDocument = Schemas['DocumentOut'];
+export type KnowledgeAnswer = Schemas['KnowledgeAnswer'];
+export type Citation = Schemas['Citation'];
 
 /** Error body FastAPI returns for HTTPException: {"detail": "..."} */
 export interface ApiError {

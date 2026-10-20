@@ -7,13 +7,14 @@ import { firstValueFrom } from 'rxjs';
 import type { Workflow, WorkflowStatus, WorkflowSummary } from '../api/types';
 import { Auth } from '../core/auth';
 import { errorMessage } from '../core/errors';
+import { KnowledgeAnswerView } from '../layout/knowledge-answer';
 
 const PENDING: WorkflowStatus[] = ['queued', 'running'];
 const POLL_MS = 2000;
 
 @Component({
   selector: 'app-workflows-page',
-  imports: [FormsModule, DatePipe, DecimalPipe],
+  imports: [FormsModule, DatePipe, DecimalPipe, KnowledgeAnswerView],
   template: `
     <h1>Workflows</h1>
     <p class="muted">Paste a customer request. The triage agent classifies it in the background.</p>
@@ -105,6 +106,11 @@ const POLL_MS = 2000;
             <p class="error">Failed after {{ wf.attempts }} attempts: {{ wf.error }}</p>
           } @else {
             <p class="muted">{{ wf.status }}… (attempt {{ wf.attempts }})</p>
+          }
+
+          @if (wf.result?.knowledge; as k) {
+            <h3>Policy answer</h3>
+            <app-knowledge-answer [answer]="k" />
           }
 
           <h3>Steps</h3>
