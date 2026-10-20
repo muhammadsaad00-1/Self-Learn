@@ -61,6 +61,9 @@ Claude writes the code into the files, then shows the full code in chat (the use
 - System Python is 3.8, which is too old. Python is managed with `uv` (Python 3.12 is installed by uv).
 - `uv` 0.12 and `gh` 2.102 are in `~/.local/bin`. `codex` is not installed.
 
+## Branch stack (none merged yet; PRs need `gh auth login`)
+`main` ← feat/phase-1-core-saas (incl. phase 0) ← feat/phase-2-first-agent ← feat/phase-3-rag ← feat/add-company. CI only runs on PRs/main, so it has not run on GitHub yet.
+
 ## Decisions
 - **Purpose is learning.** Build the full spec, including every AWS service, IaC, MCP, evals and the frontend. Don't skip components as "not needed yet". Order still follows the roadmap phases.
 - **LLM provider: Groq** (free tier), behind the provider abstraction so Bedrock and others can plug in later. The user supplies all API keys. Ask for them; never invent or reuse keys.
@@ -83,9 +86,9 @@ Roadmap phases are in spec 05. Mark items `[x]` as they land.
   - [x] 1d Audit: append-only audit_events (grants + RLS + trigger), same-transaction `audit.service.record()`, GET /v1/audit/events (ADR 0009)
   - [x] 1e Angular dashboard: login/signup, org switcher, members, audit log; typed API client from OpenAPI (`make api-types`), CI contract check
 - [x] Phase 2 — First agent (`feat/phase-2-first-agent`, ADR 0010): JSON logs + request/org/workflow ids (`observability.py`), LLM router with fallback + schema output (`llm.py`), triage agent + rules (`agents/triage.py`), idempotent `POST /v1/workflows`, Postgres-queue worker (`worker.py`, `claim_next_workflow()`), LangGraph intake→triage, evals (`make eval`), dashboard Workflows page
-- [ ] Feature (parked 2026-10-18): **Add company** — one login, many orgs; `POST /v1/orgs` (password re-confirm, shares login rate limit), shared `_create_org_with_owner`, Chrome-style profile menu, profile page. Fully built + tested in scratch; Part 1 (backend) handed over, not yet pasted. UI request: compact Account section with "Add company" directly below it.
+- [x] Feature: **Add company** (`feat/add-company`): one login, many orgs; `POST /v1/orgs` (password re-confirm, shares login rate limit), shared `_create_org_with_owner`, Chrome-style profile menu, compact profile page (account strip + Add company below).
 - [x] Phase 3 — Multi-agent RAG (`feat/phase-3-rag`, ADR 0011): upload → MinIO/S3 → worker ingestion (parse md/txt/pdf, heading-aware chunks, bge-small embeddings, prompt-injection screen → quarantine) → hybrid retrieval (pgvector HNSW iterative scan + weighted tsvector, weighted RRF) → bge-reranker-v2-m3 → agents: query planner → answer (citations) → verifier (scope-aware), code-level abstention + citation checks. APIs `/v1/knowledge/{documents,search,ask}`; workflow result includes `knowledge`. Evals: `make eval-rag [AGENTS=1]` (26/26, planner+rerank R@1 100%). Dashboard Knowledge page.
-- [ ] Phase 4 — Multi-agent: supervisor, research, knowledge, resolution, verifier, budgets
+- [~] Phase 4 — Multi-agent (planner/knowledge/verifier done in Phase 3; research + resolution agents left): supervisor, research, knowledge, resolution, verifier, budgets
 - [ ] Phase 5 — Tools: registry, permission model, CRM/ticket/email/calendar/db tools, MCP, SQS/EventBridge automation
 - [ ] Phase 6 — Approval: policy engine, approval entity + UI, pause/resume, expiry, double authorization
 - [ ] Phase 7 — AWS: IaC, ECR, ECS/RDS/S3/SQS, Secrets/KMS, CloudWatch/OTel, staging/prod
