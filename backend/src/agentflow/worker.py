@@ -24,9 +24,10 @@ from langgraph.graph.state import CompiledStateGraph
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from agentflow.agents.resolution import ProposedAction
+from agentflow.agents.resolution import ActionType, ProposedAction
 from agentflow.approvals import service as approvals
 from agentflow.config import Settings, get_settings
+from agentflow.conversations import service as conversations
 from agentflow.db import create_engine, set_tenant_context
 from agentflow.jobs import Claim
 from agentflow.knowledge import ingestion, retrieval
@@ -39,6 +40,7 @@ from agentflow.ledger.schemas import Evidence
 from agentflow.llm import build_llm
 from agentflow.observability import configure_logging, org_id_var, request_id_var, workflow_id_var
 from agentflow.policy.engine import Outcome
+from agentflow.tools import card as card_tool
 from agentflow.tools import refund as refund_tool
 from agentflow.tools import tickets as ticket_tool
 from agentflow.tools.refund import ExecutionResult
@@ -54,7 +56,7 @@ from agentflow.workflow.graph import (
     WorkflowState,
     build_workflow_graphs,
 )
-from agentflow.workflow.models import WorkflowStage
+from agentflow.workflow.models import WorkflowStage, WorkflowStatus
 
 log = logging.getLogger("agentflow.worker")
 
@@ -91,18 +93,28 @@ def tenant_research(sessions: Sessions, org_id: uuid.UUID) -> ResearchFn:
 
 
 def tenant_execute(sessions: Sessions, claim: Claim) -> ExecuteFn:
-    """The refund tool bound to this workflow's tenant. One transaction: refund, action-ledger
-    row and audit event commit together."""
+    """The write tools bound to this workflow's tenant. One transaction: the action, its
+    action-ledger row and audit event commit together."""
 
     async def execute(state: WorkflowState) -> ExecutionResult:
         triage = state.get("triage") or {}
+        proposal = ProposedAction.model_validate(state["proposal"])
         async with sessions() as session, session.begin():
             await set_tenant_context(session, org_id=claim.org_id)
+            if proposal.action == ActionType.FREEZE_CARD:
+                return await card_tool.freeze(
+                    session,
+                    org_id=claim.org_id,
+                    workflow_id=claim.workflow_id,
+                    proposal=proposal,
+                    customer_ref=state.get("customer_ref"),
+                    category=triage.get("category"),
+                )
             return await refund_tool.authorize_and_execute(
                 session,
                 org_id=claim.org_id,
                 workflow_id=claim.workflow_id,
-                proposal=ProposedAction.model_validate(state["proposal"]),
+                proposal=proposal,
                 customer_ref=state.get("customer_ref"),
                 category=triage.get("category"),
                 needs_human_review=bool(triage.get("needs_human_review")),
@@ -216,6 +228,7 @@ async def process_next(
                             state["approval"] = {"id": str(approval.id), "status": "pending"}
                             result = {k: state.get(k) for k in RESULT_KEYS}
                             await service.pause_for_approval(session, locked, result)
+                            await conversations.post_outcome(session, locked, state, "review")
                             log.info("workflow.waiting_approval")
                     return True
             else:  # execution stage, resumed after a human decided the approval
@@ -235,12 +248,15 @@ async def process_next(
                     f"{type(e).__name__}: {e}"[:2000],
                     max_attempts=settings.workflow_max_attempts,
                 )
+                if locked.status == WorkflowStatus.FAILED:
+                    await conversations.post_outcome(session, locked, {}, "failed")
         return True
 
     async with sessions() as session, session.begin():
         await set_tenant_context(session, org_id=claim.org_id)
         if locked := await service.lock_if_still_ours(session, claim):
             await service.complete(session, locked, {k: state.get(k) for k in RESULT_KEYS})
+            await conversations.post_outcome(session, locked, state, "reply")
             log.info("workflow.completed", extra={"attempt": claim.attempt})
     return True
 

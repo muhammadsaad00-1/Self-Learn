@@ -27,6 +27,11 @@ export type LedgerAccount = Schemas['AccountOut'];
 export type LedgerTransaction = Schemas['TransactionOut'];
 export type WorkflowResult = Schemas['WorkflowResult'];
 export type Ticket = Schemas['TicketOut'];
+export type Chat = Schemas['ChatOut'];
+export type ChatMessage = Schemas['MessageOut'];
+export type Conversation = Schemas['ConversationOut'];
+export type OpenedChat = Schemas['OpenedChat'];
+export type Insights = Schemas['Insights'];
 
 /** Error body FastAPI returns for HTTPException: {"detail": "..."} */
 export interface ApiError {

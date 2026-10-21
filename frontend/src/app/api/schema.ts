@@ -323,7 +323,8 @@ export interface paths {
         put?: never;
         /**
          * Seed Demo Data
-         * @description Three demo customers covering every policy path (admins; never in production).
+         * @description Demo customers covering every policy path, plus the customer help guide (cheques,
+         *     transfers, fraud, ...) queued for ingestion (admins; never in production).
          */
         post: operations["seed_demo_data_v1_ledger_demo_data_post"];
         delete?: never;
@@ -432,6 +433,162 @@ export interface paths {
         patch: operations["update_ticket_v1_tickets__ticket_id__patch"];
         trace?: never;
     };
+    "/v1/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Chat
+         * @description The whole conversation. Poll it while `thinking` is true.
+         */
+        get: operations["get_chat_v1_chat_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/chat/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send Message */
+        post: operations["send_message_v1_chat_messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/chat/voice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Voice Note
+         * @description Voice note -> Whisper transcript -> the same pipeline as a typed message.
+         */
+        post: operations["send_voice_note_v1_chat_voice_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Conversations
+         * @description The 50 most recently active conversations, newest first.
+         */
+        get: operations["list_conversations_v1_conversations_get"];
+        put?: never;
+        /**
+         * Open Chat
+         * @description Open (or reopen) a customer's chat and issue a customer token for it. In production
+         *     the bank's app does this after its own customer login; here staff use it for demos.
+         */
+        post: operations["open_chat_v1_conversations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/conversations/{conversation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Conversation */
+        get: operations["get_conversation_v1_conversations__conversation_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/conversations/{conversation_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reply As Agent
+         * @description Write to the customer as a person. The agents stop answering until handed back.
+         */
+        post: operations["reply_as_agent_v1_conversations__conversation_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/conversations/{conversation_id}/handback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Hand Back To Agents */
+        post: operations["hand_back_to_agents_v1_conversations__conversation_id__handback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/insights": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Insights
+         * @description Impact over the last 30 days: AI resolution rate, money returned, speed, AI cost.
+         */
+        get: operations["get_insights_v1_insights_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -486,12 +643,13 @@ export interface components {
             customer_name: string;
             /** Currency */
             currency: string;
+            card_status: components["schemas"]["CardStatus"];
         };
         /**
          * ActionType
          * @enum {string}
          */
-        ActionType: "refund_transaction" | "escalate_to_human" | "no_action";
+        ActionType: "refund_transaction" | "freeze_card" | "escalate_to_human" | "no_action";
         /**
          * AddCompanyRequest
          * @description Create another company for the logged-in user. Name, email and password stay the same;
@@ -638,6 +796,14 @@ export interface components {
              */
             client_secret?: string | null;
         };
+        /** Body_send_voice_note_v1_chat_voice_post */
+        Body_send_voice_note_v1_chat_voice_post: {
+            /**
+             * File
+             * @description Recorded audio (webm/ogg/m4a/mp3/wav)
+             */
+            file: string;
+        };
         /** Body_upload_document_v1_knowledge_documents_post */
         Body_upload_document_v1_knowledge_documents_post: {
             /**
@@ -649,6 +815,11 @@ export interface components {
             title?: string | null;
         };
         /**
+         * CardStatus
+         * @enum {string}
+         */
+        CardStatus: "active" | "frozen";
+        /**
          * Category
          * @enum {string}
          */
@@ -656,6 +827,16 @@ export interface components {
         /** ChangeRoleRequest */
         ChangeRoleRequest: {
             role: components["schemas"]["Role"];
+        };
+        /** ChatOut */
+        ChatOut: {
+            /** Customer Name */
+            customer_name: string | null;
+            mode: components["schemas"]["ConversationMode"];
+            /** Thinking */
+            thinking: boolean;
+            /** Messages */
+            messages: components["schemas"]["MessageOut"][];
         };
         /** Citation */
         Citation: {
@@ -677,6 +858,30 @@ export interface components {
             section: string | null;
             /** Excerpt */
             excerpt: string;
+        };
+        /**
+         * ConversationMode
+         * @enum {string}
+         */
+        ConversationMode: "ai" | "human";
+        /** ConversationOut */
+        ConversationOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Customer Ref */
+            customer_ref: string;
+            /** Customer Name */
+            customer_name: string | null;
+            mode: components["schemas"]["ConversationMode"];
+            last_message: components["schemas"]["MessageOut"] | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /**
          * CreateWorkflowRequest
@@ -774,6 +979,7 @@ export interface components {
             customer_name: string | null;
             /** Account Found */
             account_found: boolean;
+            card_status?: components["schemas"]["CardStatus"] | null;
             /** Transactions */
             transactions: components["schemas"]["TransactionOut"][];
             /** Duplicate Pairs */
@@ -814,6 +1020,41 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** Insights */
+        Insights: {
+            /** Days */
+            days: number;
+            /** Requests */
+            requests: number;
+            /** Completed */
+            completed: number;
+            /** Resolved By Ai */
+            resolved_by_ai: number;
+            /** Ai Resolution Rate */
+            ai_resolution_rate: number;
+            /** Waiting Approval */
+            waiting_approval: number;
+            /** Open Tickets */
+            open_tickets: number;
+            /** Money Returned */
+            money_returned: string;
+            /** Cards Frozen */
+            cards_frozen: number;
+            /** Median Seconds To Resolve */
+            median_seconds_to_resolve: number | null;
+            /** Ai Cost Usd */
+            ai_cost_usd: string;
+            /** Ai Cost Per Request Usd */
+            ai_cost_per_request_usd: string;
+            /** By Category */
+            by_category: {
+                [key: string]: number;
+            };
+            /** By Channel */
+            by_channel: {
+                [key: string]: number;
+            };
         };
         /**
          * KnowledgeAnswer
@@ -874,6 +1115,42 @@ export interface components {
             /** Org Slug */
             org_slug: string;
             role: components["schemas"]["Role"];
+        };
+        /** MessageOut */
+        MessageOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            role: components["schemas"]["MessageRole"];
+            /** Body */
+            body: string;
+            /** Card */
+            card: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * MessageRole
+         * @enum {string}
+         */
+        MessageRole: "customer" | "assistant" | "agent";
+        /** OpenChatIn */
+        OpenChatIn: {
+            /** Customer Ref */
+            customer_ref: string;
+        };
+        /** OpenedChat */
+        OpenedChat: {
+            conversation: components["schemas"]["ConversationOut"];
+            /** Customer Token */
+            customer_token: string;
         };
         /**
          * Outcome
@@ -981,6 +1258,11 @@ export interface components {
          * @enum {string}
          */
         StepStatus: "completed" | "failed";
+        /** TextIn */
+        TextIn: {
+            /** Text */
+            text: string;
+        };
         /** TicketOut */
         TicketOut: {
             /**
@@ -1081,6 +1363,7 @@ export interface components {
             /** Merchant */
             merchant: string;
             status: components["schemas"]["TransactionStatus"];
+            transfer_status?: components["schemas"]["TransferStatus"] | null;
             /**
              * Occurred At
              * Format: date-time
@@ -1092,6 +1375,12 @@ export interface components {
          * @enum {string}
          */
         TransactionStatus: "posted" | "reversed";
+        /**
+         * TransferStatus
+         * @description For transfers to another person (IBFT/RAAST): what the payment network reports.
+         * @enum {string}
+         */
+        TransferStatus: "credited" | "pending" | "failed";
         /** TriageResult */
         TriageResult: {
             category: components["schemas"]["Category"];
@@ -2129,6 +2418,298 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TicketOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_chat_v1_chat_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatOut"];
+                };
+            };
+        };
+    };
+    send_message_v1_chat_messages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TextIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_voice_note_v1_chat_voice_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_send_voice_note_v1_chat_voice_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_conversations_v1_conversations_get: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    open_chat_v1_conversations_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OpenChatIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OpenedChat"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_conversation_v1_conversations__conversation_id__get: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reply_as_agent_v1_conversations__conversation_id__messages_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TextIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    hand_back_to_agents_v1_conversations__conversation_id__handback_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_insights_v1_insights_get: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Insights"];
                 };
             };
             /** @description Validation Error */

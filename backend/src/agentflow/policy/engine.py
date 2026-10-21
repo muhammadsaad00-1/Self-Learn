@@ -12,6 +12,7 @@ from enum import StrEnum
 from pydantic import BaseModel
 
 from agentflow.agents.resolution import ActionType, ProposedAction
+from agentflow.ledger.models import TransferStatus
 from agentflow.ledger.schemas import Evidence
 
 
@@ -51,6 +52,12 @@ def evaluate(
         return PolicyDecision(
             outcome=Outcome.ALLOW, reasons=["No action to execute"], rules=["no_action"]
         )
+    if proposal.action == ActionType.FREEZE_CARD:
+        return PolicyDecision(
+            outcome=Outcome.ALLOW,
+            reasons=["Freezing a card is protective and reversible: done at once on fraud"],
+            rules=["protective_freeze"],
+        )
     if proposal.action == ActionType.ESCALATE_TO_HUMAN:
         return PolicyDecision(
             outcome=Outcome.BLOCK,
@@ -61,6 +68,13 @@ def evaluate(
     amount = proposal.amount or Decimal("0")
     txn = next(
         (t for t in evidence.transactions if t.reference == proposal.transaction_reference), None
+    )
+    # The payment network itself confirmed the transfer failed: the money is owed back, so
+    # the reversal doesn't wait for a second officer or a policy passage.
+    network_failed = (
+        category == "failed_payment"
+        and txn is not None
+        and txn.transfer_status == TransferStatus.FAILED
     )
     blocks: list[tuple[str, str]] = []
     approvals: list[tuple[str, str]] = []
@@ -84,7 +98,7 @@ def evaluate(
         blocks.append(("unknown_transaction", "The transaction is not in the customer's ledger"))
     if category == "unauthorized_transaction":
         approvals.append(("fraud_review", "Suspected fraud always needs human review"))
-    if amount > config.auto_approve_limit:
+    if amount > config.auto_approve_limit and not network_failed:
         approvals.append(
             (
                 "maker_checker",
@@ -93,7 +107,7 @@ def evaluate(
         )
     if needs_human_review:
         approvals.append(("triage_review", "Triage flagged this request for human review"))
-    if knowledge_status != "answered":
+    if knowledge_status != "answered" and not network_failed:
         approvals.append(("no_policy_basis", "No verified policy answer supports this refund"))
 
     if blocks:
@@ -105,6 +119,12 @@ def evaluate(
             outcome=Outcome.REQUIRE_APPROVAL,
             reasons=[r for _, r in approvals],
             rules=[i for i, _ in approvals],
+        )
+    if network_failed:
+        return PolicyDecision(
+            outcome=Outcome.ALLOW,
+            reasons=[f"The network reports the transfer failed: {amount} is owed back"],
+            rules=["failed_transfer_reversal"],
         )
     return PolicyDecision(
         outcome=Outcome.ALLOW,

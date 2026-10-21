@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     # it comes from Secrets Manager. SecretStr keeps it out of logs and reprs.
     jwt_secret: SecretStr = SecretStr(_DEV_JWT_SECRET)
     access_token_ttl_minutes: int = 30
+    customer_token_ttl_hours: int = 24  # customer chat links
     login_max_attempts: int = 10  # per email, per window
     login_window_seconds: int = 15 * 60
 
@@ -72,6 +73,9 @@ class Settings(BaseSettings):
     prompt_guard_model: str = "meta-llama/llama-prompt-guard-2-86m"  # ingestion screening
     max_upload_bytes: int = 10 * 1024 * 1024
     knowledge_asks_per_minute: int = 20  # per user; each question is 3-5 model calls
+    chat_messages_per_minute: int = 10  # per conversation; each message runs the agents
+    transcription_model: str = "whisper-large-v3-turbo"  # voice notes (Groq)
+    max_voice_bytes: int = 5 * 1024 * 1024  # ~5 minutes of opus
     document_max_attempts: int = 3
     document_lease_seconds: int = 300
 

@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict
 
-from agentflow.ledger.models import TransactionKind, TransactionStatus
+from agentflow.ledger.models import CardStatus, TransactionKind, TransactionStatus, TransferStatus
 
 
 class AccountOut(BaseModel):
@@ -13,6 +13,7 @@ class AccountOut(BaseModel):
     customer_ref: str
     customer_name: str
     currency: str
+    card_status: CardStatus
 
 
 class TransactionOut(BaseModel):
@@ -25,6 +26,7 @@ class TransactionOut(BaseModel):
     currency: str
     merchant: str
     status: TransactionStatus
+    transfer_status: TransferStatus | None = None
     occurred_at: datetime
 
 
@@ -34,6 +36,7 @@ class Evidence(BaseModel):
     customer_ref: str | None
     customer_name: str | None
     account_found: bool
+    card_status: CardStatus | None = None
     transactions: list[TransactionOut]
     duplicate_pairs: list[tuple[str, str]]  # (original reference, duplicate reference)
     reversals_last_24h: int

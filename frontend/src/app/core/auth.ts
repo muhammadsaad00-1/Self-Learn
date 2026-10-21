@@ -76,7 +76,7 @@ export class Auth {
     this.selectOrg(orgId);
     // The audit log is admin-only: leave it if the role in the new company doesn't allow it.
     if (this.router.url.startsWith('/audit') && !this.isAdmin()) {
-      void this.router.navigateByUrl('/workflows');
+      void this.router.navigateByUrl('/');
     }
   }
 

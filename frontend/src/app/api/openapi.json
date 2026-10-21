@@ -1159,7 +1159,7 @@
           "ledger"
         ],
         "summary": "Seed Demo Data",
-        "description": "Three demo customers covering every policy path (admins; never in production).",
+        "description": "Demo customers covering every policy path, plus the customer help guide (cheques,\ntransfers, fraud, ...) queued for ingestion (admins; never in production).",
         "operationId": "seed_demo_data_v1_ledger_demo_data_post",
         "security": [
           {
@@ -1562,6 +1562,482 @@
         }
       }
     },
+    "/v1/chat": {
+      "get": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Get Chat",
+        "description": "The whole conversation. Poll it while `thinking` is true.",
+        "operationId": "get_chat_v1_chat_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatOut"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/chat/messages": {
+      "post": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Send Message",
+        "operationId": "send_message_v1_chat_messages_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TextIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/chat/voice": {
+      "post": {
+        "tags": [
+          "chat"
+        ],
+        "summary": "Send Voice Note",
+        "description": "Voice note -> Whisper transcript -> the same pipeline as a typed message.",
+        "operationId": "send_voice_note_v1_chat_voice_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_send_voice_note_v1_chat_voice_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/conversations": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Open Chat",
+        "description": "Open (or reopen) a customer's chat and issue a customer token for it. In production\nthe bank's app does this after its own customer login; here staff use it for demos.",
+        "operationId": "open_chat_v1_conversations_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-org-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Organization this request acts in",
+              "title": "X-Org-Id"
+            },
+            "description": "Organization this request acts in"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpenChatIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenedChat"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "List Conversations",
+        "description": "The 50 most recently active conversations, newest first.",
+        "operationId": "list_conversations_v1_conversations_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-org-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Organization this request acts in",
+              "title": "X-Org-Id"
+            },
+            "description": "Organization this request acts in"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ConversationOut"
+                  },
+                  "title": "Response List Conversations V1 Conversations Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/conversations/{conversation_id}": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Get Conversation",
+        "operationId": "get_conversation_v1_conversations__conversation_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "x-org-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Organization this request acts in",
+              "title": "X-Org-Id"
+            },
+            "description": "Organization this request acts in"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/conversations/{conversation_id}/messages": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Reply As Agent",
+        "description": "Write to the customer as a person. The agents stop answering until handed back.",
+        "operationId": "reply_as_agent_v1_conversations__conversation_id__messages_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "x-org-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Organization this request acts in",
+              "title": "X-Org-Id"
+            },
+            "description": "Organization this request acts in"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TextIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/conversations/{conversation_id}/handback": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Hand Back To Agents",
+        "operationId": "hand_back_to_agents_v1_conversations__conversation_id__handback_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "x-org-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Organization this request acts in",
+              "title": "X-Org-Id"
+            },
+            "description": "Organization this request acts in"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/insights": {
+      "get": {
+        "tags": [
+          "insights"
+        ],
+        "summary": "Get Insights",
+        "description": "Impact over the last 30 days: AI resolution rate, money returned, speed, AI cost.",
+        "operationId": "get_insights_v1_insights_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-org-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Organization this request acts in",
+              "title": "X-Org-Id"
+            },
+            "description": "Organization this request acts in"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Insights"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -1624,13 +2100,17 @@
           "currency": {
             "type": "string",
             "title": "Currency"
+          },
+          "card_status": {
+            "$ref": "#/components/schemas/CardStatus"
           }
         },
         "type": "object",
         "required": [
           "customer_ref",
           "customer_name",
-          "currency"
+          "currency",
+          "card_status"
         ],
         "title": "AccountOut"
       },
@@ -1638,6 +2118,7 @@
         "type": "string",
         "enum": [
           "refund_transaction",
+          "freeze_card",
           "escalate_to_human",
           "no_action"
         ],
@@ -2023,6 +2504,21 @@
         ],
         "title": "Body_login_v1_auth_login_post"
       },
+      "Body_send_voice_note_v1_chat_voice_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "description": "Recorded audio (webm/ogg/m4a/mp3/wav)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_send_voice_note_v1_chat_voice_post"
+      },
       "Body_upload_document_v1_knowledge_documents_post": {
         "properties": {
           "file": {
@@ -2050,6 +2546,14 @@
         ],
         "title": "Body_upload_document_v1_knowledge_documents_post"
       },
+      "CardStatus": {
+        "type": "string",
+        "enum": [
+          "active",
+          "frozen"
+        ],
+        "title": "CardStatus"
+      },
       "Category": {
         "type": "string",
         "enum": [
@@ -2076,6 +2580,43 @@
           "role"
         ],
         "title": "ChangeRoleRequest"
+      },
+      "ChatOut": {
+        "properties": {
+          "customer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Name"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/ConversationMode"
+          },
+          "thinking": {
+            "type": "boolean",
+            "title": "Thinking"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/MessageOut"
+            },
+            "type": "array",
+            "title": "Messages"
+          }
+        },
+        "type": "object",
+        "required": [
+          "customer_name",
+          "mode",
+          "thinking",
+          "messages"
+        ],
+        "title": "ChatOut"
       },
       "Citation": {
         "properties": {
@@ -2123,6 +2664,66 @@
           "excerpt"
         ],
         "title": "Citation"
+      },
+      "ConversationMode": {
+        "type": "string",
+        "enum": [
+          "ai",
+          "human"
+        ],
+        "title": "ConversationMode"
+      },
+      "ConversationOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "customer_ref": {
+            "type": "string",
+            "title": "Customer Ref"
+          },
+          "customer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Name"
+          },
+          "mode": {
+            "$ref": "#/components/schemas/ConversationMode"
+          },
+          "last_message": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MessageOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "customer_ref",
+          "customer_name",
+          "mode",
+          "last_message",
+          "updated_at"
+        ],
+        "title": "ConversationOut"
       },
       "CreateWorkflowRequest": {
         "properties": {
@@ -2354,6 +2955,16 @@
             "type": "boolean",
             "title": "Account Found"
           },
+          "card_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CardStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "transactions": {
             "items": {
               "$ref": "#/components/schemas/TransactionOut"
@@ -2473,6 +3084,100 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "Insights": {
+        "properties": {
+          "days": {
+            "type": "integer",
+            "title": "Days"
+          },
+          "requests": {
+            "type": "integer",
+            "title": "Requests"
+          },
+          "completed": {
+            "type": "integer",
+            "title": "Completed"
+          },
+          "resolved_by_ai": {
+            "type": "integer",
+            "title": "Resolved By Ai"
+          },
+          "ai_resolution_rate": {
+            "type": "number",
+            "title": "Ai Resolution Rate"
+          },
+          "waiting_approval": {
+            "type": "integer",
+            "title": "Waiting Approval"
+          },
+          "open_tickets": {
+            "type": "integer",
+            "title": "Open Tickets"
+          },
+          "money_returned": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Money Returned"
+          },
+          "cards_frozen": {
+            "type": "integer",
+            "title": "Cards Frozen"
+          },
+          "median_seconds_to_resolve": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median Seconds To Resolve"
+          },
+          "ai_cost_usd": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Ai Cost Usd"
+          },
+          "ai_cost_per_request_usd": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Ai Cost Per Request Usd"
+          },
+          "by_category": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "By Category"
+          },
+          "by_channel": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "By Channel"
+          }
+        },
+        "type": "object",
+        "required": [
+          "days",
+          "requests",
+          "completed",
+          "resolved_by_ai",
+          "ai_resolution_rate",
+          "waiting_approval",
+          "open_tickets",
+          "money_returned",
+          "cards_frozen",
+          "median_seconds_to_resolve",
+          "ai_cost_usd",
+          "ai_cost_per_request_usd",
+          "by_category",
+          "by_channel"
+        ],
+        "title": "Insights"
       },
       "KnowledgeAnswer": {
         "properties": {
@@ -2613,6 +3318,89 @@
           "role"
         ],
         "title": "MembershipOut"
+      },
+      "MessageOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "role": {
+            "$ref": "#/components/schemas/MessageRole"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body"
+          },
+          "card": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Card"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "role",
+          "body",
+          "card",
+          "created_at"
+        ],
+        "title": "MessageOut"
+      },
+      "MessageRole": {
+        "type": "string",
+        "enum": [
+          "customer",
+          "assistant",
+          "agent"
+        ],
+        "title": "MessageRole"
+      },
+      "OpenChatIn": {
+        "properties": {
+          "customer_ref": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Customer Ref"
+          }
+        },
+        "type": "object",
+        "required": [
+          "customer_ref"
+        ],
+        "title": "OpenChatIn"
+      },
+      "OpenedChat": {
+        "properties": {
+          "conversation": {
+            "$ref": "#/components/schemas/ConversationOut"
+          },
+          "customer_token": {
+            "type": "string",
+            "title": "Customer Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversation",
+          "customer_token"
+        ],
+        "title": "OpenedChat"
       },
       "Outcome": {
         "type": "string",
@@ -2879,6 +3667,21 @@
         ],
         "title": "StepStatus"
       },
+      "TextIn": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Text"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "TextIn"
+      },
       "TicketOut": {
         "properties": {
           "id": {
@@ -3138,6 +3941,16 @@
           "status": {
             "$ref": "#/components/schemas/TransactionStatus"
           },
+          "transfer_status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransferStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "occurred_at": {
             "type": "string",
             "format": "date-time",
@@ -3164,6 +3977,16 @@
           "reversed"
         ],
         "title": "TransactionStatus"
+      },
+      "TransferStatus": {
+        "type": "string",
+        "enum": [
+          "credited",
+          "pending",
+          "failed"
+        ],
+        "title": "TransferStatus",
+        "description": "For transfers to another person (IBFT/RAAST): what the payment network reports."
       },
       "TriageResult": {
         "properties": {
@@ -3672,6 +4495,11 @@
             "tokenUrl": "/v1/auth/login"
           }
         }
+      },
+      "HTTPBearer": {
+        "type": "http",
+        "description": "Customer token from POST /v1/conversations",
+        "scheme": "bearer"
       }
     }
   }

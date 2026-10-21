@@ -9,7 +9,14 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from agentflow.ledger.models import Account, Transaction, TransactionKind, TransactionStatus
+from agentflow.ledger.models import (
+    Account,
+    CardStatus,
+    Transaction,
+    TransactionKind,
+    TransactionStatus,
+    TransferStatus,
+)
 from agentflow.ledger.schemas import Evidence, TransactionOut
 
 DUPLICATE_WINDOW = timedelta(minutes=10)
@@ -146,34 +153,78 @@ async def post_refund(
     return RefundPosted(reference, refund.reference, amount, debit.currency)
 
 
-async def seed_demo_data(session: AsyncSession, org_id: uuid.UUID) -> list[Account]:
-    """Three customers that exercise every policy path (idempotent: skips existing ones).
+async def freeze_card(session: AsyncSession, account: Account) -> bool:
+    """Freeze the customer's card (idempotent). True if it was active until now."""
+    locked = await session.scalar(select(Account).where(Account.id == account.id).with_for_update())
+    assert locked is not None  # noqa: S101 (the caller loaded it in this transaction)
+    was_active = locked.card_status == CardStatus.ACTIVE
+    locked.card_status = CardStatus.FROZEN
+    return was_active
 
-    CUST-1001  PKR 5,000 charged twice     -> refund above PKR 2,000: needs approval
-    CUST-1002  PKR 1,200 charged twice     -> small refund: allowed automatically
-    CUST-1003  unknown PKR 85,000 debits   -> suspected fraud: always a human
+
+# (merchant, amount, seconds after "3 hours ago", transfer status or None)
+DemoTxn = tuple[str, str, int, TransferStatus | None]
+
+DEMO_CUSTOMERS: list[tuple[str, str, list[DemoTxn]]] = [
+    (
+        "CUST-1001",
+        "Ayesha Khan",
+        [
+            ("KE-Bills", "5000.00", 0, None),
+            ("KE-Bills", "5000.00", 40, None),
+            ("Daraz", "2350.00", 7200, None),
+        ],
+    ),
+    (
+        "CUST-1002",
+        "Bilal Ahmed",
+        [
+            ("Careem", "1200.00", 0, None),
+            ("Careem", "1200.00", 25, None),
+            ("Foodpanda", "850.00", 9000, None),
+        ],
+    ),
+    (
+        "CUST-1003",
+        "Hina Raza",
+        [
+            ("Unknown Merchant LLC", "45000.00", 0, None),
+            ("Unknown Merchant LLC", "40000.00", 600, None),
+        ],
+    ),
+    (
+        "CUST-1004",
+        "Usman Tariq",
+        [
+            ("IBFT to Ali Raza (HBL)", "5000.00", 0, TransferStatus.FAILED),
+            ("RAAST to Sara Malik (Meezan)", "3000.00", -86400, TransferStatus.CREDITED),
+            ("Jazz top-up", "500.00", 3600, None),
+        ],
+    ),
+    (
+        "CUST-1005",
+        "Zainab Ali",
+        [
+            # Sent ~27 hours ago and still in transit: past the 24-hour window.
+            ("IBFT to Kamran Shah (UBL)", "15000.00", -86400, TransferStatus.PENDING),
+        ],
+    ),
+]
+
+
+async def seed_demo_data(session: AsyncSession, org_id: uuid.UUID) -> list[Account]:
+    """Demo customers that exercise every policy path (idempotent: skips existing ones).
+
+    CUST-1001  PKR 5,000 charged twice       -> refund above PKR 2,000: needs approval
+    CUST-1002  PKR 1,200 charged twice       -> small refund: allowed automatically
+    CUST-1003  unknown PKR 85,000 debits     -> fraud: card frozen at once, a human investigates
+    CUST-1004  PKR 5,000 transfer rejected   -> network-confirmed failure: reversed at once
+    CUST-1005  PKR 15,000 transfer stuck 27h -> partner-bank inquiry ticket
     """
     now = datetime.now(UTC)
     tag = uuid.uuid4().hex[:6].upper()
-    customers = [
-        (
-            "CUST-1001",
-            "Ayesha Khan",
-            [("KE-Bills", "5000.00", 0), ("KE-Bills", "5000.00", 40), ("Daraz", "2350.00", 7200)],
-        ),
-        (
-            "CUST-1002",
-            "Bilal Ahmed",
-            [("Careem", "1200.00", 0), ("Careem", "1200.00", 25), ("Foodpanda", "850.00", 9000)],
-        ),
-        (
-            "CUST-1003",
-            "Hina Raza",
-            [("Unknown Merchant LLC", "45000.00", 0), ("Unknown Merchant LLC", "40000.00", 600)],
-        ),
-    ]
     accounts = []
-    for ref, name, txns in customers:
+    for ref, name, txns in DEMO_CUSTOMERS:
         existing = await session.scalar(
             select(Account).where(Account.org_id == org_id, Account.customer_ref == ref)
         )
@@ -183,7 +234,7 @@ async def seed_demo_data(session: AsyncSession, org_id: uuid.UUID) -> list[Accou
         account = Account(org_id=org_id, customer_ref=ref, customer_name=name, currency="PKR")
         session.add(account)
         await session.flush()
-        for i, (merchant, amount, seconds_ago_offset) in enumerate(txns):
+        for i, (merchant, amount, offset, transfer_status) in enumerate(txns):
             session.add(
                 Transaction(
                     org_id=org_id,
@@ -193,7 +244,8 @@ async def seed_demo_data(session: AsyncSession, org_id: uuid.UUID) -> list[Accou
                     amount=Decimal(amount),
                     currency="PKR",
                     merchant=merchant,
-                    occurred_at=now - timedelta(hours=3) + timedelta(seconds=seconds_ago_offset),
+                    transfer_status=transfer_status,
+                    occurred_at=now - timedelta(hours=3) + timedelta(seconds=offset),
                 )
             )
         accounts.append(account)
@@ -231,6 +283,7 @@ async def gather_evidence(
         customer_ref=customer_ref,
         customer_name=account.customer_name,
         account_found=True,
+        card_status=account.card_status,
         transactions=transactions,
         duplicate_pairs=[(a.reference, b.reference) for a, b in find_duplicates(transactions)],
         reversals_last_24h=await reversals_since(

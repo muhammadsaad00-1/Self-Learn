@@ -13,6 +13,8 @@ import { ProfileMenu } from './profile-menu';
       <strong>AgentFlow</strong>
 
       <nav>
+        <a routerLink="/insights" routerLinkActive="active">Insights</a>
+        <a routerLink="/chats" routerLinkActive="active">Chats</a>
         <a routerLink="/workflows" routerLinkActive="active">Workflows</a>
         <a routerLink="/tickets" routerLinkActive="active">Tickets</a>
         <a routerLink="/knowledge" routerLinkActive="active">Knowledge</a>

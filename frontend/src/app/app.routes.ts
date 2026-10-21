@@ -16,11 +16,24 @@ export const routes: Routes = [
     data: { mode: 'signup' },
   },
   {
+    // The customer's app: authenticated by the customer token in the link, not a staff login.
+    path: 'chat',
+    loadComponent: () => import('./pages/chat-page').then((m) => m.ChatPage),
+  },
+  {
     path: '',
     loadComponent: () => import('./layout/shell').then((m) => m.Shell),
     canActivate: [authGuard],
     children: [
-      { path: '', pathMatch: 'full', redirectTo: 'workflows' },
+      { path: '', pathMatch: 'full', redirectTo: 'insights' },
+      {
+        path: 'insights',
+        loadComponent: () => import('./pages/insights-page').then((m) => m.InsightsPage),
+      },
+      {
+        path: 'chats',
+        loadComponent: () => import('./pages/conversations-page').then((m) => m.ConversationsPage),
+      },
       {
         path: 'workflows',
         loadComponent: () => import('./pages/workflows-page').then((m) => m.WorkflowsPage),

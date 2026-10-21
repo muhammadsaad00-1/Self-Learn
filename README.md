@@ -22,13 +22,18 @@ make web         # Angular dashboard                      →  http://localhost:
 
 Sign up at http://localhost:4200/signup.
 
-**Demo (≈3 min):**
-1. Knowledge → upload `backend/evals/rag/corpus/refunds-and-disputes.md`.
-2. Workflows → "Load demo customers".
-3. Customer CUST-1002: *"Careem charged me twice"* → refunded automatically.
-4. Customer CUST-1001: *"My PKR 5,000 bill was deducted twice"* → waits for approval.
-5. Add a second admin (Members), sign in as them, Approvals → approve. The refund executes and the decision trail shows evidence → policy → approval → ledger-verified refund → drafted reply.
-6. Customer CUST-1003: *"Someone made payments I never authorized"* → escalated, a critical ticket is opened (Tickets page) and the reply quotes the case number. `make help` lists every command. `make down` stops the stack.
+**Demo (≈5 min):**
+1. Workflows → "Load demo customers" (also queues the customer help guide; wait until Knowledge shows it `ready`).
+2. Chats → "Open the customer app as…" → a customer → **Open customer app ↗** (a phone-style chat opens in a new tab). Try:
+   - CUST-1004: *"Maine Ali ko 5000 bheje, kat gaye lekin usko nahi mile"* → the network says the transfer failed → reversed at once, transfer trace card, reply in Roman Urdu.
+   - CUST-1002: *"How do I issue a cheque?"* (or 🎤 a voice note) → answered from the help guide with its source.
+   - CUST-1003: *"I see payments I never made!"* → card frozen instantly + critical case TCK-… (Tickets page).
+   - CUST-1005: *"I sent 15000 to Kamran yesterday, still not received"* → stuck in transit → partner-bank inquiry case.
+   - CUST-1002: *"Careem charged me twice"* → refunded automatically. CUST-1001: *"My 5,000 bill was deducted twice"* → "with an officer"; a second admin approves in Approvals and the refund lands in the same chat.
+3. Back in Chats: watch every conversation; type a reply to take over from the AI, then "Hand back to AI".
+4. Insights: AI resolution rate, money returned, time to resolve, AI cost per request.
+5. Workflows → any request → the decision trail (evidence → policy → approval → ledger-verified action → reply); Audit log for the compliance record.
+`make help` lists every command. `make down` stops the stack.
 
 ## Test
 

@@ -93,7 +93,7 @@ export class ProfilePage {
     try {
       await this.auth.addCompany(orgName.trim(), password);
       this.form.reset();
-      await this.router.navigateByUrl('/workflows'); // now inside the new company
+      await this.router.navigateByUrl('/'); // now inside the new company
     } catch (err) {
       this.error.set(errorMessage(err));
       this.form.controls.password.reset(); // never leave a typed password in the form

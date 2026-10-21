@@ -63,3 +63,38 @@ def decode_access_token(token: str, settings: Settings) -> uuid.UUID | None:
         return uuid.UUID(claims["sub"])
     except (jwt.InvalidTokenError, ValueError):
         return None
+
+
+# Customer tokens: for the customer chat, minted when staff open a customer's chat (in
+# production: by the bank's mobile app after its own login). A separate audience, so a
+# customer token is never accepted as a staff token, nor the other way round.
+_CUSTOMER_AUDIENCE = "customer-chat"
+
+
+def create_customer_token(org_id: uuid.UUID, conversation_id: uuid.UUID, settings: Settings) -> str:
+    now = datetime.now(UTC)
+    claims = {
+        "sub": str(conversation_id),
+        "org": str(org_id),
+        "aud": _CUSTOMER_AUDIENCE,
+        "iss": _ISSUER,
+        "iat": now,
+        "exp": now + timedelta(hours=settings.customer_token_ttl_hours),
+    }
+    return jwt.encode(claims, settings.jwt_secret.get_secret_value(), algorithm=_ALGORITHM)
+
+
+def decode_customer_token(token: str, settings: Settings) -> tuple[uuid.UUID, uuid.UUID] | None:
+    """(org id, conversation id) from a valid customer token, else None."""
+    try:
+        claims = jwt.decode(
+            token,
+            settings.jwt_secret.get_secret_value(),
+            algorithms=[_ALGORITHM],
+            issuer=_ISSUER,
+            audience=_CUSTOMER_AUDIENCE,
+            options={"require": ["sub", "org", "aud", "exp", "iat", "iss"]},
+        )
+        return uuid.UUID(claims["org"]), uuid.UUID(claims["sub"])
+    except (jwt.InvalidTokenError, ValueError):
+        return None

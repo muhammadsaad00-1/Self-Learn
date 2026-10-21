@@ -28,11 +28,17 @@ AI could do most of this work, but **in finance, a wrong AI action is lost money
 
 So today, fintechs face a bad choice: no AI automation, or AI automation that nobody can control or audit.
 
+And the customers have changed. **Gen Z texts; it doesn't call.** Young customers of banks and microfinance institutions would rather send a WhatsApp-style message or a voice note, in Roman Urdu as often as in English, than wait on a helpline or visit a branch. Today a message like *"maine 5000 bheje, kat gaye lekin usko nahi mile"* sits in a queue for days.
+
 ## 2. Proposed Solution
 
 **AgentFlow** is a multi-tenant platform where **specialized AI agents do the investigation and propose resolutions**, while **deterministic, testable software makes every financial decision**.
 
-**Demo scenario: a duplicate-charge dispute**
+**Demo scenario 1: a texting customer (the front door)**
+
+A customer opens the bank's chat and types, in Roman Urdu, *"I sent Ali 5,000, it left my account but he never got it."* In about 25 seconds, without a human, AgentFlow traces the transfer, sees that the beneficiary bank rejected it, reverses the PKR 5,000 (verified in the ledger), and replies in Roman Urdu with a transfer-trace card and the reversal reference. A customer who reports payments they didn't make gets their **card frozen in seconds** and a fraud case number. *"How do I issue a cheque?"*, typed or as a **voice note**, is answered from the bank's own guide, with the source shown. Staff watch every chat live and can take over with one message.
+
+**Demo scenario 2: a duplicate-charge dispute (the governance behind it)**
 
 1. A customer reports a double charge. AgentFlow opens a tracked **workflow** with an idempotency key, so the same complaint submitted twice is processed once.
 2. The **triage agent** classifies it: *transaction dispute → duplicate charge*.
@@ -72,6 +78,8 @@ The AI did the 15 minutes of investigation. A human spent 10 seconds on the one 
 
 | User | What AgentFlow gives them |
 |---|---|
+| **Gen Z bank & microfinance customers** | Problems solved by text or voice note in seconds, in their own language, 24/7 |
+| **Banks & microfinance institutions** | A texting-first support channel where the AI resolves most requests and humans keep control of the rest |
 | **Payment service providers & digital wallets** | Faster dispute, refund and failed-payment resolution at scale |
 | **Microfinance institutions & digital lenders** | Automated document checks (e.g. bank statements) and application triage |
 | **Operations / support managers** | One approval inbox for the decisions that actually need a human |
@@ -89,7 +97,10 @@ The AI did the 15 minutes of investigation. A human spent 10 seconds on the one 
 7. **Immutable audit trail and observability.** An append-only audit log (the database refuses edits and deletes) plus end-to-end tracing from request to agent to tool to outcome.
 8. **Security by design.** Multi-tenant isolation in the application *and* the database (row-level security), Argon2 password hashing, short-lived JWT tokens, login rate limiting, and secrets kept out of code, prompts and logs.
 9. **AI safety evaluation suite.** Golden datasets, prompt-injection attacks hidden in customer messages and documents, cross-tenant attacks and cost regression tests, all running in CI and blocking unsafe releases.
-10. **Operations dashboard (Angular).** Live workflows, approval inbox with evidence and citations, audit log, and knowledge sources.
+10. **Texting-first customer chat.** A WhatsApp-style chat for the bank's customers: text or voice notes (Whisper), English, Urdu or Roman Urdu, answers with fact cards (transfer trace, refund reference, frozen card, case number). Every message runs through the same governed pipeline; staff can take over any conversation live.
+11. **Instant fraud containment and failed-transfer recovery.** Card freeze on suspected fraud (protective and reversible, so no approval wait) and automatic reversal of network-confirmed failed transfers; stuck transfers become partner-bank inquiry cases.
+12. **Impact insights.** AI resolution rate, money returned to customers, time to resolve and AI cost per request, live.
+13. **Operations dashboard (Angular).** Live workflows, approval inbox with evidence and citations, audit log, and knowledge sources.
 
 ## 6. Implementation Plan
 

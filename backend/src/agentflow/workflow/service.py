@@ -52,7 +52,7 @@ async def create(
     session: AsyncSession,
     *,
     org_id: uuid.UUID,
-    user_id: uuid.UUID,
+    user_id: uuid.UUID | None,  # None: a customer channel (chat), not a staff member
     idempotency_key: str,
     body: CreateWorkflowRequest,
     request_id: str | None,

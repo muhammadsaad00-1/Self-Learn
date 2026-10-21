@@ -18,6 +18,7 @@ from agentflow import __version__
 from agentflow.approvals import api as approvals_api
 from agentflow.audit import api as audit_api
 from agentflow.config import Settings, get_settings
+from agentflow.conversations import api as conversations_api
 from agentflow.db import create_engine
 from agentflow.identity import api as identity_api
 from agentflow.knowledge import api as knowledge_api
@@ -27,6 +28,7 @@ from agentflow.llm import StructuredLLM
 from agentflow.observability import configure_logging, request_context_middleware
 from agentflow.tickets import api as tickets_api
 from agentflow.workflow import api as workflow_api
+from agentflow.workflow import insights
 
 
 def create_app(
@@ -62,6 +64,7 @@ def create_app(
     app.state.settings = settings
     app.state.llm = llm
     app.state.knowledge = knowledge
+    app.state.transcriber = None  # built on first voice note (conversations.api)
     app.middleware("http")(request_context_middleware)
     app.include_router(identity_api.router)
     app.include_router(identity_api.members_router)
@@ -72,6 +75,9 @@ def create_app(
     app.include_router(ledger_api.router)
     app.include_router(approvals_api.router)
     app.include_router(tickets_api.router)
+    app.include_router(conversations_api.router)
+    app.include_router(conversations_api.staff_router)
+    app.include_router(insights.router)
 
     @app.get("/health", tags=["ops"])
     async def health() -> dict[str, str]:
