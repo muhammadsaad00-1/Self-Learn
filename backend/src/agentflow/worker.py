@@ -1,0 +1,350 @@
+"""Background worker: runs queued workflows (agents) and document ingestion jobs.
+
+    python -m agentflow.worker        (make worker / the `worker` service in docker compose)
+
+Why not run this inside the API request? Model calls take seconds, providers rate-limit and
+fail, embedding is CPU-heavy, and a crash must not lose work. So the API only records the
+job (fast, durable) and returns 202; this loop picks it up and retries with backoff. Any
+number of workers can run side by side: claiming uses FOR UPDATE SKIP LOCKED.
+
+Database transactions are kept short and never span a model call: claim (commit), do the
+slow work, then save results in their own small transactions.
+"""
+
+import asyncio
+import contextlib
+import logging
+import signal
+import uuid
+from collections.abc import Sequence
+from typing import Any, cast
+
+from langchain_core.runnables import RunnableConfig
+from langgraph.graph.state import CompiledStateGraph
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from agentflow.agents.resolution import ActionType, ProposedAction
+from agentflow.approvals import service as approvals
+from agentflow.config import Settings, get_settings
+from agentflow.conversations import service as conversations
+from agentflow.db import create_engine, set_tenant_context
+from agentflow.jobs import Claim
+from agentflow.knowledge import ingestion, retrieval
+from agentflow.knowledge import service as knowledge_service
+from agentflow.knowledge.retrieval import RetrievedChunk
+from agentflow.knowledge.runtime import KnowledgeRuntime, build_runtime
+from agentflow.knowledge.storage import S3ObjectStore
+from agentflow.ledger import service as ledger
+from agentflow.ledger.schemas import Evidence
+from agentflow.llm import build_llm
+from agentflow.observability import configure_logging, org_id_var, request_id_var, workflow_id_var
+from agentflow.policy.engine import Outcome
+from agentflow.tools import card as card_tool
+from agentflow.tools import refund as refund_tool
+from agentflow.tools import tickets as ticket_tool
+from agentflow.tools.refund import ExecutionResult
+from agentflow.tools.tickets import TicketRef
+from agentflow.workflow import service
+from agentflow.workflow.graph import (
+    RECURSION_LIMIT,
+    ExecuteFn,
+    OpenTicketFn,
+    ResearchFn,
+    SearchFn,
+    WorkflowGraphs,
+    WorkflowState,
+    build_workflow_graphs,
+)
+from agentflow.workflow.models import WorkflowStage, WorkflowStatus
+
+log = logging.getLogger("agentflow.worker")
+
+Sessions = async_sessionmaker[AsyncSession]
+
+
+def tenant_search(sessions: Sessions, org_id: uuid.UUID, runtime: KnowledgeRuntime) -> SearchFn:
+    """Knowledge search bound to one tenant. Candidates are fetched in a short transaction;
+    the reranker (CPU, ~1 s) runs after it, so no connection is held during inference."""
+
+    async def search(queries: Sequence[str], rerank_query: str) -> list[RetrievedChunk]:
+        async with sessions() as session, session.begin():
+            await set_tenant_context(session, org_id=org_id)
+            candidates = await retrieval.hybrid_candidates(
+                session, org_id, queries, runtime.embedder, runtime.params
+            )
+        return await retrieval.rerank(
+            runtime.reranker,
+            rerank_query,
+            candidates[: runtime.params.rerank_candidates],
+            runtime.params.top_k,
+        )
+
+    return search
+
+
+def tenant_research(sessions: Sessions, org_id: uuid.UUID) -> ResearchFn:
+    async def research(customer_ref: str | None) -> Evidence:
+        async with sessions() as session, session.begin():
+            await set_tenant_context(session, org_id=org_id)
+            return await ledger.gather_evidence(session, org_id, customer_ref)
+
+    return research
+
+
+def tenant_execute(sessions: Sessions, claim: Claim) -> ExecuteFn:
+    """The write tools bound to this workflow's tenant. One transaction: the action, its
+    action-ledger row and audit event commit together."""
+
+    async def execute(state: WorkflowState) -> ExecutionResult:
+        triage = state.get("triage") or {}
+        proposal = ProposedAction.model_validate(state["proposal"])
+        async with sessions() as session, session.begin():
+            await set_tenant_context(session, org_id=claim.org_id)
+            if proposal.action == ActionType.FREEZE_CARD:
+                return await card_tool.freeze(
+                    session,
+                    org_id=claim.org_id,
+                    workflow_id=claim.workflow_id,
+                    proposal=proposal,
+                    customer_ref=state.get("customer_ref"),
+                    category=triage.get("category"),
+                )
+            return await refund_tool.authorize_and_execute(
+                session,
+                org_id=claim.org_id,
+                workflow_id=claim.workflow_id,
+                proposal=proposal,
+                customer_ref=state.get("customer_ref"),
+                category=triage.get("category"),
+                needs_human_review=bool(triage.get("needs_human_review")),
+                knowledge_status=(state.get("knowledge") or {}).get("status"),
+                approval_status=(state.get("approval") or {}).get("status"),
+            )
+
+    return execute
+
+
+def tenant_open_ticket(sessions: Sessions, claim: Claim) -> OpenTicketFn:
+    async def open_ticket(state: WorkflowState, reasons: list[str]) -> TicketRef:
+        async with sessions() as session, session.begin():
+            await set_tenant_context(session, org_id=claim.org_id)
+            return await ticket_tool.open_ticket(
+                session,
+                org_id=claim.org_id,
+                workflow_id=claim.workflow_id,
+                reasons=reasons,
+                state=dict(state),
+            )
+
+    return open_ticket
+
+
+async def _run(
+    graph: CompiledStateGraph[WorkflowState],
+    state: dict[str, Any],
+    config: dict[str, Any],
+    sessions: Sessions,
+    claim: Claim,
+) -> dict[str, Any]:
+    """Stream a graph, saving each node's output as a workflow step as it finishes."""
+    run_config: RunnableConfig = {"recursion_limit": RECURSION_LIMIT, "configurable": config}
+    async for update in graph.astream(
+        cast(WorkflowState, state),
+        run_config,
+        stream_mode="updates",  # yields {node_name: what that node returned}
+    ):
+        for node, output in update.items():
+            meta = output.pop("node_meta", {})
+            state.update(output)
+            async with sessions() as session, session.begin():
+                await set_tenant_context(session, org_id=claim.org_id)
+                await service.record_step(session, claim, node, output, meta)
+    return state
+
+
+RESULT_KEYS = (
+    "triage",
+    "knowledge",
+    "evidence",
+    "proposal",
+    "decision",
+    "approval",
+    "execution",
+    "ticket",
+    "reply",
+)
+
+
+async def process_next(
+    sessions: Sessions, graphs: WorkflowGraphs, settings: Settings, runtime: KnowledgeRuntime
+) -> bool:
+    """Claim and run one workflow (its analysis or its execution stage). False = idle."""
+    async with sessions() as session, session.begin():
+        claim = await service.claim_next(
+            session,
+            max_attempts=settings.workflow_max_attempts,
+            lease_seconds=settings.workflow_lease_seconds,
+        )
+    if claim is None:
+        return False
+
+    org_id_var.set(str(claim.org_id))
+    workflow_id_var.set(str(claim.workflow_id))
+    async with sessions() as session, session.begin():
+        await set_tenant_context(session, org_id=claim.org_id)
+        wf = await service.get(session, claim.org_id, claim.workflow_id)
+        stage, saved, request_id = wf.stage, dict(wf.result or {}), wf.request_id
+        message, customer_ref = wf.input["message"], wf.input.get("customer_ref")
+        approval = await approvals.get_for_workflow(session, wf.id)
+    request_id_var.set(request_id)  # logs of this run correlate with the API request
+    log.info("workflow.started", extra={"attempt": claim.attempt, "stage": stage})
+
+    config = {
+        "search": tenant_search(sessions, claim.org_id, runtime),
+        "min_rerank_score": runtime.min_rerank_score,
+        "research": tenant_research(sessions, claim.org_id),
+        "execute": tenant_execute(sessions, claim),
+        "open_ticket": tenant_open_ticket(sessions, claim),
+    }
+    try:
+        async with asyncio.timeout(settings.workflow_timeout_seconds):
+            if stage == WorkflowStage.ANALYSIS:
+                state = await _run(
+                    graphs.analysis,
+                    {"message": message, "customer_ref": customer_ref},
+                    config,
+                    sessions,
+                    claim,
+                )
+                decision = state.get("decision") or {}
+                if decision.get("outcome") == Outcome.REQUIRE_APPROVAL:
+                    async with sessions() as session, session.begin():
+                        await set_tenant_context(session, org_id=claim.org_id)
+                        if locked := await service.lock_if_still_ours(session, claim):
+                            approval = await approvals.request_approval(
+                                session, locked, state["proposal"], decision.get("reasons", [])
+                            )
+                            state["approval"] = {"id": str(approval.id), "status": "pending"}
+                            result = {k: state.get(k) for k in RESULT_KEYS}
+                            await service.pause_for_approval(session, locked, result)
+                            await conversations.post_outcome(session, locked, state, "review")
+                            log.info("workflow.waiting_approval")
+                    return True
+            else:  # execution stage, resumed after a human decided the approval
+                state = {**saved, "message": message, "customer_ref": customer_ref}
+                if approval is not None:
+                    state["approval"] = {"id": str(approval.id), "status": approval.status}
+            state = await _run(graphs.execution, state, config, sessions, claim)
+    except Exception as e:  # any failure: model, validation, timeout, bug
+        log.exception("workflow.attempt_failed", extra={"attempt": claim.attempt})
+        async with sessions() as session, session.begin():
+            await set_tenant_context(session, org_id=claim.org_id)
+            if locked := await service.lock_if_still_ours(session, claim):
+                await service.fail_attempt(
+                    session,
+                    locked,
+                    claim,
+                    f"{type(e).__name__}: {e}"[:2000],
+                    max_attempts=settings.workflow_max_attempts,
+                )
+                if locked.status == WorkflowStatus.FAILED:
+                    await conversations.post_outcome(session, locked, {}, "failed")
+        return True
+
+    async with sessions() as session, session.begin():
+        await set_tenant_context(session, org_id=claim.org_id)
+        if locked := await service.lock_if_still_ours(session, claim):
+            await service.complete(session, locked, {k: state.get(k) for k in RESULT_KEYS})
+            await conversations.post_outcome(session, locked, state, "reply")
+            log.info("workflow.completed", extra={"attempt": claim.attempt})
+    return True
+
+
+async def process_next_document(
+    sessions: Sessions, settings: Settings, runtime: KnowledgeRuntime
+) -> bool:
+    """Claim and ingest one document: download, parse, chunk, embed, swap chunks."""
+    async with sessions() as session, session.begin():
+        claim = await knowledge_service.claim_next_document(
+            session,
+            max_attempts=settings.document_max_attempts,
+            lease_seconds=settings.document_lease_seconds,
+        )
+    if claim is None:
+        return False
+
+    org_id_var.set(str(claim.org_id))
+    async with sessions() as session, session.begin():
+        await set_tenant_context(session, org_id=claim.org_id)
+        document = await knowledge_service.get_document(session, claim.org_id, claim.job_id)
+        key, content_type = document.storage_key, document.content_type
+    log.info("document.ingest_started", extra={"document_id": str(claim.job_id)})
+
+    try:
+        data = await runtime.store.get(key)
+        prepared = await ingestion.prepare(data, content_type, runtime.embedder, runtime.screen)
+    except Exception as e:
+        log.exception("document.ingest_failed", extra={"attempt": claim.attempt})
+        async with sessions() as session, session.begin():
+            await set_tenant_context(session, org_id=claim.org_id)
+            if locked := await knowledge_service.lock_if_still_ours(session, claim):
+                await knowledge_service.fail_ingestion_attempt(
+                    session,
+                    locked,
+                    claim,
+                    f"{type(e).__name__}: {e}"[:2000],
+                    max_attempts=settings.document_max_attempts,
+                )
+        return True
+
+    async with sessions() as session, session.begin():
+        await set_tenant_context(session, org_id=claim.org_id)
+        if locked := await knowledge_service.lock_if_still_ours(session, claim):
+            await knowledge_service.complete_ingestion(session, locked, prepared)
+            log.info("document.ingested", extra={"chunks": len(prepared.drafts)})
+    return True
+
+
+async def run(settings: Settings, stop: asyncio.Event, poll_seconds: float = 1.0) -> None:
+    engine = create_engine(str(settings.database_url))
+    sessions = async_sessionmaker(engine, expire_on_commit=False)
+    runtime = build_runtime(settings)
+    if settings.env == "local" and isinstance(runtime.store, S3ObjectStore):
+        await runtime.store.ensure_bucket()
+    graphs = build_workflow_graphs(build_llm(settings))
+    log.info("worker.started")
+    try:
+        while not stop.is_set():
+            # Ingestion first: an answer can only be as good as the indexed documents.
+            busy = await process_next_document(sessions, settings, runtime)
+            # Approvals nobody decided in time expire (and their workflows resume).
+            async with sessions() as session, session.begin():
+                await session.execute(text("SELECT expire_approvals()"))
+            busy = await process_next(sessions, graphs, settings, runtime) or busy
+            if not busy:
+                # Idle: wait before polling again, but wake at once on shutdown.
+                with contextlib.suppress(TimeoutError):
+                    await asyncio.wait_for(stop.wait(), timeout=poll_seconds)
+    finally:
+        await engine.dispose()
+        log.info("worker.stopped")
+
+
+def main() -> None:
+    settings = get_settings()
+    configure_logging(settings.log_level)
+
+    async def _main() -> None:
+        stop = asyncio.Event()
+        loop = asyncio.get_running_loop()
+        # Docker/ECS send SIGTERM on deploy: finish the current job, then exit.
+        for sig in (signal.SIGTERM, signal.SIGINT):
+            loop.add_signal_handler(sig, stop.set)
+        await run(settings, stop)
+
+    asyncio.run(_main())
+
+
+if __name__ == "__main__":
+    main()
