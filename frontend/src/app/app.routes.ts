@@ -38,6 +38,11 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/profile-page').then((m) => m.ProfilePage),
       },
       {
+        path: 'approvals',
+        loadComponent: () => import('./pages/approvals-page').then((m) => m.ApprovalsPage),
+        canActivate: [adminGuard],
+      },
+      {
         path: 'audit',
         loadComponent: () => import('./pages/audit-page').then((m) => m.AuditPage),
         canActivate: [adminGuard],

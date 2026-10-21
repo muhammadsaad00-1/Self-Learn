@@ -17,6 +17,7 @@ import { ProfileMenu } from './profile-menu';
         <a routerLink="/knowledge" routerLinkActive="active">Knowledge</a>
         <a routerLink="/members" routerLinkActive="active">Members</a>
         @if (auth.isAdmin()) {
+          <a routerLink="/approvals" routerLinkActive="active">Approvals</a>
           <a routerLink="/audit" routerLinkActive="active">Audit log</a>
         }
       </nav>

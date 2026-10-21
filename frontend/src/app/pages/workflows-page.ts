@@ -4,9 +4,10 @@ import { Component, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 
-import type { Workflow, WorkflowStatus, WorkflowSummary } from '../api/types';
+import type { LedgerAccount, Workflow, WorkflowStatus, WorkflowSummary } from '../api/types';
 import { Auth } from '../core/auth';
 import { errorMessage } from '../core/errors';
+import { DecisionTrail } from '../layout/decision-trail';
 import { KnowledgeAnswerView } from '../layout/knowledge-answer';
 
 const PENDING: WorkflowStatus[] = ['queued', 'running'];
@@ -14,7 +15,7 @@ const POLL_MS = 2000;
 
 @Component({
   selector: 'app-workflows-page',
-  imports: [FormsModule, DatePipe, DecimalPipe, KnowledgeAnswerView],
+  imports: [FormsModule, DatePipe, DecimalPipe, KnowledgeAnswerView, DecisionTrail],
   template: `
     <h1>Workflows</h1>
     <p class="muted">Paste a customer request. The triage agent classifies it in the background.</p>
@@ -27,7 +28,22 @@ const POLL_MS = 2000;
         maxlength="8000"
         placeholder="e.g. I was charged PKR 5,000 twice for transfer TXN-88231 on 3 Oct."
       ></textarea>
-      <button type="submit" [disabled]="!message.trim() || submitting()">Submit request</button>
+      <div class="row">
+        <label class="muted">
+          Customer
+          <select [(ngModel)]="customerRef" name="customer">
+            <option value="">(unknown)</option>
+            @for (c of accounts.value() ?? []; track c.customer_ref) {
+              <option [value]="c.customer_ref">{{ c.customer_ref }} · {{ c.customer_name }}</option>
+            }
+          </select>
+        </label>
+        @if (auth.isAdmin() && !(accounts.value() ?? []).length) {
+          <button type="button" class="link" (click)="loadDemoData()">Load demo customers</button>
+        }
+        <span class="spacer"></span>
+        <button type="submit" [disabled]="!message.trim() || submitting()">Submit request</button>
+      </div>
     </form>
     @if (error()) {
       <p class="error" role="alert">{{ error() }}</p>
@@ -108,6 +124,10 @@ const POLL_MS = 2000;
             <p class="muted">{{ wf.status }}… (attempt {{ wf.attempts }})</p>
           }
 
+          @if (wf.result; as r) {
+            <app-decision-trail [result]="r" />
+          }
+
           @if (wf.result?.knowledge; as k) {
             <h3>Policy answer</h3>
             <app-knowledge-answer [answer]="k" />
@@ -139,9 +159,10 @@ const POLL_MS = 2000;
 })
 export class WorkflowsPage {
   private readonly http = inject(HttpClient);
-  private readonly auth = inject(Auth);
+  protected readonly auth = inject(Auth);
 
   protected message = '';
+  protected customerRef = '';
   protected readonly submitting = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly selectedId = signal<string | null>(null);
@@ -154,6 +175,20 @@ export class WorkflowsPage {
     const orgId = this.auth.orgId();
     return orgId ? { url: '/v1/workflows', headers: { 'X-Org-Id': orgId } } : undefined;
   });
+
+  protected readonly accounts = httpResource<LedgerAccount[]>(() => {
+    const orgId = this.auth.orgId();
+    return orgId ? { url: '/v1/ledger/accounts', headers: { 'X-Org-Id': orgId } } : undefined;
+  });
+
+  protected async loadDemoData(): Promise<void> {
+    try {
+      await firstValueFrom(this.http.post('/v1/ledger/demo-data', {}));
+    } catch (err) {
+      this.error.set(errorMessage(err));
+    }
+    this.accounts.reload();
+  }
 
   protected readonly detail = httpResource<Workflow>(() => {
     const id = this.selectedId();
@@ -192,7 +227,7 @@ export class WorkflowsPage {
       const wf = await firstValueFrom(
         this.http.post<Workflow>(
           '/v1/workflows',
-          { message: this.message.trim() },
+          { message: this.message.trim(), customer_ref: this.customerRef || null },
           { headers: { 'Idempotency-Key': this.idempotencyKey } },
         ),
       );

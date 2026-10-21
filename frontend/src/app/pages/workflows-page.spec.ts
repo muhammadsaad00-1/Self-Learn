@@ -42,6 +42,8 @@ describe('WorkflowsPage polling', () => {
       await settle();
     };
 
+    await settle();
+    backend.expectOne('/v1/ledger/accounts').flush([]); // the customer picker loads once
     await answerList('queued');
     await vi.advanceTimersByTimeAsync(2000);
     await answerList('running'); // still pending: another poll must follow

@@ -278,6 +278,120 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/ledger/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Accounts */
+        get: operations["list_accounts_v1_ledger_accounts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/ledger/accounts/{customer_ref}/transactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Transactions */
+        get: operations["list_transactions_v1_ledger_accounts__customer_ref__transactions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/ledger/demo-data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Seed Demo Data
+         * @description Three demo customers covering every policy path (admins; never in production).
+         */
+        post: operations["seed_demo_data_v1_ledger_demo_data_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Approvals
+         * @description Approvals in this organization, newest first (admins and owners).
+         */
+        get: operations["list_approvals_v1_approvals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/approvals/{approval_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve
+         * @description Approve the proposed action; the workflow resumes and executes it (re-authorized).
+         */
+        post: operations["approve_v1_approvals__approval_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/approvals/{approval_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject
+         * @description Reject the proposed action; the workflow resumes without executing it.
+         */
+        post: operations["reject_v1_approvals__approval_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -324,6 +438,20 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AccountOut */
+        AccountOut: {
+            /** Customer Ref */
+            customer_ref: string;
+            /** Customer Name */
+            customer_name: string;
+            /** Currency */
+            currency: string;
+        };
+        /**
+         * ActionType
+         * @enum {string}
+         */
+        ActionType: "refund_transaction" | "escalate_to_human" | "no_action";
         /**
          * AddCompanyRequest
          * @description Create another company for the logged-in user. Name, email and password stay the same;
@@ -349,6 +477,67 @@ export interface components {
             /** @default member */
             role: components["schemas"]["Role"];
         };
+        /** ApprovalOut */
+        ApprovalOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Workflow Id
+             * Format: uuid
+             */
+            workflow_id: string;
+            status: components["schemas"]["ApprovalStatus"];
+            /** Action */
+            action: {
+                [key: string]: unknown;
+            };
+            /** Policy Reasons */
+            policy_reasons: string[];
+            /** Requested By */
+            requested_by: string | null;
+            /**
+             * Requested At
+             * Format: date-time
+             */
+            requested_at: string;
+            /**
+             * Expires At
+             * Format: date-time
+             */
+            expires_at: string;
+            /** Decided By */
+            decided_by: string | null;
+            /** Decided At */
+            decided_at: string | null;
+            /** Note */
+            note: string | null;
+            /** Message Preview */
+            message_preview: string;
+            /** Customer Ref */
+            customer_ref: string | null;
+            /** Category */
+            category: string | null;
+            /** Urgency */
+            urgency: string | null;
+        };
+        /** ApprovalRef */
+        ApprovalRef: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Status */
+            status: string;
+        };
+        /**
+         * ApprovalStatus
+         * @enum {string}
+         */
+        ApprovalStatus: "pending" | "approved" | "rejected" | "expired";
         /** AskRequest */
         AskRequest: {
             /** Question */
@@ -465,6 +654,11 @@ export interface components {
             /** Customer Ref */
             customer_ref?: string | null;
         };
+        /** DecisionRequest */
+        DecisionRequest: {
+            /** Note */
+            note?: string | null;
+        };
         /**
          * Details
          * @description Facts copied from the message. Null when the customer didn't state them.
@@ -529,6 +723,53 @@ export interface components {
          * @enum {string}
          */
         DocumentStatus: "pending" | "processing" | "ready" | "failed";
+        /**
+         * Evidence
+         * @description What the research step found in the ledger: the agents' factual basis.
+         */
+        Evidence: {
+            /** Customer Ref */
+            customer_ref: string | null;
+            /** Customer Name */
+            customer_name: string | null;
+            /** Account Found */
+            account_found: boolean;
+            /** Transactions */
+            transactions: components["schemas"]["TransactionOut"][];
+            /** Duplicate Pairs */
+            duplicate_pairs: [
+                string,
+                string
+            ][];
+            /** Reversals Last 24H */
+            reversals_last_24h: number;
+        };
+        /** ExecutionResult */
+        ExecutionResult: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "executed" | "not_executed";
+            /** Detail */
+            detail: string;
+            /** Refund Reference */
+            refund_reference?: string | null;
+            /** Amount */
+            amount?: string | null;
+            /** Currency */
+            currency?: string | null;
+            /**
+             * Verified
+             * @default false
+             */
+            verified: boolean;
+            /**
+             * Replayed
+             * @default false
+             */
+            replayed: boolean;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -593,6 +834,38 @@ export interface components {
             /** Org Slug */
             org_slug: string;
             role: components["schemas"]["Role"];
+        };
+        /**
+         * Outcome
+         * @enum {string}
+         */
+        Outcome: "allow" | "require_approval" | "block";
+        /** PolicyDecision */
+        PolicyDecision: {
+            outcome: components["schemas"]["Outcome"];
+            /** Reasons */
+            reasons: string[];
+            /** Rules */
+            rules: string[];
+        };
+        /** ProposedAction */
+        ProposedAction: {
+            action: components["schemas"]["ActionType"];
+            /**
+             * Transaction Reference
+             * @description Debit to refund, if refunding
+             */
+            transaction_reference: string | null;
+            /**
+             * Amount
+             * @description Amount to refund, if refunding
+             */
+            amount: string | null;
+            /**
+             * Rationale
+             * @description Why, in one or two sentences an auditor can check
+             */
+            rationale: string;
         };
         /**
          * Role
@@ -680,6 +953,39 @@ export interface components {
             /** Expires In */
             expires_in: number;
         };
+        /**
+         * TransactionKind
+         * @enum {string}
+         */
+        TransactionKind: "debit" | "credit";
+        /** TransactionOut */
+        TransactionOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Reference */
+            reference: string;
+            kind: components["schemas"]["TransactionKind"];
+            /** Amount */
+            amount: string;
+            /** Currency */
+            currency: string;
+            /** Merchant */
+            merchant: string;
+            status: components["schemas"]["TransactionStatus"];
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+        };
+        /**
+         * TransactionStatus
+         * @enum {string}
+         */
+        TransactionStatus: "posted" | "reversed";
         /** TriageResult */
         TriageResult: {
             category: components["schemas"]["Category"];
@@ -774,12 +1080,19 @@ export interface components {
         WorkflowResult: {
             triage?: components["schemas"]["TriageResult"] | null;
             knowledge?: components["schemas"]["KnowledgeAnswer"] | null;
+            evidence?: components["schemas"]["Evidence"] | null;
+            proposal?: components["schemas"]["ProposedAction"] | null;
+            decision?: components["schemas"]["PolicyDecision"] | null;
+            approval?: components["schemas"]["ApprovalRef"] | null;
+            execution?: components["schemas"]["ExecutionResult"] | null;
+            /** Reply */
+            reply?: string | null;
         };
         /**
          * WorkflowStatus
          * @enum {string}
          */
-        WorkflowStatus: "queued" | "running" | "completed" | "failed";
+        WorkflowStatus: "queued" | "running" | "waiting_approval" | "completed" | "failed";
         /** WorkflowStepOut */
         WorkflowStepOut: {
             /** Node */
@@ -1429,6 +1742,214 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["KnowledgeAnswer"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_accounts_v1_ledger_accounts_get: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_transactions_v1_ledger_accounts__customer_ref__transactions_get: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path: {
+                customer_ref: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransactionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    seed_demo_data_v1_ledger_demo_data_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AccountOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_approvals_v1_approvals_get: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["ApprovalStatus"] | null;
+            };
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_v1_approvals__approval_id__approve_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path: {
+                approval_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_v1_approvals__approval_id__reject_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path: {
+                approval_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecisionRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalOut"];
                 };
             };
             /** @description Validation Error */

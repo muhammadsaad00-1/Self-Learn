@@ -22,6 +22,10 @@ export type TriageResult = Schemas['TriageResult'];
 export type KnowledgeDocument = Schemas['DocumentOut'];
 export type KnowledgeAnswer = Schemas['KnowledgeAnswer'];
 export type Citation = Schemas['Citation'];
+export type Approval = Schemas['ApprovalOut'];
+export type LedgerAccount = Schemas['AccountOut'];
+export type LedgerTransaction = Schemas['TransactionOut'];
+export type WorkflowResult = Schemas['WorkflowResult'];
 
 /** Error body FastAPI returns for HTTPException: {"detail": "..."} */
 export interface ApiError {

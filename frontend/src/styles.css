@@ -439,3 +439,45 @@ app-profile-menu {
 .company-list small {
   margin-left: 0.4rem; /* role next to the name; template whitespace isn't reliable */
 }
+
+/* Actions: decision trail and approvals */
+.badge[data-status='waiting_approval'] {
+  background: #fff4e0;
+  color: #93640b;
+}
+.badge[data-decision='allow'] {
+  background: #e3f4ec;
+  color: #0b6e4f;
+}
+.badge[data-decision='require_approval'] {
+  background: #fff4e0;
+  color: #93640b;
+}
+.badge[data-decision='block'] {
+  background: #fde8e7;
+  color: var(--danger);
+}
+table.compact td {
+  padding: 0.3rem 0.5rem;
+  font-size: 0.85rem;
+}
+tr.highlight {
+  background: #fff4e0;
+}
+.reasons {
+  margin: 0.4rem 0;
+  padding-left: 1.1rem;
+  font-size: 0.9rem;
+}
+blockquote.reply {
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  background: #f0f5f3;
+  border-radius: 6px;
+}
+.danger-button {
+  background: var(--danger);
+}
+.approval p {
+  margin: 0.5rem 0;
+}
