@@ -27,7 +27,8 @@ Sign up at http://localhost:4200/signup.
 2. Workflows → "Load demo customers".
 3. Customer CUST-1002: *"Careem charged me twice"* → refunded automatically.
 4. Customer CUST-1001: *"My PKR 5,000 bill was deducted twice"* → waits for approval.
-5. Add a second admin (Members), sign in as them, Approvals → approve. The refund executes and the decision trail shows evidence → policy → approval → ledger-verified refund → drafted reply. `make help` lists every command. `make down` stops the stack.
+5. Add a second admin (Members), sign in as them, Approvals → approve. The refund executes and the decision trail shows evidence → policy → approval → ledger-verified refund → drafted reply.
+6. Customer CUST-1003: *"Someone made payments I never authorized"* → escalated, a critical ticket is opened (Tickets page) and the reply quotes the case number. `make help` lists every command. `make down` stops the stack.
 
 ## Test
 

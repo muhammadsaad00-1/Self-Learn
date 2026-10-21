@@ -392,6 +392,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/tickets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Tickets
+         * @description Open tickets (default) most urgent first, or resolved/all newest first.
+         */
+        get: operations["list_tickets_v1_tickets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/tickets/{ticket_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update Ticket
+         * @description take: assign to me (in progress) · resolve: close with a note · reopen.
+         */
+        patch: operations["update_ticket_v1_tickets__ticket_id__patch"];
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -941,6 +981,72 @@ export interface components {
          * @enum {string}
          */
         StepStatus: "completed" | "failed";
+        /** TicketOut */
+        TicketOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Code */
+            code: string;
+            /** Workflow Id */
+            workflow_id: string | null;
+            /** Title */
+            title: string;
+            /** Description */
+            description: string;
+            priority: components["schemas"]["TicketPriority"];
+            /** Category */
+            category: string | null;
+            /** Customer Ref */
+            customer_ref: string | null;
+            status: components["schemas"]["TicketStatus"];
+            /** Assignee Id */
+            assignee_id: string | null;
+            /** Resolution Note */
+            resolution_note: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Resolved At */
+            resolved_at: string | null;
+        };
+        /**
+         * TicketPriority
+         * @enum {string}
+         */
+        TicketPriority: "low" | "normal" | "high" | "critical";
+        /** TicketRef */
+        TicketRef: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Code */
+            code: string;
+            priority: components["schemas"]["TicketPriority"];
+            /** Reasons */
+            reasons: string[];
+        };
+        /**
+         * TicketStatus
+         * @enum {string}
+         */
+        TicketStatus: "open" | "in_progress" | "resolved";
+        /** TicketUpdate */
+        TicketUpdate: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "take" | "resolve" | "reopen";
+            /** Note */
+            note?: string | null;
+        };
         /** TokenResponse */
         TokenResponse: {
             /** Access Token */
@@ -1085,6 +1191,7 @@ export interface components {
             decision?: components["schemas"]["PolicyDecision"] | null;
             approval?: components["schemas"]["ApprovalRef"] | null;
             execution?: components["schemas"]["ExecutionResult"] | null;
+            ticket?: components["schemas"]["TicketRef"] | null;
             /** Reply */
             reply?: string | null;
         };
@@ -1950,6 +2057,78 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApprovalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_tickets_v1_tickets_get: {
+        parameters: {
+            query?: {
+                status?: "open" | "resolved" | "all";
+            };
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_ticket_v1_tickets__ticket_id__patch: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path: {
+                ticket_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TicketUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TicketOut"];
                 };
             };
             /** @description Validation Error */

@@ -14,6 +14,7 @@ import { ProfileMenu } from './profile-menu';
 
       <nav>
         <a routerLink="/workflows" routerLinkActive="active">Workflows</a>
+        <a routerLink="/tickets" routerLinkActive="active">Tickets</a>
         <a routerLink="/knowledge" routerLinkActive="active">Knowledge</a>
         <a routerLink="/members" routerLinkActive="active">Members</a>
         @if (auth.isAdmin()) {

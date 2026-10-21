@@ -40,11 +40,14 @@ from agentflow.llm import build_llm
 from agentflow.observability import configure_logging, org_id_var, request_id_var, workflow_id_var
 from agentflow.policy.engine import Outcome
 from agentflow.tools import refund as refund_tool
+from agentflow.tools import tickets as ticket_tool
 from agentflow.tools.refund import ExecutionResult
+from agentflow.tools.tickets import TicketRef
 from agentflow.workflow import service
 from agentflow.workflow.graph import (
     RECURSION_LIMIT,
     ExecuteFn,
+    OpenTicketFn,
     ResearchFn,
     SearchFn,
     WorkflowGraphs,
@@ -110,6 +113,21 @@ def tenant_execute(sessions: Sessions, claim: Claim) -> ExecuteFn:
     return execute
 
 
+def tenant_open_ticket(sessions: Sessions, claim: Claim) -> OpenTicketFn:
+    async def open_ticket(state: WorkflowState, reasons: list[str]) -> TicketRef:
+        async with sessions() as session, session.begin():
+            await set_tenant_context(session, org_id=claim.org_id)
+            return await ticket_tool.open_ticket(
+                session,
+                org_id=claim.org_id,
+                workflow_id=claim.workflow_id,
+                reasons=reasons,
+                state=dict(state),
+            )
+
+    return open_ticket
+
+
 async def _run(
     graph: CompiledStateGraph[WorkflowState],
     state: dict[str, Any],
@@ -141,6 +159,7 @@ RESULT_KEYS = (
     "decision",
     "approval",
     "execution",
+    "ticket",
     "reply",
 )
 
@@ -174,6 +193,7 @@ async def process_next(
         "min_rerank_score": runtime.min_rerank_score,
         "research": tenant_research(sessions, claim.org_id),
         "execute": tenant_execute(sessions, claim),
+        "open_ticket": tenant_open_ticket(sessions, claim),
     }
     try:
         async with asyncio.timeout(settings.workflow_timeout_seconds):

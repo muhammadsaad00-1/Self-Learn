@@ -15,7 +15,8 @@ Customer-request workflow, in two graphs (a human approval can take hours; no wo
                                                     +--(once)--+                         v
                                     research (ledger) -> resolve -> policy_gate -> END
   EXECUTION (immediately if allowed, else after a human decided the approval)
-    START -> execute (re-authorized, exactly once) -> communicate -> END
+    START -> execute (re-authorized, exactly once) -> raise_ticket (if a human must own it)
+          -> communicate -> END
 
     agents (LLM):        triage, plan_queries, answer, verify, resolve, communicate
     deterministic code:  intake, retrieve, abstain, citation checks, research, proposal
@@ -48,6 +49,7 @@ from agentflow.ledger.schemas import Evidence
 from agentflow.llm import LLMResult, StructuredLLM
 from agentflow.policy import engine as policy
 from agentflow.tools.refund import ExecutionResult
+from agentflow.tools.tickets import TicketRef
 
 MAX_MESSAGE_CHARS = 8000
 MAX_ANSWER_ATTEMPTS = 2  # first answer + one retry with verifier feedback
@@ -73,6 +75,7 @@ class WorkflowState(TypedDict, total=False):
     decision: dict[str, Any]  # PolicyDecision (policy_gate)
     approval: dict[str, Any] | None  # {"id", "status"} once a human was asked
     execution: dict[str, Any]  # ExecutionResult (execute)
+    ticket: dict[str, Any] | None  # TicketRef, when a human must own the case (raise_ticket)
     reply: str  # drafted customer reply (communicate)
     # Model/tokens/latency of the node that just ran; the caller stores it on the step.
     node_meta: dict[str, Any]
@@ -245,6 +248,7 @@ INFORMATIONAL = {"general_inquiry"}
 
 ResearchFn = Callable[[str | None], Awaitable[Evidence]]
 ExecuteFn = Callable[["WorkflowState"], Awaitable[ExecutionResult]]
+OpenTicketFn = Callable[["WorkflowState", list[str]], Awaitable[TicketRef]]
 
 
 def build_graph(llm: StructuredLLM) -> CompiledStateGraph[WorkflowState]:
@@ -324,7 +328,7 @@ def build_graph(llm: StructuredLLM) -> CompiledStateGraph[WorkflowState]:
 
 
 def build_execution_graph(llm: StructuredLLM) -> CompiledStateGraph[WorkflowState]:
-    """EXECUTION: execute (re-authorized, exactly once) -> communicate."""
+    """EXECUTION: execute (re-authorized, exactly once) -> raise_ticket -> communicate."""
 
     async def execute(state: WorkflowState, config: RunnableConfig) -> WorkflowState:
         run: ExecuteFn = _configurable(config)["execute"]
@@ -335,9 +339,29 @@ def build_execution_graph(llm: StructuredLLM) -> CompiledStateGraph[WorkflowStat
             "node_meta": {"latency_ms": round((time.perf_counter() - start) * 1000)},
         }
 
+    async def raise_ticket(state: WorkflowState, config: RunnableConfig) -> WorkflowState:
+        """Code decides when a human must own the case (policy.ticket_reasons)."""
+        triage_result = state.get("triage") or {}
+        execution = state.get("execution") or {}
+        decision = state.get("decision")
+        reasons = policy.ticket_reasons(
+            category=triage_result.get("category"),
+            urgency=triage_result.get("urgency"),
+            decision=policy.PolicyDecision.model_validate(decision) if decision else None,
+            approval_status=(state.get("approval") or {}).get("status"),
+            execution_status=execution.get("status"),
+            execution_detail=execution.get("detail"),
+        )
+        if not reasons:
+            return {"ticket": None, "node_meta": {}}
+        open_ticket: OpenTicketFn = _configurable(config)["open_ticket"]
+        ticket = await open_ticket(state, reasons)
+        return {"ticket": ticket.model_dump(mode="json"), "node_meta": {}}
+
     async def communicate(state: WorkflowState) -> WorkflowState:
         execution = state.get("execution") or {}
         outcome = {
+            "case_number": (state.get("ticket") or {}).get("code"),
             "action": (state.get("proposal") or {}).get("action"),
             "execution": {
                 k: execution.get(k)
@@ -354,9 +378,11 @@ def build_execution_graph(llm: StructuredLLM) -> CompiledStateGraph[WorkflowStat
 
     graph = StateGraph(WorkflowState)
     graph.add_node("execute", execute)
+    graph.add_node("raise_ticket", raise_ticket)
     graph.add_node("communicate", communicate)
     graph.add_edge(START, "execute")
-    graph.add_edge("execute", "communicate")
+    graph.add_edge("execute", "raise_ticket")
+    graph.add_edge("raise_ticket", "communicate")
     graph.add_edge("communicate", END)
     return graph.compile()
 

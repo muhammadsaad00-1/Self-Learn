@@ -99,6 +99,7 @@ async def test_worker_triages_and_records_steps(
         ("resolve", "completed"),
         ("policy_gate", "completed"),
         ("execute", "completed"),
+        ("raise_ticket", "completed"),
         ("communicate", "completed"),
     ]
     assert wf["steps"][1]["model"] == "fake-model"
@@ -107,7 +108,9 @@ async def test_worker_triages_and_records_steps(
         e["action"]
         for e in client.get("/v1/audit/events", headers=owner.headers()).json()["events"]
     ]
-    assert actions[:2] == ["workflow.completed", "workflow.created"]
+    # No customer account -> escalated -> a ticket is opened for a human to own.
+    assert actions[:3] == ["workflow.completed", "tool.ticket_opened", "workflow.created"]
+    assert wf["result"]["ticket"]["code"].startswith("TCK-")
     summary = client.get("/v1/workflows", headers=owner.headers()).json()[0]
     assert (summary["category"], summary["urgency"]) == ("duplicate_charge", "normal")
 

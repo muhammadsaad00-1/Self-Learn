@@ -481,3 +481,19 @@ blockquote.reply {
 .approval p {
   margin: 0.5rem 0;
 }
+
+/* Tickets */
+.ticket-description {
+  white-space: pre-wrap;
+  font: inherit;
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin: 0.25rem 0 0.5rem;
+}
+button.link.active-tab {
+  font-weight: 600;
+  text-decoration: underline;
+}
+.badge + a {
+  margin-left: 0.4rem;
+}

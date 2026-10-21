@@ -327,6 +327,7 @@ async def test_workflow_answers_from_the_knowledge_base(
         "resolve",
         "policy_gate",
         "execute",
+        "raise_ticket",
         "communicate",
     ]
     knowledge = wf["result"]["knowledge"]

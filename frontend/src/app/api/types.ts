@@ -26,6 +26,7 @@ export type Approval = Schemas['ApprovalOut'];
 export type LedgerAccount = Schemas['AccountOut'];
 export type LedgerTransaction = Schemas['TransactionOut'];
 export type WorkflowResult = Schemas['WorkflowResult'];
+export type Ticket = Schemas['TicketOut'];
 
 /** Error body FastAPI returns for HTTPException: {"detail": "..."} */
 export interface ApiError {

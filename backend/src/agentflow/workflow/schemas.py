@@ -10,6 +10,7 @@ from agentflow.knowledge.schemas import KnowledgeAnswer
 from agentflow.ledger.schemas import Evidence
 from agentflow.policy.engine import PolicyDecision
 from agentflow.tools.refund import ExecutionResult
+from agentflow.tools.tickets import TicketRef
 from agentflow.workflow.models import StepStatus, WorkflowStatus
 
 
@@ -52,6 +53,7 @@ class WorkflowResult(BaseModel):
     decision: PolicyDecision | None = None  # policy engine
     approval: ApprovalRef | None = None  # human decision, if one was needed
     execution: ExecutionResult | None = None  # what the tool actually did
+    ticket: TicketRef | None = None  # opened when a human must own the case
     reply: str | None = None  # drafted customer reply
 
 

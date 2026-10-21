@@ -6,7 +6,9 @@ CI) in a separate `<db>_test` database, so your local dev data is never touched.
 
 import asyncio
 from collections.abc import AsyncGenerator, Awaitable, Callable, Iterator
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 
 import pytest
 from alembic import command
@@ -17,8 +19,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.pool import NullPool
 
 from agentflow.config import Settings
+from agentflow.knowledge.runtime import KnowledgeRuntime
 from agentflow.main import create_app
 from agentflow.models import Base
+from tests.fakes import fake_runtime
 
 BACKEND_DIR = Path(__file__).parents[1]
 APP_ROLE_SQL = BACKEND_DIR.parent / "infra" / "postgres" / "app-role.sql"
@@ -163,3 +167,21 @@ async def sessions(settings: Settings) -> AsyncGenerator[async_sessionmaker[Asyn
     engine = create_async_engine(str(settings.database_url))
     yield async_sessionmaker(engine, expire_on_commit=False)
     await engine.dispose()
+
+
+@pytest.fixture
+def runtime() -> KnowledgeRuntime:
+    """Fake models + in-memory storage for the knowledge module (see tests/fakes.py)."""
+    return fake_runtime()
+
+
+@pytest.fixture
+def client_for(settings: Settings, runtime: KnowledgeRuntime) -> Callable[[Any], Any]:
+    """Factory: a TestClient whose app uses the given (fake) LLM and the fake runtime."""
+
+    @contextmanager
+    def make(llm: Any) -> Iterator[TestClient]:
+        with TestClient(create_app(settings, llm=llm, knowledge=runtime)) as client:
+            yield client
+
+    return make

@@ -1,5 +1,6 @@
 import { DatePipe } from '@angular/common';
 import { Component, computed, input } from '@angular/core';
+import { RouterLink } from '@angular/router';
 
 import type { WorkflowResult } from '../api/types';
 
@@ -7,7 +8,7 @@ import type { WorkflowResult } from '../api/types';
  *  approval -> execution -> reply. This is what a reviewer or an auditor reads. */
 @Component({
   selector: 'app-decision-trail',
-  imports: [DatePipe],
+  imports: [DatePipe, RouterLink],
   template: `
     @let r = result();
     @if (r.evidence; as ev) {
@@ -87,6 +88,19 @@ import type { WorkflowResult } from '../api/types';
           <span class="badge" data-status="completed">verified in ledger</span>
         }
       </p>
+    }
+
+    @if (r.ticket; as t) {
+      <h3>Ticket</h3>
+      <p>
+        <span class="badge" [attr.data-urgency]="t.priority">{{ t.code }} · {{ t.priority }}</span>
+        <a routerLink="/tickets">open the ticket queue</a>
+      </p>
+      <ul class="reasons">
+        @for (reason of t.reasons; track reason) {
+          <li>{{ reason }}</li>
+        }
+      </ul>
     }
 
     @if (r.reply) {

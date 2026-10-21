@@ -113,3 +113,31 @@ def evaluate(
         ],
         rules=["auto_approve"],
     )
+
+
+def ticket_reasons(
+    *,
+    category: str | None,
+    urgency: str | None,
+    decision: PolicyDecision | None,
+    approval_status: str | None,
+    execution_status: str | None,
+    execution_detail: str | None,
+) -> list[str]:
+    """Why a human must own this case as a ticket (empty list = no ticket).
+
+    Approval-required actions don't get one while pending: the approvals inbox owns them.
+    A ticket is for outcomes that left the case unresolved or that are critical anyway.
+    """
+    reasons = []
+    if category == "unauthorized_transaction":
+        reasons.append("Suspected fraud: investigate and contact the customer")
+    if urgency == "critical":
+        reasons.append("Critical urgency")
+    if decision is not None and decision.outcome == Outcome.BLOCK:
+        reasons.append("Not automated: " + "; ".join(decision.reasons))
+    if approval_status in ("rejected", "expired"):
+        reasons.append(f"Approval {approval_status}: the customer still needs a resolution")
+    if approval_status == "approved" and execution_status == "not_executed":
+        reasons.append(f"Approved action could not be executed: {execution_detail}")
+    return reasons

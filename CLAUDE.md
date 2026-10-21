@@ -62,7 +62,7 @@ Claude writes the code into the files, then shows the full code in chat (the use
 - `uv` 0.12 and `gh` 2.102 are in `~/.local/bin`. `codex` is not installed.
 
 ## Branch stack (none merged yet; PRs need `gh auth login`)
-`main` ← feat/phase-1-core-saas (incl. phase 0) ← feat/phase-2-first-agent ← feat/phase-3-rag ← feat/add-company ← feat/phase-4-6-actions. CI only runs on PRs/main, so it has not run on GitHub yet.
+`main` ← feat/phase-1-core-saas (incl. phase 0) ← feat/phase-2-first-agent ← feat/phase-3-rag ← feat/add-company ← feat/phase-4-6-actions ← feat/tickets. CI only runs on PRs/main, so it has not run on GitHub yet.
 
 ## Decisions
 - **Purpose is learning.** Build the full spec, including every AWS service, IaC, MCP, evals and the frontend. Don't skip components as "not needed yet". Order still follows the roadmap phases.
@@ -90,6 +90,7 @@ Roadmap phases are in spec 05. Mark items `[x]` as they land.
 - [x] Phase 3 — Multi-agent RAG (`feat/phase-3-rag`, ADR 0011): upload → MinIO/S3 → worker ingestion (parse md/txt/pdf, heading-aware chunks, bge-small embeddings, prompt-injection screen → quarantine) → hybrid retrieval (pgvector HNSW iterative scan + weighted tsvector, weighted RRF) → bge-reranker-v2-m3 → agents: query planner → answer (citations) → verifier (scope-aware), code-level abstention + citation checks. APIs `/v1/knowledge/{documents,search,ask}`; workflow result includes `knowledge`. Evals: `make eval-rag [AGENTS=1]` (26/26, planner+rerank R@1 100%). Dashboard Knowledge page.
 - [x] Phase 4 — Multi-agent (`feat/phase-4-6-actions`): research (ledger tool + code duplicate detection), resolution agent (typed proposal + code validation), communication agent (reply from outcome). Old list: supervisor, research, knowledge, resolution, verifier, budgets
 - [~] Phase 5 — Tools: DONE simulated ledger (`ledger/`), refund tool exactly-once (`tools/refund.py`, `action_executions`), demo data. LEFT: tool registry, CRM/ticket/email/calendar, MCP, SQS/EventBridge. Old list: registry, permission model, CRM/ticket/email/calendar/db tools, MCP, SQS/EventBridge automation
+- [x] Tickets (`feat/tickets`): `policy.ticket_reasons` (fraud, critical, block/escalation, approval rejected/expired, approved-but-not-executed) → execution-graph node `raise_ticket` → exactly-once ticket tool (`tools/tickets.py`); `/v1/tickets` queue (take/resolve/reopen); reply quotes the case number; dashboard Tickets page.
 - [x] Phase 6 — Approval (ADR 0012): policy engine (`policy/engine.py`), approvals + maker-checker + expiry, waiting_approval/stage resume, re-authorization at execution, dashboard Approvals inbox + decision trail. Old list: policy engine, approval entity + UI, pause/resume, expiry, double authorization
 - [ ] Phase 7 — AWS: IaC, ECR, ECS/RDS/S3/SQS, Secrets/KMS, CloudWatch/OTel, staging/prod
 - [ ] Phase 8 — Hardening: golden/adversarial/prompt-injection/cross-tenant/load/chaos/cost tests

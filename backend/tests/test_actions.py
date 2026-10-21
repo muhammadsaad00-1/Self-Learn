@@ -4,11 +4,9 @@ request -> triage -> knowledge -> research -> resolve -> policy -> [approval] ->
 """
 
 import uuid
-from collections.abc import Awaitable, Callable, Iterator
-from contextlib import contextmanager
+from collections.abc import Awaitable, Callable
 from typing import Any
 
-import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -16,7 +14,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from agentflow.config import Settings
 from agentflow.db import set_tenant_context
 from agentflow.knowledge.runtime import KnowledgeRuntime
-from agentflow.main import create_app
 from agentflow.tools.models import ActionExecution
 from agentflow.tools.refund import authorize_and_execute
 from agentflow.worker import process_next, process_next_document
@@ -24,7 +21,6 @@ from agentflow.workflow.graph import build_workflow_graphs
 from tests.fakes import (
     FakeLLM,
     draft,
-    fake_runtime,
     proposal,
     query_plan,
     reply,
@@ -40,21 +36,6 @@ POLICY = b"""# Refund policy
 ## Duplicate charges
 A duplicate debit is reversed in full within 3 business days of the customer reporting it.
 """
-
-
-@pytest.fixture
-def runtime() -> KnowledgeRuntime:
-    return fake_runtime()
-
-
-@pytest.fixture
-def client_for(settings: Settings, runtime: KnowledgeRuntime) -> Callable[[FakeLLM], Any]:
-    @contextmanager
-    def make(llm: FakeLLM) -> Iterator[TestClient]:
-        with TestClient(create_app(settings, llm=llm, knowledge=runtime)) as client:
-            yield client
-
-    return make
 
 
 def agents(
@@ -161,13 +142,15 @@ async def test_small_duplicate_is_refunded_automatically(
         assert r["execution"]["status"] == "executed"
         assert r["execution"]["verified"] is True
         assert r["reply"] == "Your refund has been processed."
-        assert [s["node"] for s in wf["steps"]][-5:] == [
+        assert [s["node"] for s in wf["steps"]][-6:] == [
             "research",
             "resolve",
             "policy_gate",
             "execute",
+            "raise_ticket",
             "communicate",
         ]
+        assert r["ticket"] is None  # resolved automatically: nobody needs to own it
         txns = client.get(
             "/v1/ledger/accounts/CUST-1002/transactions", headers=owner.headers()
         ).json()
