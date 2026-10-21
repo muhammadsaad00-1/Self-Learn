@@ -16,8 +16,17 @@ from agentflow.db import Base, TimestampMixin, enum_check, str_enum
 class WorkflowStatus(StrEnum):
     QUEUED = "queued"  # waiting for a worker (new, or retrying after a failure)
     RUNNING = "running"  # a worker holds the lease
+    WAITING_APPROVAL = "waiting_approval"  # paused until a human approves or rejects
     COMPLETED = "completed"
     FAILED = "failed"  # gave up after max attempts (dead-lettered); needs a human
+
+
+class WorkflowStage(StrEnum):
+    """Where a (re)started workflow resumes. Analysis ends at the policy decision; execution
+    runs after it (immediately when allowed, or after a human decided an approval)."""
+
+    ANALYSIS = "analysis"
+    EXECUTION = "execution"
 
 
 class StepStatus(StrEnum):
@@ -29,6 +38,7 @@ class Workflow(TimestampMixin, Base):
     __tablename__ = "workflows"
     __table_args__ = (
         enum_check("status", WorkflowStatus),
+        enum_check("stage", WorkflowStage),
         # The same Idempotency-Key within an org always means the same workflow.
         UniqueConstraint("org_id", "idempotency_key"),
         # The worker's "next job" query reads only this small partial index.
@@ -48,6 +58,9 @@ class Workflow(TimestampMixin, Base):
     request_id: Mapped[str | None] = mapped_column(String(64))  # correlates logs across services
     status: Mapped[WorkflowStatus] = mapped_column(
         str_enum(WorkflowStatus), default=WorkflowStatus.QUEUED
+    )
+    stage: Mapped[WorkflowStage] = mapped_column(
+        str_enum(WorkflowStage), default=WorkflowStage.ANALYSIS
     )
     input: Mapped[dict[str, Any]] = mapped_column(JSONB)
     result: Mapped[dict[str, Any] | None] = mapped_column(JSONB)

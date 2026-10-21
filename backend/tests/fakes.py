@@ -4,12 +4,15 @@ import hashlib
 import math
 import re
 from collections.abc import Sequence
+from decimal import Decimal
 from typing import Any
 
 from pydantic import BaseModel
 
+from agentflow.agents.communication import CustomerReply
 from agentflow.agents.knowledge import DraftAnswer, Verification
 from agentflow.agents.query_planner import QueryPlan
+from agentflow.agents.resolution import ActionType, ProposedAction
 from agentflow.agents.triage import Category, Details, TriageResult, Urgency
 from agentflow.knowledge.models import EMBEDDING_DIMENSIONS
 from agentflow.knowledge.retrieval import SearchParams
@@ -51,6 +54,21 @@ def abstention(reason: str = "The sources don't cover this.") -> DraftAnswer:
 
 def verdict(supported: bool = True, *claims: str) -> Verification:
     return Verification(supported=supported, unsupported_claims=list(claims))
+
+
+def reply(message: str = "We are looking into your request.") -> CustomerReply:
+    return CustomerReply(message=message)
+
+
+def proposal(
+    reference: str | None = None, amount: str | None = None, action: str = "refund_transaction"
+) -> ProposedAction:
+    return ProposedAction(
+        action=ActionType(action),
+        transaction_reference=reference,
+        amount=Decimal(amount) if amount else None,
+        rationale="The second debit duplicates the first.",
+    )
 
 
 class FakeLLM:

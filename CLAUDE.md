@@ -22,7 +22,7 @@ Python + FastAPI · LangGraph + LangChain · PostgreSQL + pgvector · Redis · S
 
 ## Architecture stance
 - **Modular monolith first.** One FastAPI app plus one worker process. Domain modules have clear boundaries; split into services only with a measured reason (spec rule).
-- Domain modules (spec 02 §3): identity ✅, audit ✅, workflow ✅ (+ `agents/`, `llm.py`), knowledge ✅, knowledge, agent, tooling, policy, approval, automation, audit, evaluation, usage.
+- Domain modules (spec 02 §3): identity ✅, audit ✅, workflow ✅ (+ `agents/`, `llm.py`), knowledge ✅, policy ✅, approval ✅, tooling ✅ (refund; + `ledger/` simulator), knowledge, agent, tooling, policy, approval, automation, audit, evaluation, usage.
 - Modules talk to each other only through their public service functions, never by reaching into another module's tables or models.
 - Add AWS managed services (Step Functions, EventBridge, AgentCore) only when they solve a concrete problem. Locally, everything runs in Docker Compose.
 
@@ -62,7 +62,7 @@ Claude writes the code into the files, then shows the full code in chat (the use
 - `uv` 0.12 and `gh` 2.102 are in `~/.local/bin`. `codex` is not installed.
 
 ## Branch stack (none merged yet; PRs need `gh auth login`)
-`main` ← feat/phase-1-core-saas (incl. phase 0) ← feat/phase-2-first-agent ← feat/phase-3-rag ← feat/add-company. CI only runs on PRs/main, so it has not run on GitHub yet.
+`main` ← feat/phase-1-core-saas (incl. phase 0) ← feat/phase-2-first-agent ← feat/phase-3-rag ← feat/add-company ← feat/phase-4-6-actions. CI only runs on PRs/main, so it has not run on GitHub yet.
 
 ## Decisions
 - **Purpose is learning.** Build the full spec, including every AWS service, IaC, MCP, evals and the frontend. Don't skip components as "not needed yet". Order still follows the roadmap phases.
@@ -88,9 +88,9 @@ Roadmap phases are in spec 05. Mark items `[x]` as they land.
 - [x] Phase 2 — First agent (`feat/phase-2-first-agent`, ADR 0010): JSON logs + request/org/workflow ids (`observability.py`), LLM router with fallback + schema output (`llm.py`), triage agent + rules (`agents/triage.py`), idempotent `POST /v1/workflows`, Postgres-queue worker (`worker.py`, `claim_next_workflow()`), LangGraph intake→triage, evals (`make eval`), dashboard Workflows page
 - [x] Feature: **Add company** (`feat/add-company`): one login, many orgs; `POST /v1/orgs` (password re-confirm, shares login rate limit), shared `_create_org_with_owner`, Chrome-style profile menu, compact profile page (account strip + Add company below).
 - [x] Phase 3 — Multi-agent RAG (`feat/phase-3-rag`, ADR 0011): upload → MinIO/S3 → worker ingestion (parse md/txt/pdf, heading-aware chunks, bge-small embeddings, prompt-injection screen → quarantine) → hybrid retrieval (pgvector HNSW iterative scan + weighted tsvector, weighted RRF) → bge-reranker-v2-m3 → agents: query planner → answer (citations) → verifier (scope-aware), code-level abstention + citation checks. APIs `/v1/knowledge/{documents,search,ask}`; workflow result includes `knowledge`. Evals: `make eval-rag [AGENTS=1]` (26/26, planner+rerank R@1 100%). Dashboard Knowledge page.
-- [~] Phase 4 — Multi-agent (planner/knowledge/verifier done in Phase 3; research + resolution agents left): supervisor, research, knowledge, resolution, verifier, budgets
-- [ ] Phase 5 — Tools: registry, permission model, CRM/ticket/email/calendar/db tools, MCP, SQS/EventBridge automation
-- [ ] Phase 6 — Approval: policy engine, approval entity + UI, pause/resume, expiry, double authorization
+- [x] Phase 4 — Multi-agent (`feat/phase-4-6-actions`): research (ledger tool + code duplicate detection), resolution agent (typed proposal + code validation), communication agent (reply from outcome). Old list: supervisor, research, knowledge, resolution, verifier, budgets
+- [~] Phase 5 — Tools: DONE simulated ledger (`ledger/`), refund tool exactly-once (`tools/refund.py`, `action_executions`), demo data. LEFT: tool registry, CRM/ticket/email/calendar, MCP, SQS/EventBridge. Old list: registry, permission model, CRM/ticket/email/calendar/db tools, MCP, SQS/EventBridge automation
+- [x] Phase 6 — Approval (ADR 0012): policy engine (`policy/engine.py`), approvals + maker-checker + expiry, waiting_approval/stage resume, re-authorization at execution, dashboard Approvals inbox + decision trail. Old list: policy engine, approval entity + UI, pause/resume, expiry, double authorization
 - [ ] Phase 7 — AWS: IaC, ECR, ECS/RDS/S3/SQS, Secrets/KMS, CloudWatch/OTel, staging/prod
 - [ ] Phase 8 — Hardening: golden/adversarial/prompt-injection/cross-tenant/load/chaos/cost tests
 - [ ] Phase 9–10 — Pilot, commercial MVP

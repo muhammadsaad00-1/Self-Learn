@@ -4,8 +4,12 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from agentflow.agents.resolution import ProposedAction
 from agentflow.agents.triage import Category, TriageResult, Urgency
 from agentflow.knowledge.schemas import KnowledgeAnswer
+from agentflow.ledger.schemas import Evidence
+from agentflow.policy.engine import PolicyDecision
+from agentflow.tools.refund import ExecutionResult
 from agentflow.workflow.models import StepStatus, WorkflowStatus
 
 
@@ -33,11 +37,22 @@ class WorkflowStepOut(BaseModel):
     created_at: datetime
 
 
+class ApprovalRef(BaseModel):
+    id: uuid.UUID
+    status: str
+
+
 class WorkflowResult(BaseModel):
     """What the agents concluded. Grows a field per phase (resolution, actions, ...)."""
 
     triage: TriageResult | None = None
     knowledge: KnowledgeAnswer | None = None  # policy answer with citations (RAG)
+    evidence: Evidence | None = None  # ledger research
+    proposal: ProposedAction | None = None  # resolution agent, validated
+    decision: PolicyDecision | None = None  # policy engine
+    approval: ApprovalRef | None = None  # human decision, if one was needed
+    execution: ExecutionResult | None = None  # what the tool actually did
+    reply: str | None = None  # drafted customer reply
 
 
 class WorkflowOut(BaseModel):

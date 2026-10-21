@@ -15,12 +15,14 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from agentflow import __version__
+from agentflow.approvals import api as approvals_api
 from agentflow.audit import api as audit_api
 from agentflow.config import Settings, get_settings
 from agentflow.db import create_engine
 from agentflow.identity import api as identity_api
 from agentflow.knowledge import api as knowledge_api
 from agentflow.knowledge.runtime import KnowledgeRuntime
+from agentflow.ledger import api as ledger_api
 from agentflow.llm import StructuredLLM
 from agentflow.observability import configure_logging, request_context_middleware
 from agentflow.workflow import api as workflow_api
@@ -66,6 +68,8 @@ def create_app(
     app.include_router(audit_api.router)
     app.include_router(workflow_api.router)
     app.include_router(knowledge_api.router)
+    app.include_router(ledger_api.router)
+    app.include_router(approvals_api.router)
 
     @app.get("/health", tags=["ops"])
     async def health() -> dict[str, str]:

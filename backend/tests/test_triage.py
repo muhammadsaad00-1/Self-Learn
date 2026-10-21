@@ -5,6 +5,7 @@ from decimal import Decimal
 import pytest
 
 from agentflow.agents.triage import Category, Details, Urgency, apply_rules, triage
+from agentflow.ledger.schemas import Evidence
 from agentflow.workflow.graph import build_graph
 from tests.fakes import FakeLLM, query_plan, triage_result
 
@@ -78,12 +79,22 @@ async def test_graph_runs_intake_triage_then_knowledge_agents() -> None:
     async def no_documents(queries: object, rerank_query: object) -> list[object]:
         return []
 
+    async def no_account(customer_ref: str | None) -> Evidence:
+        return Evidence(
+            customer_ref=None,
+            customer_name=None,
+            account_found=False,
+            transactions=[],
+            duplicate_pairs=[],
+            reversals_last_24h=0,
+        )
+
     updates = [
         u
         async for u in build_graph(llm).astream(
             {"message": "  money   left\n\n my account  "},
             stream_mode="updates",
-            config={"configurable": {"search": no_documents}},
+            config={"configurable": {"search": no_documents, "research": no_account}},
         )
     ]
     assert [next(iter(u)) for u in updates] == [
@@ -92,7 +103,13 @@ async def test_graph_runs_intake_triage_then_knowledge_agents() -> None:
         "plan_queries",
         "retrieve",
         "abstain",  # no documents: refuse without calling the answer agent
+        "research",
+        "resolve",
+        "policy_gate",
     ]
+    # Account unknown: escalated by code without asking the resolution agent; blocked.
+    assert updates[6]["resolve"]["proposal"]["action"] == "escalate_to_human"
+    assert updates[7]["policy_gate"]["decision"]["outcome"] == "block"
     assert updates[0]["intake"]["message"] == "money left my account"  # whitespace normalized
     assert llm.calls[0]["user"].endswith("money left my account\n>>>")
     assert updates[1]["triage"]["triage"]["category"] == "failed_payment"

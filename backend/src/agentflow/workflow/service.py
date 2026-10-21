@@ -190,6 +190,14 @@ async def record_step(
     )
 
 
+async def pause_for_approval(session: AsyncSession, wf: Workflow, result: dict[str, Any]) -> None:
+    """Save the analysis and park the workflow until a human decides (approvals.service)."""
+    wf.status = WorkflowStatus.WAITING_APPROVAL
+    wf.result = result
+    wf.locked_until = None
+    wf.error = None
+
+
 async def complete(session: AsyncSession, wf: Workflow, result: dict[str, Any]) -> None:
     wf.status = WorkflowStatus.COMPLETED
     wf.result = result

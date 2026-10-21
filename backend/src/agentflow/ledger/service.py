@@ -1,0 +1,239 @@
+"""Ledger operations used by the tools: look up a customer's transactions, find duplicate
+debits, post a refund, and seed demo data. Money is Decimal everywhere."""
+
+import uuid
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
+
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from agentflow.ledger.models import Account, Transaction, TransactionKind, TransactionStatus
+from agentflow.ledger.schemas import Evidence, TransactionOut
+
+DUPLICATE_WINDOW = timedelta(minutes=10)
+
+
+class AccountNotFoundError(Exception):
+    pass
+
+
+async def get_account(session: AsyncSession, org_id: uuid.UUID, customer_ref: str) -> Account:
+    account = await session.scalar(
+        select(Account).where(Account.org_id == org_id, Account.customer_ref == customer_ref)
+    )
+    if account is None:
+        raise AccountNotFoundError
+    return account
+
+
+async def list_accounts(session: AsyncSession, org_id: uuid.UUID) -> list[Account]:
+    return list(
+        await session.scalars(
+            select(Account).where(Account.org_id == org_id).order_by(Account.customer_ref)
+        )
+    )
+
+
+async def recent_transactions(
+    session: AsyncSession, account: Account, days: int = 30
+) -> list[TransactionOut]:
+    since = datetime.now(UTC) - timedelta(days=days)
+    rows = await session.scalars(
+        select(Transaction)
+        .where(
+            Transaction.org_id == account.org_id,
+            Transaction.account_id == account.id,
+            Transaction.occurred_at >= since,
+        )
+        .order_by(Transaction.occurred_at.desc())
+        .limit(100)
+    )
+    return [TransactionOut.model_validate(t) for t in rows]
+
+
+def find_duplicates(
+    transactions: list[TransactionOut],
+) -> list[tuple[TransactionOut, TransactionOut]]:
+    """(original, duplicate) pairs: posted debits with the same amount, currency and merchant
+    within DUPLICATE_WINDOW of each other. Deterministic: this is evidence, not a guess."""
+    debits = sorted(
+        (t for t in transactions if t.kind == TransactionKind.DEBIT),
+        key=lambda t: t.occurred_at,
+    )
+    pairs = []
+    used: set[uuid.UUID] = set()
+    for i, first in enumerate(debits):
+        for later in debits[i + 1 :]:
+            if later.occurred_at - first.occurred_at > DUPLICATE_WINDOW:
+                break
+            same = (first.amount, first.currency, first.merchant) == (
+                later.amount,
+                later.currency,
+                later.merchant,
+            )
+            if same and first.id not in used and later.id not in used:
+                pairs.append((first, later))
+                used |= {first.id, later.id}
+    return pairs
+
+
+async def reversals_since(session: AsyncSession, account: Account, since: datetime) -> int:
+    """Refund credits posted to this account since `since` (a policy input)."""
+    count = await session.scalar(
+        select(func.count())
+        .select_from(Transaction)
+        .where(
+            Transaction.account_id == account.id,
+            Transaction.kind == TransactionKind.CREDIT,
+            Transaction.reverses_id.is_not(None),
+            Transaction.occurred_at >= since,
+        )
+    )
+    return count or 0
+
+
+@dataclass(frozen=True)
+class RefundPosted:
+    original_reference: str
+    refund_reference: str
+    amount: Decimal
+    currency: str
+
+
+class RefundNotPossibleError(Exception):
+    """The transaction can't be refunded (missing, not a debit, already reversed, ...)."""
+
+
+async def post_refund(
+    session: AsyncSession, account: Account, reference: str, amount: Decimal
+) -> RefundPosted:
+    """Credit `amount` back for debit `reference` and mark the debit reversed, in the
+    caller's transaction. The row lock makes two concurrent refunds of one debit impossible:
+    the second waits, then sees status 'reversed' and is refused."""
+    debit = await session.scalar(
+        select(Transaction)
+        .where(
+            Transaction.org_id == account.org_id,
+            Transaction.account_id == account.id,
+            Transaction.reference == reference,
+        )
+        .with_for_update()
+    )
+    if debit is None:
+        raise RefundNotPossibleError(f"transaction {reference} not found on this account")
+    if debit.kind != TransactionKind.DEBIT:
+        raise RefundNotPossibleError(f"{reference} is not a debit")
+    if debit.status == TransactionStatus.REVERSED:
+        raise RefundNotPossibleError(f"{reference} was already refunded")
+    if not Decimal("0") < amount <= debit.amount:
+        raise RefundNotPossibleError(f"refund amount must be between 0 and {debit.amount}")
+    debit.status = TransactionStatus.REVERSED
+    refund = Transaction(
+        org_id=account.org_id,
+        account_id=account.id,
+        reference=f"RFD-{uuid.uuid4().hex[:10].upper()}",
+        kind=TransactionKind.CREDIT,
+        amount=amount,
+        currency=debit.currency,
+        merchant=f"Refund of {reference}",
+        reverses_id=debit.id,
+        occurred_at=datetime.now(UTC),
+    )
+    session.add(refund)
+    await session.flush()
+    return RefundPosted(reference, refund.reference, amount, debit.currency)
+
+
+async def seed_demo_data(session: AsyncSession, org_id: uuid.UUID) -> list[Account]:
+    """Three customers that exercise every policy path (idempotent: skips existing ones).
+
+    CUST-1001  PKR 5,000 charged twice     -> refund above PKR 2,000: needs approval
+    CUST-1002  PKR 1,200 charged twice     -> small refund: allowed automatically
+    CUST-1003  unknown PKR 85,000 debits   -> suspected fraud: always a human
+    """
+    now = datetime.now(UTC)
+    tag = uuid.uuid4().hex[:6].upper()
+    customers = [
+        (
+            "CUST-1001",
+            "Ayesha Khan",
+            [("KE-Bills", "5000.00", 0), ("KE-Bills", "5000.00", 40), ("Daraz", "2350.00", 7200)],
+        ),
+        (
+            "CUST-1002",
+            "Bilal Ahmed",
+            [("Careem", "1200.00", 0), ("Careem", "1200.00", 25), ("Foodpanda", "850.00", 9000)],
+        ),
+        (
+            "CUST-1003",
+            "Hina Raza",
+            [("Unknown Merchant LLC", "45000.00", 0), ("Unknown Merchant LLC", "40000.00", 600)],
+        ),
+    ]
+    accounts = []
+    for ref, name, txns in customers:
+        existing = await session.scalar(
+            select(Account).where(Account.org_id == org_id, Account.customer_ref == ref)
+        )
+        if existing:
+            accounts.append(existing)
+            continue
+        account = Account(org_id=org_id, customer_ref=ref, customer_name=name, currency="PKR")
+        session.add(account)
+        await session.flush()
+        for i, (merchant, amount, seconds_ago_offset) in enumerate(txns):
+            session.add(
+                Transaction(
+                    org_id=org_id,
+                    account_id=account.id,
+                    reference=f"TXN-{ref[-4:]}-{tag}-{i + 1}",
+                    kind=TransactionKind.DEBIT,
+                    amount=Decimal(amount),
+                    currency="PKR",
+                    merchant=merchant,
+                    occurred_at=now - timedelta(hours=3) + timedelta(seconds=seconds_ago_offset),
+                )
+            )
+        accounts.append(account)
+    await session.flush()
+    return accounts
+
+
+async def gather_evidence(
+    session: AsyncSession, org_id: uuid.UUID, customer_ref: str | None
+) -> Evidence:
+    """The research step's tool: the customer's recent ledger activity, duplicates found by
+    code, and the reversal count the policy engine needs. Read-only."""
+    if not customer_ref:
+        return Evidence(
+            customer_ref=None,
+            customer_name=None,
+            account_found=False,
+            transactions=[],
+            duplicate_pairs=[],
+            reversals_last_24h=0,
+        )
+    try:
+        account = await get_account(session, org_id, customer_ref)
+    except AccountNotFoundError:
+        return Evidence(
+            customer_ref=customer_ref,
+            customer_name=None,
+            account_found=False,
+            transactions=[],
+            duplicate_pairs=[],
+            reversals_last_24h=0,
+        )
+    transactions = await recent_transactions(session, account)
+    return Evidence(
+        customer_ref=customer_ref,
+        customer_name=account.customer_name,
+        account_found=True,
+        transactions=transactions,
+        duplicate_pairs=[(a.reference, b.reference) for a, b in find_duplicates(transactions)],
+        reversals_last_24h=await reversals_since(
+            session, account, datetime.now(UTC) - timedelta(days=1)
+        ),
+    )

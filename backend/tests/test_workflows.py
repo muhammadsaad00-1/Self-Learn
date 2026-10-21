@@ -13,8 +13,8 @@ from agentflow.db import set_tenant_context
 from agentflow.llm import LLMError
 from agentflow.worker import process_next
 from agentflow.workflow import service
-from agentflow.workflow.graph import build_graph
-from tests.fakes import FakeLLM, fake_runtime, query_plan, triage_result
+from agentflow.workflow.graph import build_workflow_graphs
+from tests.fakes import FakeLLM, fake_runtime, query_plan, reply, triage_result
 from tests.helpers import Account, signup
 
 Sessions = async_sessionmaker[AsyncSession]
@@ -31,13 +31,13 @@ def submit(
 
 
 async def run_once(sessions: Sessions, settings: Settings, llm: FakeLLM) -> bool:
-    return await process_next(sessions, build_graph(llm), settings, fake_runtime())
+    return await process_next(sessions, build_workflow_graphs(llm), settings, fake_runtime())
 
 
 def agents() -> FakeLLM:
-    """Triage + query planner. With no documents uploaded, retrieval finds nothing and the
-    workflow ends in an abstention without calling the answer agents."""
-    return FakeLLM(triage_result(), query_plan("duplicate charge refund"))
+    """Triage + query planner + reply. No documents and no customer account: the knowledge
+    agents abstain, the request is escalated (account unknown), nothing is executed."""
+    return FakeLLM(triage_result(), query_plan("duplicate charge refund"), reply())
 
 
 # --- API ------------------------------------------------------------------------------
@@ -95,6 +95,11 @@ async def test_worker_triages_and_records_steps(
         ("plan_queries", "completed"),
         ("retrieve", "completed"),
         ("abstain", "completed"),
+        ("research", "completed"),
+        ("resolve", "completed"),
+        ("policy_gate", "completed"),
+        ("execute", "completed"),
+        ("communicate", "completed"),
     ]
     assert wf["steps"][1]["model"] == "fake-model"
     assert wf["steps"][1]["input_tokens"] == 100

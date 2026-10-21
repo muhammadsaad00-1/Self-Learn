@@ -16,13 +16,14 @@ from agentflow.config import Settings
 from agentflow.knowledge.runtime import KnowledgeRuntime
 from agentflow.main import create_app
 from agentflow.worker import process_next, process_next_document
-from agentflow.workflow.graph import build_graph
+from agentflow.workflow.graph import build_workflow_graphs
 from tests.fakes import (
     FakeLLM,
     MemoryObjectStore,
     draft,
     fake_runtime,
     query_plan,
+    reply,
     triage_result,
     verdict,
 )
@@ -52,6 +53,7 @@ def llm() -> FakeLLM:
         query_plan("duplicate debit reversed"),
         draft("Duplicate debits are reversed within 3 business days.", 1),
         verdict(),
+        reply(),
     )
 
 
@@ -311,7 +313,7 @@ async def test_workflow_answers_from_the_knowledge_base(
         json={"message": "I was charged twice, when do I get my money back?"},
     ).json()["id"]
 
-    assert await process_next(sessions, build_graph(llm), settings, runtime)
+    assert await process_next(sessions, build_workflow_graphs(llm), settings, runtime)
     wf = app_client.get(f"/v1/workflows/{wf_id}", headers=owner.headers()).json()
     assert wf["status"] == "completed"
     assert [s["node"] for s in wf["steps"]] == [
@@ -321,6 +323,11 @@ async def test_workflow_answers_from_the_knowledge_base(
         "retrieve",
         "answer",
         "verify",
+        "research",
+        "resolve",
+        "policy_gate",
+        "execute",
+        "communicate",
     ]
     knowledge = wf["result"]["knowledge"]
     assert knowledge["status"] == "answered"

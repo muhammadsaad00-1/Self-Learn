@@ -17,22 +17,41 @@ import logging
 import signal
 import uuid
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 
+from langchain_core.runnables import RunnableConfig
 from langgraph.graph.state import CompiledStateGraph
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from agentflow.agents.resolution import ProposedAction
+from agentflow.approvals import service as approvals
 from agentflow.config import Settings, get_settings
 from agentflow.db import create_engine, set_tenant_context
+from agentflow.jobs import Claim
 from agentflow.knowledge import ingestion, retrieval
 from agentflow.knowledge import service as knowledge_service
 from agentflow.knowledge.retrieval import RetrievedChunk
 from agentflow.knowledge.runtime import KnowledgeRuntime, build_runtime
 from agentflow.knowledge.storage import S3ObjectStore
+from agentflow.ledger import service as ledger
+from agentflow.ledger.schemas import Evidence
 from agentflow.llm import build_llm
 from agentflow.observability import configure_logging, org_id_var, request_id_var, workflow_id_var
+from agentflow.policy.engine import Outcome
+from agentflow.tools import refund as refund_tool
+from agentflow.tools.refund import ExecutionResult
 from agentflow.workflow import service
-from agentflow.workflow.graph import RECURSION_LIMIT, SearchFn, WorkflowState, build_graph
+from agentflow.workflow.graph import (
+    RECURSION_LIMIT,
+    ExecuteFn,
+    ResearchFn,
+    SearchFn,
+    WorkflowGraphs,
+    WorkflowState,
+    build_workflow_graphs,
+)
+from agentflow.workflow.models import WorkflowStage
 
 log = logging.getLogger("agentflow.worker")
 
@@ -59,13 +78,77 @@ def tenant_search(sessions: Sessions, org_id: uuid.UUID, runtime: KnowledgeRunti
     return search
 
 
-async def process_next(
-    sessions: Sessions,
+def tenant_research(sessions: Sessions, org_id: uuid.UUID) -> ResearchFn:
+    async def research(customer_ref: str | None) -> Evidence:
+        async with sessions() as session, session.begin():
+            await set_tenant_context(session, org_id=org_id)
+            return await ledger.gather_evidence(session, org_id, customer_ref)
+
+    return research
+
+
+def tenant_execute(sessions: Sessions, claim: Claim) -> ExecuteFn:
+    """The refund tool bound to this workflow's tenant. One transaction: refund, action-ledger
+    row and audit event commit together."""
+
+    async def execute(state: WorkflowState) -> ExecutionResult:
+        triage = state.get("triage") or {}
+        async with sessions() as session, session.begin():
+            await set_tenant_context(session, org_id=claim.org_id)
+            return await refund_tool.authorize_and_execute(
+                session,
+                org_id=claim.org_id,
+                workflow_id=claim.workflow_id,
+                proposal=ProposedAction.model_validate(state["proposal"]),
+                customer_ref=state.get("customer_ref"),
+                category=triage.get("category"),
+                needs_human_review=bool(triage.get("needs_human_review")),
+                knowledge_status=(state.get("knowledge") or {}).get("status"),
+                approval_status=(state.get("approval") or {}).get("status"),
+            )
+
+    return execute
+
+
+async def _run(
     graph: CompiledStateGraph[WorkflowState],
-    settings: Settings,
-    runtime: KnowledgeRuntime,
+    state: dict[str, Any],
+    config: dict[str, Any],
+    sessions: Sessions,
+    claim: Claim,
+) -> dict[str, Any]:
+    """Stream a graph, saving each node's output as a workflow step as it finishes."""
+    run_config: RunnableConfig = {"recursion_limit": RECURSION_LIMIT, "configurable": config}
+    async for update in graph.astream(
+        cast(WorkflowState, state),
+        run_config,
+        stream_mode="updates",  # yields {node_name: what that node returned}
+    ):
+        for node, output in update.items():
+            meta = output.pop("node_meta", {})
+            state.update(output)
+            async with sessions() as session, session.begin():
+                await set_tenant_context(session, org_id=claim.org_id)
+                await service.record_step(session, claim, node, output, meta)
+    return state
+
+
+RESULT_KEYS = (
+    "triage",
+    "knowledge",
+    "evidence",
+    "proposal",
+    "decision",
+    "approval",
+    "execution",
+    "reply",
+)
+
+
+async def process_next(
+    sessions: Sessions, graphs: WorkflowGraphs, settings: Settings, runtime: KnowledgeRuntime
 ) -> bool:
-    """Claim and run one workflow. Returns False when there was nothing to do."""
+    """Claim and run one workflow (its analysis or its execution stage). False = idle."""
     async with sessions() as session, session.begin():
         claim = await service.claim_next(
             session,
@@ -80,31 +163,46 @@ async def process_next(
     async with sessions() as session, session.begin():
         await set_tenant_context(session, org_id=claim.org_id)
         wf = await service.get(session, claim.org_id, claim.workflow_id)
-        message, request_id = wf.input["message"], wf.request_id
+        stage, saved, request_id = wf.stage, dict(wf.result or {}), wf.request_id
+        message, customer_ref = wf.input["message"], wf.input.get("customer_ref")
+        approval = await approvals.get_for_workflow(session, wf.id)
     request_id_var.set(request_id)  # logs of this run correlate with the API request
-    log.info("workflow.started", extra={"attempt": claim.attempt})
+    log.info("workflow.started", extra={"attempt": claim.attempt, "stage": stage})
 
-    state: dict[str, Any] = {}
+    config = {
+        "search": tenant_search(sessions, claim.org_id, runtime),
+        "min_rerank_score": runtime.min_rerank_score,
+        "research": tenant_research(sessions, claim.org_id),
+        "execute": tenant_execute(sessions, claim),
+    }
     try:
-        # Wall-clock budget for the whole graph, on top of per-call model timeouts.
         async with asyncio.timeout(settings.workflow_timeout_seconds):
-            async for update in graph.astream(
-                {"message": message},
-                stream_mode="updates",  # yields {node_name: what that node returned}
-                config={
-                    "recursion_limit": RECURSION_LIMIT,
-                    "configurable": {
-                        "search": tenant_search(sessions, claim.org_id, runtime),
-                        "min_rerank_score": runtime.min_rerank_score,
-                    },
-                },
-            ):
-                for node, output in update.items():
-                    meta = output.pop("node_meta", {})
-                    state.update(output)
+            if stage == WorkflowStage.ANALYSIS:
+                state = await _run(
+                    graphs.analysis,
+                    {"message": message, "customer_ref": customer_ref},
+                    config,
+                    sessions,
+                    claim,
+                )
+                decision = state.get("decision") or {}
+                if decision.get("outcome") == Outcome.REQUIRE_APPROVAL:
                     async with sessions() as session, session.begin():
                         await set_tenant_context(session, org_id=claim.org_id)
-                        await service.record_step(session, claim, node, output, meta)
+                        if locked := await service.lock_if_still_ours(session, claim):
+                            approval = await approvals.request_approval(
+                                session, locked, state["proposal"], decision.get("reasons", [])
+                            )
+                            state["approval"] = {"id": str(approval.id), "status": "pending"}
+                            result = {k: state.get(k) for k in RESULT_KEYS}
+                            await service.pause_for_approval(session, locked, result)
+                            log.info("workflow.waiting_approval")
+                    return True
+            else:  # execution stage, resumed after a human decided the approval
+                state = {**saved, "message": message, "customer_ref": customer_ref}
+                if approval is not None:
+                    state["approval"] = {"id": str(approval.id), "status": approval.status}
+            state = await _run(graphs.execution, state, config, sessions, claim)
     except Exception as e:  # any failure: model, validation, timeout, bug
         log.exception("workflow.attempt_failed", extra={"attempt": claim.attempt})
         async with sessions() as session, session.begin():
@@ -122,8 +220,7 @@ async def process_next(
     async with sessions() as session, session.begin():
         await set_tenant_context(session, org_id=claim.org_id)
         if locked := await service.lock_if_still_ours(session, claim):
-            result = {"triage": state.get("triage"), "knowledge": state.get("knowledge")}
-            await service.complete(session, locked, result)
+            await service.complete(session, locked, {k: state.get(k) for k in RESULT_KEYS})
             log.info("workflow.completed", extra={"attempt": claim.attempt})
     return True
 
@@ -179,13 +276,16 @@ async def run(settings: Settings, stop: asyncio.Event, poll_seconds: float = 1.0
     runtime = build_runtime(settings)
     if settings.env == "local" and isinstance(runtime.store, S3ObjectStore):
         await runtime.store.ensure_bucket()
-    graph = build_graph(build_llm(settings))
+    graphs = build_workflow_graphs(build_llm(settings))
     log.info("worker.started")
     try:
         while not stop.is_set():
             # Ingestion first: an answer can only be as good as the indexed documents.
             busy = await process_next_document(sessions, settings, runtime)
-            busy = await process_next(sessions, graph, settings, runtime) or busy
+            # Approvals nobody decided in time expire (and their workflows resume).
+            async with sessions() as session, session.begin():
+                await session.execute(text("SELECT expire_approvals()"))
+            busy = await process_next(sessions, graphs, settings, runtime) or busy
             if not busy:
                 # Idle: wait before polling again, but wake at once on shutdown.
                 with contextlib.suppress(TimeoutError):
