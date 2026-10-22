@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentflow.conversations.models import ChatMessage, Conversation, ConversationMode, MessageRole
 from agentflow.workflow import service as workflows
+from agentflow.workflow.graph import records_of
 from agentflow.workflow.models import Workflow
 from agentflow.workflow.schemas import CreateWorkflowRequest
 
@@ -130,6 +131,32 @@ async def post_agent_message(
     return message
 
 
+async def post_team_update(
+    session: AsyncSession,
+    *,
+    org_id: uuid.UUID,
+    customer_ref: str,
+    user_id: uuid.UUID,
+    text: str,
+    card: dict[str, Any] | None = None,
+) -> ChatMessage:
+    """A message from the team that doesn't take the chat over (e.g. "your case is
+    resolved"): the agents keep answering the customer's next messages."""
+    conversation = await open_for_customer(session, org_id, customer_ref)
+    message = ChatMessage(
+        org_id=org_id,
+        conversation_id=conversation.id,
+        role=MessageRole.AGENT,
+        body=text,
+        card=card,
+        author_id=user_id,
+    )
+    session.add(message)
+    conversation.updated_at = func.now()
+    await session.flush()
+    return message
+
+
 def outcome_card(state: dict[str, Any]) -> dict[str, Any]:
     """What the chat shows besides the text: facts from the workflow, never model prose."""
     card: dict[str, Any] = {}
@@ -150,7 +177,9 @@ def outcome_card(state: dict[str, Any]) -> dict[str, Any]:
         card["review"] = {"amount": proposal.get("amount")}
     if ticket := state.get("ticket"):
         card["case"] = {"code": ticket.get("code"), "priority": ticket.get("priority")}
-    if category == "failed_payment":
+    if category == "failed_payment" and proposal.get("action") != "answer_from_records":
+        # The transfer in question: the one acted on, else (an escalation) the one not
+        # delivered. A records answer shows its own records instead.
         transfers = [t for t in transactions if t.get("transfer_status")]
         target = next(
             (t for t in transfers if t["reference"] == proposal.get("transaction_reference")),
@@ -166,6 +195,8 @@ def outcome_card(state: dict[str, Any]) -> dict[str, Any]:
                 "sent_at": target["occurred_at"],
                 "reversed": bool(card.get("refund")),
             }
+    if records := records_of(state):
+        card["records"] = records
     knowledge = state.get("knowledge") or {}
     if knowledge.get("status") == "answered":
         titles = dict.fromkeys(c["document_title"] for c in knowledge.get("citations") or [])

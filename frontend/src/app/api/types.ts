@@ -32,6 +32,11 @@ export type ChatMessage = Schemas['MessageOut'];
 export type Conversation = Schemas['ConversationOut'];
 export type OpenedChat = Schemas['OpenedChat'];
 export type Insights = Schemas['Insights'];
+export type CustomerMe = Schemas['CustomerMe'];
+export type CustomerCase = Schemas['CustomerCase'];
+export type LoginStartOut = Schemas['LoginStartOut'];
+export type CustomerSession = Schemas['CustomerSession'];
+export type RiskAssessment = Schemas['RiskAssessment'];
 
 /** Error body FastAPI returns for HTTPException: {"detail": "..."} */
 export interface ApiError {

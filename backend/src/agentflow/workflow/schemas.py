@@ -9,6 +9,7 @@ from agentflow.agents.triage import Category, TriageResult, Urgency
 from agentflow.knowledge.schemas import KnowledgeAnswer
 from agentflow.ledger.schemas import Evidence
 from agentflow.policy.engine import PolicyDecision
+from agentflow.policy.risk import RiskAssessment
 from agentflow.tools.refund import ExecutionResult
 from agentflow.tools.tickets import TicketRef
 from agentflow.workflow.models import StepStatus, WorkflowStatus
@@ -51,6 +52,7 @@ class WorkflowResult(BaseModel):
     evidence: Evidence | None = None  # ledger research
     proposal: ProposedAction | None = None  # resolution agent, validated
     decision: PolicyDecision | None = None  # policy engine
+    risk: RiskAssessment | None = None  # criticality analysis (code)
     approval: ApprovalRef | None = None  # human decision, if one was needed
     execution: ExecutionResult | None = None  # what the tool actually did
     ticket: TicketRef | None = None  # opened when a human must own the case

@@ -83,11 +83,16 @@ def tenant_search(sessions: Sessions, org_id: uuid.UUID, runtime: KnowledgeRunti
     return search
 
 
-def tenant_research(sessions: Sessions, org_id: uuid.UUID) -> ResearchFn:
+def tenant_research(sessions: Sessions, claim: Claim) -> ResearchFn:
     async def research(customer_ref: str | None) -> Evidence:
         async with sessions() as session, session.begin():
-            await set_tenant_context(session, org_id=org_id)
-            return await ledger.gather_evidence(session, org_id, customer_ref)
+            await set_tenant_context(session, org_id=claim.org_id)
+            evidence = await ledger.gather_evidence(session, claim.org_id, customer_ref)
+            if customer_ref:
+                evidence.recent_requests_72h = await service.count_recent_for_customer(
+                    session, claim.org_id, customer_ref, hours=72, excluding=claim.workflow_id
+                )
+            return evidence
 
     return research
 
@@ -165,6 +170,7 @@ async def _run(
 
 RESULT_KEYS = (
     "triage",
+    "risk",
     "knowledge",
     "evidence",
     "proposal",
@@ -203,7 +209,7 @@ async def process_next(
     config = {
         "search": tenant_search(sessions, claim.org_id, runtime),
         "min_rerank_score": runtime.min_rerank_score,
-        "research": tenant_research(sessions, claim.org_id),
+        "research": tenant_research(sessions, claim),
         "execute": tenant_execute(sessions, claim),
         "open_ticket": tenant_open_ticket(sessions, claim),
     }

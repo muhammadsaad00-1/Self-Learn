@@ -31,8 +31,9 @@ unit-tested with a fake LLM and a fake search.
 
 import re
 import time
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any, Literal, TypedDict
 
 from langchain_core.runnables import RunnableConfig
@@ -48,6 +49,7 @@ from agentflow.knowledge.schemas import Citation, KnowledgeAnswer, Source
 from agentflow.ledger.schemas import Evidence
 from agentflow.llm import LLMResult, StructuredLLM
 from agentflow.policy import engine as policy
+from agentflow.policy import risk as risk_analysis
 from agentflow.tools.refund import ExecutionResult
 from agentflow.tools.tickets import TicketRef
 
@@ -73,6 +75,7 @@ class WorkflowState(TypedDict, total=False):
     evidence: dict[str, Any]  # ledger Evidence as JSON (research)
     proposal: dict[str, Any]  # validated ProposedAction (resolve)
     decision: dict[str, Any]  # PolicyDecision (policy_gate)
+    risk: dict[str, Any]  # RiskAssessment (policy_gate): criticality, by code
     approval: dict[str, Any] | None  # {"id", "status"} once a human was asked
     execution: dict[str, Any]  # ExecutionResult (execute)
     ticket: dict[str, Any] | None  # TicketRef, when a human must own the case (raise_ticket)
@@ -273,7 +276,9 @@ def build_graph(llm: StructuredLLM) -> CompiledStateGraph[WorkflowState]:
         triage_result = state.get("triage", {})
         category = triage_result.get("category")
         meta: dict[str, Any] = {}
-        if category in ACTIONABLE and evidence.account_found:
+        # Account questions ("did my transfer reach Sara?") are answered from the ledger
+        # too, so informational requests with a known customer also go to the agent.
+        if evidence.account_found and (category in ACTIONABLE or category in INFORMATIONAL):
             result = await resolution.propose(
                 llm, state["message"], triage_result, state.get("knowledge"), evidence
             )
@@ -302,14 +307,31 @@ def build_graph(llm: StructuredLLM) -> CompiledStateGraph[WorkflowState]:
 
     async def policy_gate(state: WorkflowState) -> WorkflowState:
         triage_result = state.get("triage", {})
+        proposal = ProposedAction.model_validate(state["proposal"])
+        evidence = Evidence.model_validate(state["evidence"])
+        claimed = (triage_result.get("details") or {}).get("amount")
+        risk = risk_analysis.assess(
+            message=state["message"],
+            triage_urgency=triage_result.get("urgency"),
+            category=triage_result.get("category"),
+            amount_at_stake=max(
+                (Decimal(str(a)) for a in (claimed, proposal.amount) if a is not None),
+                default=None,
+            ),
+            recent_requests=evidence.recent_requests_72h,
+        )
         decision = policy.evaluate(
-            ProposedAction.model_validate(state["proposal"]),
-            evidence=Evidence.model_validate(state["evidence"]),
+            proposal,
+            evidence=evidence,
             category=triage_result.get("category"),
             needs_human_review=bool(triage_result.get("needs_human_review")),
             knowledge_status=(state.get("knowledge") or {}).get("status"),
         )
-        return {"decision": decision.model_dump(mode="json"), "node_meta": {}}
+        return {
+            "decision": decision.model_dump(mode="json"),
+            "risk": risk.model_dump(mode="json"),
+            "node_meta": {},
+        }
 
     graph = StateGraph(WorkflowState)
     graph.add_node("intake", intake)
@@ -351,6 +373,8 @@ def build_execution_graph(llm: StructuredLLM) -> CompiledStateGraph[WorkflowStat
             approval_status=(state.get("approval") or {}).get("status"),
             execution_status=execution.get("status"),
             execution_detail=execution.get("detail"),
+            risk_critical=bool((state.get("risk") or {}).get("critical")),
+            risk_signals=[s["detail"] for s in (state.get("risk") or {}).get("signals", [])],
         )
         if not reasons:
             return {"ticket": None, "node_meta": {}}
@@ -369,9 +393,18 @@ def build_execution_graph(llm: StructuredLLM) -> CompiledStateGraph[WorkflowStat
             },
             "approval": (state.get("approval") or {}).get("status"),
             "decision": (state.get("decision") or {}).get("outcome"),
+            # The transactions the resolution cited (verified by code): the reply may state
+            # them as facts.
+            "records": records_of(state),
         }
         knowledge = state.get("knowledge") or {}
         policy_text = knowledge.get("answer") if knowledge.get("status") == "answered" else None
+        proposal = state.get("proposal") or {}
+        if proposal.get("action") == ActionType.ANSWER_FROM_RECORDS:
+            # The records are the answer. Policy text here invites promises nobody executed
+            # ("we'll reverse the duplicate" when the records show one charge).
+            outcome["finding"] = proposal.get("rationale")
+            policy_text = None
         result = await communication.draft_reply(llm, state["message"], outcome, policy_text)
         reply = result.value.message[: communication.MAX_REPLY_CHARS]
         return {"reply": reply, "node_meta": _meta(result)}
@@ -385,6 +418,19 @@ def build_execution_graph(llm: StructuredLLM) -> CompiledStateGraph[WorkflowStat
     graph.add_edge("raise_ticket", "communicate")
     graph.add_edge("communicate", END)
     return graph.compile()
+
+
+RECORD_FIELDS = ("reference", "kind", "amount", "currency", "merchant", "status")
+
+
+def records_of(state: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """The ledger rows an answer_from_records proposal cites, as plain facts."""
+    refs = set((state.get("proposal") or {}).get("record_references") or [])
+    return [
+        {k: t.get(k) for k in (*RECORD_FIELDS, "transfer_status", "occurred_at")}
+        for t in (state.get("evidence") or {}).get("transactions") or []
+        if t["reference"] in refs
+    ]
 
 
 @dataclass(frozen=True)

@@ -62,7 +62,7 @@ Claude writes the code into the files, then shows the full code in chat (the use
 - `uv` 0.12 and `gh` 2.102 are in `~/.local/bin`. `codex` is not installed.
 
 ## Branch stack (none merged yet; PRs need `gh auth login`)
-`main` ← feat/phase-1-core-saas (incl. phase 0) ← feat/phase-2-first-agent ← feat/phase-3-rag ← feat/add-company ← feat/phase-4-6-actions ← feat/tickets ← feat/customer-chat. CI only runs on PRs/main, so it has not run on GitHub yet.
+`main` ← feat/phase-1-core-saas (incl. phase 0) ← feat/phase-2-first-agent ← feat/phase-3-rag ← feat/add-company ← feat/phase-4-6-actions ← feat/tickets ← feat/customer-chat ← feat/customer-portal. CI only runs on PRs/main, so it has not run on GitHub yet.
 
 ## Decisions
 - **Purpose is learning.** Build the full spec, including every AWS service, IaC, MCP, evals and the frontend. Don't skip components as "not needed yet". Order still follows the roadmap phases.
@@ -94,6 +94,7 @@ Roadmap phases are in spec 05. Mark items `[x]` as they land.
 - [x] Tickets (`feat/tickets`): `policy.ticket_reasons` (fraud, critical, block/escalation, approval rejected/expired, approved-but-not-executed) → execution-graph node `raise_ticket` → exactly-once ticket tool (`tools/tickets.py`); `/v1/tickets` queue (take/resolve/reopen); reply quotes the case number; dashboard Tickets page.
 - [x] Phase 6 — Approval (ADR 0012): policy engine (`policy/engine.py`), approvals + maker-checker + expiry, waiting_approval/stage resume, re-authorization at execution, dashboard Approvals inbox + decision trail. Old list: policy engine, approval entity + UI, pause/resume, expiry, double authorization
 - [x] Customer chat (`feat/customer-chat`, ADR 0013): Gen Z texting-first customer app (`/chat`, customer token, voice notes via Groq Whisper, fact cards, Urdu/Roman Urdu replies); each message is a `chat` workflow, outcome posted back by the worker; staff inbox `/chats` with take-over/hand-back; failed-transfer reversal (`transfer_status`, policy `failed_transfer_reversal`); `freeze_card` tool (policy `protective_freeze`); customer help guide seeded with demo data; `/v1/insights` + Insights page (default landing page).
+- [x] Customer portal (`feat/customer-portal`, ADR 0014): separate customer app `/customer` (OTP login by phone, Chat/Activity/Cases) vs staff dashboard; criticality analysis in code (`policy/risk.py`, escalate-only, signals in ticket + trail); `answer_from_records` (customer doubts settled from verified ledger rows, no ticket); ticket hand-off (`assign`/`note`, `activity` trail, `mine`, resolve → message in customer chat).
 - [ ] Phase 7 — AWS: IaC, ECR, ECS/RDS/S3/SQS, Secrets/KMS, CloudWatch/OTel, staging/prod
 - [ ] Phase 8 — Hardening: golden/adversarial/prompt-injection/cross-tenant/load/chaos/cost tests
 - [ ] Phase 9–10 — Pilot, commercial MVP

@@ -556,7 +556,8 @@ button.link.active-tab {
   padding: 0.35rem 0.75rem;
   font-size: 0.85rem;
 }
-app-chat-thread {
+app-chat-thread,
+app-customer-chat {
   display: contents; /* the .thread inside is the flex child that grows */
 }
 .thread {
@@ -767,4 +768,100 @@ app-chat-thread {
   display: block;
   height: 100%;
   background: var(--accent);
+}
+
+/* Customer portal */
+.phone-head .on-accent {
+  color: #fff;
+}
+.customer-login {
+  display: grid;
+  gap: 0.8rem;
+  padding: 1.25rem;
+  align-content: start;
+  flex: 1;
+}
+.customer-login label {
+  display: grid;
+  gap: 0.3rem;
+}
+.activity {
+  flex: 1;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  background: var(--surface);
+}
+.activity li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.25rem;
+  border-bottom: 1px solid var(--border);
+}
+.activity li > span:first-child {
+  display: grid;
+  gap: 0.15rem;
+}
+.amount {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.amount.in {
+  color: #0b6e4f;
+}
+.badge[data-transfer='failed'] {
+  background: #fdecea;
+  color: var(--danger);
+}
+.badge[data-transfer='pending'] {
+  background: #fff4e0;
+  color: #93500b;
+}
+.badge[data-transfer='credited'] {
+  background: #e3f4ec;
+  color: #0b6e4f;
+}
+.tabbar {
+  display: flex;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+.tabbar button {
+  flex: 1;
+  background: none;
+  color: var(--muted);
+  border: 0;
+  border-radius: 0;
+  padding: 0.7rem 0;
+}
+.tabbar button.active {
+  color: var(--accent);
+  font-weight: 600;
+}
+.activity-trail {
+  margin: 0.5rem 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.3rem;
+}
+.fact.records {
+  display: grid;
+  gap: 0.35rem;
+}
+.record {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+.record > span {
+  display: grid;
+}
+.record > span:last-child {
+  text-align: right;
+}
+.record .ok {
+  color: #0b6e4f;
 }

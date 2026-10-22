@@ -1,8 +1,10 @@
 import uuid
 from datetime import datetime
 from enum import StrEnum
+from typing import Any
 
 from sqlalchemy import BigInteger, DateTime, ForeignKey, Identity, Index, String, Text, text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from agentflow.db import Base, TimestampMixin, enum_check, str_enum
@@ -49,6 +51,11 @@ class Ticket(TimestampMixin, Base):
     assignee_id: Mapped[uuid.UUID | None]
     resolution_note: Mapped[str | None] = mapped_column(Text)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Hand-offs and notes, oldest first: [{"at", "by", "kind", "text", "to"?}]. The audit
+    # log has the same events; this copy is what the team reads on the ticket.
+    activity: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, default=list, server_default=text("'[]'::jsonb")
+    )
 
     @property
     def code(self) -> str:

@@ -1427,7 +1427,7 @@
           "tickets"
         ],
         "summary": "List Tickets",
-        "description": "Open tickets (default) most urgent first, or resolved/all newest first.",
+        "description": "Open tickets (default) most urgent first, or resolved/all newest first.\n`mine=true`: only tickets assigned to me.",
         "operationId": "list_tickets_v1_tickets_get",
         "security": [
           {
@@ -1448,6 +1448,16 @@
               "type": "string",
               "default": "open",
               "title": "Status"
+            }
+          },
+          {
+            "name": "mine",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Mine"
             }
           },
           {
@@ -1497,7 +1507,7 @@
           "tickets"
         ],
         "summary": "Update Ticket",
-        "description": "take: assign to me (in progress) \u00b7 resolve: close with a note \u00b7 reopen.",
+        "description": "take: assign to me \u00b7 assign: hand off to a teammate (note recommended) \u00b7 note: add a\nnote \u00b7 resolve: close with a note (and optionally message the customer) \u00b7 reopen.",
         "operationId": "update_ticket_v1_tickets__ticket_id__patch",
         "security": [
           {
@@ -1987,6 +1997,178 @@
         }
       }
     },
+    "/v1/customer/login/start": {
+      "post": {
+        "tags": [
+          "customer"
+        ],
+        "summary": "Login Start",
+        "description": "Send a 6-digit one-time code to the customer's registered mobile number.",
+        "operationId": "login_start_v1_customer_login_start_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginStartIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginStartOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/customer/login/verify": {
+      "post": {
+        "tags": [
+          "customer"
+        ],
+        "summary": "Login Verify",
+        "description": "Exchange the one-time code for a customer token (the customer's session).",
+        "operationId": "login_verify_v1_customer_login_verify_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginVerifyIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerSession"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/customer/me": {
+      "get": {
+        "tags": [
+          "customer"
+        ],
+        "summary": "Customer Me",
+        "operationId": "customer_me_v1_customer_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerMe"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/customer/transactions": {
+      "get": {
+        "tags": [
+          "customer"
+        ],
+        "summary": "Customer Transactions",
+        "description": "The customer's last 30 days, newest first: the same data the agents read.",
+        "operationId": "customer_transactions_v1_customer_transactions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TransactionOut"
+                  },
+                  "type": "array",
+                  "title": "Response Customer Transactions V1 Customer Transactions Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/customer/cases": {
+      "get": {
+        "tags": [
+          "customer"
+        ],
+        "summary": "Customer Cases",
+        "description": "The customer's support cases. Internal notes and titles stay with the team.",
+        "operationId": "customer_cases_v1_customer_cases_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CustomerCase"
+                  },
+                  "type": "array",
+                  "title": "Response Customer Cases V1 Customer Cases Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/v1/insights": {
       "get": {
         "tags": [
@@ -2119,6 +2301,7 @@
         "enum": [
           "refund_transaction",
           "freeze_card",
+          "answer_from_records",
           "escalate_to_human",
           "no_action"
         ],
@@ -2764,6 +2947,101 @@
         "title": "CreateWorkflowRequest",
         "description": "A customer request entering the system (from a support inbox, chat, or the dashboard)."
       },
+      "CustomerCase": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TicketStatus"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "status",
+          "category",
+          "created_at",
+          "resolved_at"
+        ],
+        "title": "CustomerCase"
+      },
+      "CustomerMe": {
+        "properties": {
+          "customer_ref": {
+            "type": "string",
+            "title": "Customer Ref"
+          },
+          "customer_name": {
+            "type": "string",
+            "title": "Customer Name"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
+          "card_status": {
+            "$ref": "#/components/schemas/CardStatus"
+          }
+        },
+        "type": "object",
+        "required": [
+          "customer_ref",
+          "customer_name",
+          "phone",
+          "card_status"
+        ],
+        "title": "CustomerMe"
+      },
+      "CustomerSession": {
+        "properties": {
+          "customer_token": {
+            "type": "string",
+            "title": "Customer Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "customer_token"
+        ],
+        "title": "CustomerSession"
+      },
       "DecisionRequest": {
         "properties": {
           "note": {
@@ -2992,6 +3270,11 @@
           "reversals_last_24h": {
             "type": "integer",
             "title": "Reversals Last 24H"
+          },
+          "recent_requests_72h": {
+            "type": "integer",
+            "title": "Recent Requests 72H",
+            "default": 0
           }
         },
         "type": "object",
@@ -3237,6 +3520,78 @@
         "title": "KnowledgeAnswer",
         "description": "Outcome of the knowledge agents for one question.\n\nanswered:   the answer passed citation checks and the verifier.\nabstained:  no good-enough sources (decided by code), or the answer agent declined.\nunverified: an answer exists but failed verification twice; a human must check it."
       },
+      "LoginStartIn": {
+        "properties": {
+          "bank_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Bank Id"
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 20,
+            "minLength": 10,
+            "title": "Phone"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bank_id",
+          "phone"
+        ],
+        "title": "LoginStartIn"
+      },
+      "LoginStartOut": {
+        "properties": {
+          "sent": {
+            "type": "boolean",
+            "title": "Sent"
+          },
+          "dev_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dev Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sent"
+        ],
+        "title": "LoginStartOut"
+      },
+      "LoginVerifyIn": {
+        "properties": {
+          "bank_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Bank Id"
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 20,
+            "minLength": 10,
+            "title": "Phone"
+          },
+          "code": {
+            "type": "string",
+            "pattern": "^\\d{6}$",
+            "title": "Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bank_id",
+          "phone",
+          "code"
+        ],
+        "title": "LoginVerifyIn"
+      },
       "MeResponse": {
         "properties": {
           "user": {
@@ -3473,6 +3828,15 @@
             "type": "string",
             "title": "Rationale",
             "description": "Why, in one or two sentences an auditor can check"
+          },
+          "record_references": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Record References",
+            "description": "For answer_from_records: references of the transactions that answer it",
+            "default": []
           }
         },
         "type": "object",
@@ -3483,6 +3847,66 @@
           "rationale"
         ],
         "title": "ProposedAction"
+      },
+      "RiskAssessment": {
+        "properties": {
+          "score": {
+            "type": "integer",
+            "title": "Score"
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "low",
+              "normal",
+              "high",
+              "critical"
+            ],
+            "title": "Priority"
+          },
+          "critical": {
+            "type": "boolean",
+            "title": "Critical"
+          },
+          "signals": {
+            "items": {
+              "$ref": "#/components/schemas/RiskSignal"
+            },
+            "type": "array",
+            "title": "Signals"
+          }
+        },
+        "type": "object",
+        "required": [
+          "score",
+          "priority",
+          "critical",
+          "signals"
+        ],
+        "title": "RiskAssessment"
+      },
+      "RiskSignal": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "points": {
+            "type": "integer",
+            "title": "Points"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "points",
+          "detail"
+        ],
+        "title": "RiskSignal"
       },
       "Role": {
         "type": "string",
@@ -3780,6 +4204,14 @@
               }
             ],
             "title": "Resolved At"
+          },
+          "activity": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Activity"
           }
         },
         "type": "object",
@@ -3796,7 +4228,8 @@
           "assignee_id",
           "resolution_note",
           "created_at",
-          "resolved_at"
+          "resolved_at",
+          "activity"
         ],
         "title": "TicketOut"
       },
@@ -3856,6 +4289,8 @@
             "type": "string",
             "enum": [
               "take",
+              "assign",
+              "note",
               "resolve",
               "reopen"
             ],
@@ -3872,6 +4307,30 @@
               }
             ],
             "title": "Note"
+          },
+          "assignee_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignee Id"
+          },
+          "customer_message": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 2000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Message"
           }
         },
         "type": "object",
@@ -4257,6 +4716,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/PolicyDecision"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "risk": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RiskAssessment"
               },
               {
                 "type": "null"

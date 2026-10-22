@@ -162,51 +162,64 @@ async def freeze_card(session: AsyncSession, account: Account) -> bool:
     return was_active
 
 
-# (merchant, amount, seconds after "3 hours ago", transfer status or None)
+# (merchant, amount, seconds after "3 hours ago", transfer status or None). Amounts
+# starting with "+" are credits (money in).
 DemoTxn = tuple[str, str, int, TransferStatus | None]
 
-DEMO_CUSTOMERS: list[tuple[str, str, list[DemoTxn]]] = [
+DAY = 86400
+DEMO_CUSTOMERS: list[tuple[str, str, str, list[DemoTxn]]] = [
     (
         "CUST-1001",
         "Ayesha Khan",
+        "923001234501",
         [
             ("KE-Bills", "5000.00", 0, None),
             ("KE-Bills", "5000.00", 40, None),
             ("Daraz", "2350.00", 7200, None),
+            ("Salary - Systems Ltd", "+120000.00", -5 * DAY, None),
         ],
     ),
     (
         "CUST-1002",
         "Bilal Ahmed",
+        "923001234502",
         [
             ("Careem", "1200.00", 0, None),
             ("Careem", "1200.00", 25, None),
             ("Foodpanda", "850.00", 9000, None),
+            ("Salary - Arbisoft", "+85000.00", -2 * DAY, None),
+            ("RAAST from Ahmed Raza", "+4500.00", -DAY, TransferStatus.CREDITED),
         ],
     ),
     (
         "CUST-1003",
         "Hina Raza",
+        "923001234503",
         [
             ("Unknown Merchant LLC", "45000.00", 0, None),
             ("Unknown Merchant LLC", "40000.00", 600, None),
+            ("Salary - Jazz", "+95000.00", -3 * DAY, None),
         ],
     ),
     (
         "CUST-1004",
         "Usman Tariq",
+        "923001234504",
         [
             ("IBFT to Ali Raza (HBL)", "5000.00", 0, TransferStatus.FAILED),
-            ("RAAST to Sara Malik (Meezan)", "3000.00", -86400, TransferStatus.CREDITED),
+            # Reached the recipient: "my 3000 to Sara didn't arrive" is answered from records.
+            ("RAAST to Sara Malik (Meezan)", "3000.00", -DAY, TransferStatus.CREDITED),
             ("Jazz top-up", "500.00", 3600, None),
+            ("Microfinance loan disbursal", "+50000.00", -10 * DAY, None),
         ],
     ),
     (
         "CUST-1005",
         "Zainab Ali",
+        "923001234505",
         [
             # Sent ~27 hours ago and still in transit: past the 24-hour window.
-            ("IBFT to Kamran Shah (UBL)", "15000.00", -86400, TransferStatus.PENDING),
+            ("IBFT to Kamran Shah (UBL)", "15000.00", -DAY, TransferStatus.PENDING),
         ],
     ),
 ]
@@ -220,18 +233,21 @@ async def seed_demo_data(session: AsyncSession, org_id: uuid.UUID) -> list[Accou
     CUST-1003  unknown PKR 85,000 debits     -> fraud: card frozen at once, a human investigates
     CUST-1004  PKR 5,000 transfer rejected   -> network-confirmed failure: reversed at once
     CUST-1005  PKR 15,000 transfer stuck 27h -> partner-bank inquiry ticket
+    Phones 923001234501..05 log in to the customer app (OTP).
     """
     now = datetime.now(UTC)
     tag = uuid.uuid4().hex[:6].upper()
     accounts = []
-    for ref, name, txns in DEMO_CUSTOMERS:
+    for ref, name, phone, txns in DEMO_CUSTOMERS:
         existing = await session.scalar(
             select(Account).where(Account.org_id == org_id, Account.customer_ref == ref)
         )
         if existing:
             accounts.append(existing)
             continue
-        account = Account(org_id=org_id, customer_ref=ref, customer_name=name, currency="PKR")
+        account = Account(
+            org_id=org_id, customer_ref=ref, customer_name=name, phone=phone, currency="PKR"
+        )
         session.add(account)
         await session.flush()
         for i, (merchant, amount, offset, transfer_status) in enumerate(txns):
@@ -240,8 +256,8 @@ async def seed_demo_data(session: AsyncSession, org_id: uuid.UUID) -> list[Accou
                     org_id=org_id,
                     account_id=account.id,
                     reference=f"TXN-{ref[-4:]}-{tag}-{i + 1}",
-                    kind=TransactionKind.DEBIT,
-                    amount=Decimal(amount),
+                    kind=TransactionKind.CREDIT if amount[0] == "+" else TransactionKind.DEBIT,
+                    amount=Decimal(amount.lstrip("+")),
                     currency="PKR",
                     merchant=merchant,
                     transfer_status=transfer_status,
@@ -289,4 +305,12 @@ async def gather_evidence(
         reversals_last_24h=await reversals_since(
             session, account, datetime.now(UTC) - timedelta(days=1)
         ),
+    )
+
+
+async def get_account_by_phone(
+    session: AsyncSession, org_id: uuid.UUID, phone: str
+) -> Account | None:
+    return await session.scalar(
+        select(Account).where(Account.org_id == org_id, Account.phone == phone)
     )

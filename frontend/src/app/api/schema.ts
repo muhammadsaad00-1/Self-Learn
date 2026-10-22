@@ -403,6 +403,7 @@ export interface paths {
         /**
          * List Tickets
          * @description Open tickets (default) most urgent first, or resolved/all newest first.
+         *     `mine=true`: only tickets assigned to me.
          */
         get: operations["list_tickets_v1_tickets_get"];
         put?: never;
@@ -428,7 +429,8 @@ export interface paths {
         head?: never;
         /**
          * Update Ticket
-         * @description take: assign to me (in progress) · resolve: close with a note · reopen.
+         * @description take: assign to me · assign: hand off to a teammate (note recommended) · note: add a
+         *     note · resolve: close with a note (and optionally message the customer) · reopen.
          */
         patch: operations["update_ticket_v1_tickets__ticket_id__patch"];
         trace?: never;
@@ -569,6 +571,103 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/customer/login/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Login Start
+         * @description Send a 6-digit one-time code to the customer's registered mobile number.
+         */
+        post: operations["login_start_v1_customer_login_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/customer/login/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Login Verify
+         * @description Exchange the one-time code for a customer token (the customer's session).
+         */
+        post: operations["login_verify_v1_customer_login_verify_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/customer/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Customer Me */
+        get: operations["customer_me_v1_customer_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/customer/transactions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Customer Transactions
+         * @description The customer's last 30 days, newest first: the same data the agents read.
+         */
+        get: operations["customer_transactions_v1_customer_transactions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/customer/cases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Customer Cases
+         * @description The customer's support cases. Internal notes and titles stay with the team.
+         */
+        get: operations["customer_cases_v1_customer_cases_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/insights": {
         parameters: {
             query?: never;
@@ -649,7 +748,7 @@ export interface components {
          * ActionType
          * @enum {string}
          */
-        ActionType: "refund_transaction" | "freeze_card" | "escalate_to_human" | "no_action";
+        ActionType: "refund_transaction" | "freeze_card" | "answer_from_records" | "escalate_to_human" | "no_action";
         /**
          * AddCompanyRequest
          * @description Create another company for the logged-in user. Name, email and password stay the same;
@@ -899,6 +998,36 @@ export interface components {
             /** Customer Ref */
             customer_ref?: string | null;
         };
+        /** CustomerCase */
+        CustomerCase: {
+            /** Code */
+            code: string;
+            status: components["schemas"]["TicketStatus"];
+            /** Category */
+            category: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Resolved At */
+            resolved_at: string | null;
+        };
+        /** CustomerMe */
+        CustomerMe: {
+            /** Customer Ref */
+            customer_ref: string;
+            /** Customer Name */
+            customer_name: string;
+            /** Phone */
+            phone: string | null;
+            card_status: components["schemas"]["CardStatus"];
+        };
+        /** CustomerSession */
+        CustomerSession: {
+            /** Customer Token */
+            customer_token: string;
+        };
         /** DecisionRequest */
         DecisionRequest: {
             /** Note */
@@ -989,6 +1118,11 @@ export interface components {
             ][];
             /** Reversals Last 24H */
             reversals_last_24h: number;
+            /**
+             * Recent Requests 72H
+             * @default 0
+             */
+            recent_requests_72h: number;
         };
         /** ExecutionResult */
         ExecutionResult: {
@@ -1078,6 +1212,35 @@ export interface components {
             queries: string[];
             /** Reason */
             reason?: string | null;
+        };
+        /** LoginStartIn */
+        LoginStartIn: {
+            /**
+             * Bank Id
+             * Format: uuid
+             */
+            bank_id: string;
+            /** Phone */
+            phone: string;
+        };
+        /** LoginStartOut */
+        LoginStartOut: {
+            /** Sent */
+            sent: boolean;
+            /** Dev Code */
+            dev_code?: string | null;
+        };
+        /** LoginVerifyIn */
+        LoginVerifyIn: {
+            /**
+             * Bank Id
+             * Format: uuid
+             */
+            bank_id: string;
+            /** Phone */
+            phone: string;
+            /** Code */
+            code: string;
         };
         /** MeResponse */
         MeResponse: {
@@ -1183,6 +1346,35 @@ export interface components {
              * @description Why, in one or two sentences an auditor can check
              */
             rationale: string;
+            /**
+             * Record References
+             * @description For answer_from_records: references of the transactions that answer it
+             * @default []
+             */
+            record_references: string[];
+        };
+        /** RiskAssessment */
+        RiskAssessment: {
+            /** Score */
+            score: number;
+            /**
+             * Priority
+             * @enum {string}
+             */
+            priority: "low" | "normal" | "high" | "critical";
+            /** Critical */
+            critical: boolean;
+            /** Signals */
+            signals: components["schemas"]["RiskSignal"][];
+        };
+        /** RiskSignal */
+        RiskSignal: {
+            /** Id */
+            id: string;
+            /** Points */
+            points: number;
+            /** Detail */
+            detail: string;
         };
         /**
          * Role
@@ -1295,6 +1487,10 @@ export interface components {
             created_at: string;
             /** Resolved At */
             resolved_at: string | null;
+            /** Activity */
+            activity: {
+                [key: string]: unknown;
+            }[];
         };
         /**
          * TicketPriority
@@ -1325,9 +1521,13 @@ export interface components {
              * Action
              * @enum {string}
              */
-            action: "take" | "resolve" | "reopen";
+            action: "take" | "assign" | "note" | "resolve" | "reopen";
             /** Note */
             note?: string | null;
+            /** Assignee Id */
+            assignee_id?: string | null;
+            /** Customer Message */
+            customer_message?: string | null;
         };
         /** TokenResponse */
         TokenResponse: {
@@ -1478,6 +1678,7 @@ export interface components {
             evidence?: components["schemas"]["Evidence"] | null;
             proposal?: components["schemas"]["ProposedAction"] | null;
             decision?: components["schemas"]["PolicyDecision"] | null;
+            risk?: components["schemas"]["RiskAssessment"] | null;
             approval?: components["schemas"]["ApprovalRef"] | null;
             execution?: components["schemas"]["ExecutionResult"] | null;
             ticket?: components["schemas"]["TicketRef"] | null;
@@ -2363,6 +2564,7 @@ export interface operations {
         parameters: {
             query?: {
                 status?: "open" | "resolved" | "all";
+                mine?: boolean;
             };
             header: {
                 /** @description Organization this request acts in */
@@ -2687,6 +2889,132 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    login_start_v1_customer_login_start_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginStartIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginStartOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    login_verify_v1_customer_login_verify_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginVerifyIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerSession"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    customer_me_v1_customer_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerMe"];
+                };
+            };
+        };
+    };
+    customer_transactions_v1_customer_transactions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransactionOut"][];
+                };
+            };
+        };
+    };
+    customer_cases_v1_customer_cases_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerCase"][];
                 };
             };
         };

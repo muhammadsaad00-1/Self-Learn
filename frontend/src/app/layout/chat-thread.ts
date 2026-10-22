@@ -19,6 +19,16 @@ interface Card {
   review?: { amount: string | null };
   case?: { code: string; priority: string };
   sources?: string[];
+  /** The customer's own transactions the answer is based on (answer_from_records). */
+  records?: {
+    reference: string;
+    kind: 'debit' | 'credit';
+    amount: string;
+    currency: string;
+    merchant: string;
+    transfer_status: 'credited' | 'pending' | 'failed' | null;
+    occurred_at: string;
+  }[];
 }
 
 /** Chat bubbles with their fact cards (refund, transfer trace, frozen card, case number).
@@ -65,6 +75,29 @@ interface Card {
                       <li class="done">Money returned to you</li>
                     }
                   </ol>
+                </div>
+              }
+              @if (c.records; as rs) {
+                <div class="fact records">
+                  @for (r of rs; track r.reference) {
+                    <div class="record">
+                      <span>
+                        {{ r.merchant }}
+                        <small class="muted"
+                          >{{ r.occurred_at | date: 'MMM d, h:mm a' }} · {{ r.reference }}</small
+                        >
+                      </span>
+                      <span>
+                        <strong
+                          >{{ r.kind === 'credit' ? '+' : '−'
+                          }}{{ +r.amount | number: '1.0-0' }}</strong
+                        >
+                        @if (r.transfer_status === 'credited') {
+                          <small class="ok">✓ delivered</small>
+                        }
+                      </span>
+                    </div>
+                  }
                 </div>
               }
               @if (c.refund; as r) {

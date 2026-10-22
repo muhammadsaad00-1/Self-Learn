@@ -40,3 +40,6 @@ class Evidence(BaseModel):
     transactions: list[TransactionOut]
     duplicate_pairs: list[tuple[str, str]]  # (original reference, duplicate reference)
     reversals_last_24h: int
+    # Earlier requests from this customer in 72h (set by the worker from the workflow
+    # module): repeat contact is a criticality signal.
+    recent_requests_72h: int = 0

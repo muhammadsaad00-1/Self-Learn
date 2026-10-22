@@ -1,10 +1,15 @@
 """Customer chat API.
 
+/v1/customer       customer login (phone + one-time code) and their own dashboard data
 /v1/chat           the customer's side, authenticated by a customer token (one conversation)
 /v1/conversations  the team's side: open a customer's chat, read every conversation, take
                    over from the agents and hand back
 """
 
+import hashlib
+import hmac
+import re
+import secrets
 import uuid
 from collections.abc import Awaitable, Callable
 from datetime import datetime
@@ -30,11 +35,15 @@ from agentflow.db import SessionDep, set_tenant_context
 from agentflow.identity.deps import OrgContextDep, SettingsDep
 from agentflow.identity.security import create_customer_token, decode_customer_token
 from agentflow.ledger import service as ledger
-from agentflow.ledger.models import Account
+from agentflow.ledger.models import Account, CardStatus
+from agentflow.ledger.schemas import TransactionOut
 from agentflow.observability import request_id_var
+from agentflow.tickets import service as tickets
+from agentflow.tickets.models import TicketStatus
 
 router = APIRouter(prefix="/v1/chat", tags=["chat"])
 staff_router = APIRouter(prefix="/v1/conversations", tags=["conversations"])
+customer_router = APIRouter(prefix="/v1/customer", tags=["customer"])
 
 # (audio bytes, filename) -> text. Injectable: tests set app.state.transcriber.
 Transcriber = Callable[[bytes, str], Awaitable[str]]
@@ -330,3 +339,152 @@ async def hand_back_to_agents(
     )
     await session.flush()
     return await _chat(session, conversation)
+
+
+# --- Customer login and dashboard -------------------------------------------------------------
+#
+# ponytail: one-time codes are returned in the response outside production instead of being
+# sent by SMS; plug an SMS provider into `login_start` for a real deployment.
+
+OTP_TTL_SECONDS = 300
+OTP_MAX_TRIES = 5
+OTP_SENDS_PER_10_MIN = 3
+
+
+class LoginStartIn(BaseModel):
+    bank_id: uuid.UUID  # the bank's organization id, from the bank's customer-app link
+    phone: str = Field(min_length=10, max_length=20)
+
+
+class LoginStartOut(BaseModel):
+    sent: bool  # always true: the answer never reveals whether the number is registered
+    dev_code: str | None = None  # outside production only (no SMS provider yet)
+
+
+class LoginVerifyIn(LoginStartIn):
+    code: str = Field(pattern=r"^\d{6}$")
+
+
+class CustomerSession(BaseModel):
+    customer_token: str
+
+
+class CustomerMe(BaseModel):
+    customer_ref: str
+    customer_name: str
+    phone: str | None  # masked
+    card_status: CardStatus
+
+
+class CustomerCase(BaseModel):
+    code: str
+    status: TicketStatus
+    category: str | None
+    created_at: datetime
+    resolved_at: datetime | None
+
+
+def _normalize_phone(phone: str) -> str:
+    """03001234567 / +92 300 1234567 / 923001234567 -> 923001234567."""
+    digits = re.sub(r"\D", "", phone)
+    return "92" + digits[1:] if digits.startswith("0") else digits
+
+
+def _otp_hash(code: str) -> str:
+    return hashlib.sha256(code.encode()).hexdigest()
+
+
+@customer_router.post("/login/start")
+async def login_start(
+    body: LoginStartIn, request: Request, session: SessionDep, settings: SettingsDep
+) -> LoginStartOut:
+    """Send a 6-digit one-time code to the customer's registered mobile number."""
+    redis = request.app.state.redis
+    phone = _normalize_phone(body.phone)
+    sends = f"otp-sends:{body.bank_id}:{phone}"
+    await redis.set(sends, 0, ex=600, nx=True)
+    if await redis.incr(sends) > OTP_SENDS_PER_10_MIN:
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Too many codes, try later")
+    await set_tenant_context(session, org_id=body.bank_id)
+    account = await ledger.get_account_by_phone(session, body.bank_id, phone)
+    if account is None:
+        return LoginStartOut(sent=True)  # same answer as success: no number enumeration
+    code = f"{secrets.randbelow(10**6):06d}"
+    await redis.set(f"otp:{body.bank_id}:{phone}", _otp_hash(code), ex=OTP_TTL_SECONDS)
+    await redis.delete(f"otp-tries:{body.bank_id}:{phone}")
+    return LoginStartOut(sent=True, dev_code=code if settings.env != "prod" else None)
+
+
+@customer_router.post("/login/verify")
+async def login_verify(
+    body: LoginVerifyIn, request: Request, session: SessionDep, settings: SettingsDep
+) -> CustomerSession:
+    """Exchange the one-time code for a customer token (the customer's session)."""
+    redis = request.app.state.redis
+    phone = _normalize_phone(body.phone)
+    key, tries = f"otp:{body.bank_id}:{phone}", f"otp-tries:{body.bank_id}:{phone}"
+    invalid = HTTPException(status.HTTP_401_UNAUTHORIZED, "Wrong or expired code")
+    expected = await redis.get(key)
+    if expected is None:
+        raise invalid
+    await redis.set(tries, 0, ex=OTP_TTL_SECONDS, nx=True)
+    if await redis.incr(tries) > OTP_MAX_TRIES:  # brute force: locked until a new code
+        raise invalid
+    if not hmac.compare_digest(expected.decode(), _otp_hash(body.code)):
+        raise invalid
+    await redis.delete(key, tries)  # one-time
+
+    await set_tenant_context(session, org_id=body.bank_id)
+    account = await ledger.get_account_by_phone(session, body.bank_id, phone)
+    if account is None:
+        raise invalid
+    conversation = await service.open_for_customer(session, body.bank_id, account.customer_ref)
+    await audit.record(
+        session,
+        org_id=body.bank_id,
+        actor_user_id=None,
+        action="customer.login",
+        target_type="customer",
+        target_id=account.customer_ref,
+    )
+    return CustomerSession(
+        customer_token=create_customer_token(body.bank_id, conversation.id, settings)
+    )
+
+
+@customer_router.get("/me")
+async def customer_me(conversation: CustomerConversation, session: SessionDep) -> CustomerMe:
+    account = await ledger.get_account(session, conversation.org_id, conversation.customer_ref)
+    return CustomerMe(
+        customer_ref=account.customer_ref,
+        customer_name=account.customer_name,
+        phone=f"+{account.phone[:2]} *** ***{account.phone[-4:]}" if account.phone else None,
+        card_status=account.card_status,
+    )
+
+
+@customer_router.get("/transactions")
+async def customer_transactions(
+    conversation: CustomerConversation, session: SessionDep
+) -> list[TransactionOut]:
+    """The customer's last 30 days, newest first: the same data the agents read."""
+    account = await ledger.get_account(session, conversation.org_id, conversation.customer_ref)
+    return await ledger.recent_transactions(session, account)
+
+
+@customer_router.get("/cases")
+async def customer_cases(
+    conversation: CustomerConversation, session: SessionDep
+) -> list[CustomerCase]:
+    """The customer's support cases. Internal notes and titles stay with the team."""
+    rows = await tickets.for_customer(session, conversation.org_id, conversation.customer_ref)
+    return [
+        CustomerCase(
+            code=t.code,
+            status=t.status,
+            category=t.category,
+            created_at=t.created_at,
+            resolved_at=t.resolved_at,
+        )
+        for t in rows
+    ]

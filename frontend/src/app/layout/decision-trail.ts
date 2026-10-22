@@ -65,6 +65,23 @@ import type { WorkflowResult } from '../api/types';
       </ul>
     }
 
+    @if (r.risk; as k) {
+      <h3>Criticality (code)</h3>
+      <p>
+        <span class="badge" [attr.data-urgency]="k.priority"
+          >{{ k.priority }} · score {{ k.score }}</span
+        >
+        @if (!k.signals.length) {
+          <small class="muted">no risk signals</small>
+        }
+      </p>
+      <ul class="reasons">
+        @for (s of k.signals; track s.id) {
+          <li>{{ s.id.replaceAll('_', ' ') }} (+{{ s.points }}): {{ s.detail }}</li>
+        }
+      </ul>
+    }
+
     @if (r.approval; as a) {
       <h3>Approval</h3>
       <span

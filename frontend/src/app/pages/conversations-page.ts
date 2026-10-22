@@ -27,10 +27,11 @@ const POLL_MS = 2500;
       <button (click)="openCustomerApp()" [disabled]="!customerRef || busy()">
         Open customer app ↗
       </button>
-      <small class="muted"
-        >In production the bank's mobile app opens the chat after its own login.</small
-      >
     </div>
+    <p class="muted">
+      Customers sign in with their mobile number at
+      <code>{{ portalLink() }}</code>
+    </p>
     @if (error()) {
       <p class="error" role="alert">{{ error() }}</p>
     }
@@ -98,6 +99,10 @@ export class ConversationsPage {
   protected readonly error = signal<string | null>(null);
   protected readonly selected = signal<string | null>(null);
   protected readonly thread = signal<Chat | null>(null);
+
+  protected portalLink(): string {
+    return `${location.origin}/customer/login?bank=${this.auth.orgId()}`;
+  }
 
   protected readonly accounts = httpResource<LedgerAccount[]>(() =>
     this.auth.orgId() ? '/v1/ledger/accounts' : undefined,

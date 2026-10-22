@@ -38,6 +38,7 @@ class Account(Base):
     __tablename__ = "ledger_accounts"
     __table_args__ = (
         UniqueConstraint("org_id", "customer_ref"),
+        UniqueConstraint("org_id", "phone"),
         enum_check("card_status", CardStatus),
     )
 
@@ -45,6 +46,8 @@ class Account(Base):
     org_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"))
     customer_ref: Mapped[str] = mapped_column(String(100))  # the business's own customer id
     customer_name: Mapped[str] = mapped_column(String(200))
+    # Mobile number the customer logs in with (E.164 digits, e.g. 923001234501).
+    phone: Mapped[str | None] = mapped_column(String(20))
     currency: Mapped[str] = mapped_column(String(3))
     card_status: Mapped[CardStatus] = mapped_column(
         str_enum(CardStatus), default=CardStatus.ACTIVE, server_default=CardStatus.ACTIVE

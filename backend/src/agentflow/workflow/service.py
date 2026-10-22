@@ -4,7 +4,7 @@ import hashlib
 import json
 import logging
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import func, select, text
@@ -245,3 +245,26 @@ async def fail_attempt(
     else:
         wf.status = WorkflowStatus.QUEUED
         wf.available_at = datetime.now(UTC) + backoff(claim.attempt)
+
+
+async def count_recent_for_customer(
+    session: AsyncSession,
+    org_id: uuid.UUID,
+    customer_ref: str,
+    *,
+    hours: int,
+    excluding: uuid.UUID,
+) -> int:
+    """Requests from this customer in the last `hours` (repeat-contact signal)."""
+    since = datetime.now(UTC) - timedelta(hours=hours)
+    count = await session.scalar(
+        select(func.count())
+        .select_from(Workflow)
+        .where(
+            Workflow.org_id == org_id,
+            Workflow.input["customer_ref"].astext == customer_ref,
+            Workflow.created_at >= since,
+            Workflow.id != excluding,
+        )
+    )
+    return count or 0

@@ -15,10 +15,19 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/auth-page').then((m) => m.AuthPage),
     data: { mode: 'signup' },
   },
+  // The customer's app: its own login (phone + one-time code) and its own session; never
+  // the staff dashboard. /chat#<token> is the staff-issued link into the same app.
   {
-    // The customer's app: authenticated by the customer token in the link, not a staff login.
+    path: 'customer/login',
+    loadComponent: () => import('./pages/customer-login-page').then((m) => m.CustomerLoginPage),
+  },
+  {
+    path: 'customer',
+    loadComponent: () => import('./pages/customer-portal-page').then((m) => m.CustomerPortalPage),
+  },
+  {
     path: 'chat',
-    loadComponent: () => import('./pages/chat-page').then((m) => m.ChatPage),
+    loadComponent: () => import('./pages/customer-portal-page').then((m) => m.CustomerPortalPage),
   },
   {
     path: '',

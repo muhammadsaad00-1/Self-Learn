@@ -116,7 +116,12 @@ async def credits(sessions: Sessions, org_id: str) -> int:
     async with sessions() as s, s.begin():
         await set_tenant_context(s, org_id=uuid.UUID(org_id))
         return (
-            await s.scalar(text("SELECT count(*) FROM ledger_transactions WHERE kind = 'credit'"))
+            await s.scalar(
+                text(
+                    "SELECT count(*) FROM ledger_transactions "
+                    "WHERE kind = 'credit' AND reverses_id IS NOT NULL"
+                )
+            )
             or 0
         )
 

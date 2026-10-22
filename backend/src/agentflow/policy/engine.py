@@ -48,6 +48,12 @@ def evaluate(
     knowledge_status: str | None,
     config: PolicyConfig = PolicyConfig(),  # noqa: B008 (immutable)
 ) -> PolicyDecision:
+    if proposal.action == ActionType.ANSWER_FROM_RECORDS:
+        return PolicyDecision(
+            outcome=Outcome.ALLOW,
+            reasons=["Answered from the customer's own records (read-only)"],
+            rules=["records_answer"],
+        )
     if proposal.action == ActionType.NO_ACTION:
         return PolicyDecision(
             outcome=Outcome.ALLOW, reasons=["No action to execute"], rules=["no_action"]
@@ -143,6 +149,8 @@ def ticket_reasons(
     approval_status: str | None,
     execution_status: str | None,
     execution_detail: str | None,
+    risk_critical: bool = False,
+    risk_signals: list[str] | None = None,
 ) -> list[str]:
     """Why a human must own this case as a ticket (empty list = no ticket).
 
@@ -154,6 +162,8 @@ def ticket_reasons(
         reasons.append("Suspected fraud: investigate and contact the customer")
     if urgency == "critical":
         reasons.append("Critical urgency")
+    elif risk_critical:
+        reasons.append("Critical risk: " + "; ".join(risk_signals or []))
     if decision is not None and decision.outcome == Outcome.BLOCK:
         reasons.append("Not automated: " + "; ".join(decision.reasons))
     if approval_status in ("rejected", "expired"):

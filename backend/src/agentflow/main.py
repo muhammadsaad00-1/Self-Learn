@@ -77,6 +77,7 @@ def create_app(
     app.include_router(tickets_api.router)
     app.include_router(conversations_api.router)
     app.include_router(conversations_api.staff_router)
+    app.include_router(conversations_api.customer_router)
     app.include_router(insights.router)
 
     @app.get("/health", tags=["ops"])

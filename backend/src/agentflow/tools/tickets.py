@@ -50,7 +50,8 @@ async def open_ticket(
 
     triage = state.get("triage") or {}
     proposal = state.get("proposal") or {}
-    urgency = triage.get("urgency") or "normal"
+    # The criticality analysis may have raised the priority above triage's urgency.
+    urgency = (state.get("risk") or {}).get("priority") or triage.get("urgency") or "normal"
     category = triage.get("category")
     lines = [
         "Why a human is needed:",
@@ -59,6 +60,8 @@ async def open_ticket(
         f"Customer message: {state.get('message', '')}",
         f"Customer: {state.get('customer_ref') or 'unknown'}",
     ]
+    if signals := (state.get("risk") or {}).get("signals"):
+        lines.append("Risk signals: " + "; ".join(f"{s['id']} {s['detail']}" for s in signals))
     if proposal:
         lines.append(f"Agents proposed: {proposal.get('action')} ({proposal.get('rationale')})")
     ticket = Ticket(
