@@ -62,7 +62,7 @@ Claude writes the code into the files, then shows the full code in chat (the use
 - `uv` 0.12 and `gh` 2.102 are in `~/.local/bin`. `codex` is not installed.
 
 ## Branch stack (none merged yet; PRs need `gh auth login`)
-`main` ← feat/phase-1-core-saas (incl. phase 0) ← feat/phase-2-first-agent ← feat/phase-3-rag ← feat/add-company ← feat/phase-4-6-actions ← feat/tickets ← feat/customer-chat ← feat/customer-portal ← feat/help-and-issues. CI only runs on PRs/main, so it has not run on GitHub yet.
+`main` ← feat/phase-1-core-saas (incl. phase 0) ← feat/phase-2-first-agent ← feat/phase-3-rag ← feat/add-company ← feat/phase-4-6-actions ← feat/tickets ← feat/customer-chat ← feat/customer-portal ← feat/help-and-issues ← feat/ui-redesign. CI only runs on PRs/main, so it has not run on GitHub yet.
 
 ## Decisions
 - **Purpose is learning.** Build the full spec, including every AWS service, IaC, MCP, evals and the frontend. Don't skip components as "not needed yet". Order still follows the roadmap phases.
@@ -96,6 +96,7 @@ Roadmap phases are in spec 05. Mark items `[x]` as they land.
 - [x] Customer chat (`feat/customer-chat`, ADR 0013): Gen Z texting-first customer app (`/chat`, customer token, voice notes via Groq Whisper, fact cards, Urdu/Roman Urdu replies); each message is a `chat` workflow, outcome posted back by the worker; staff inbox `/chats` with take-over/hand-back; failed-transfer reversal (`transfer_status`, policy `failed_transfer_reversal`); `freeze_card` tool (policy `protective_freeze`); customer help guide seeded with demo data; `/v1/insights` + Insights page (default landing page).
 - [x] Customer portal (`feat/customer-portal`, ADR 0014): separate customer app `/customer` (OTP login by phone, Chat/Activity/Cases) vs staff dashboard; criticality analysis in code (`policy/risk.py`, escalate-only, signals in ticket + trail); `answer_from_records` (customer doubts settled from verified ledger rows, no ticket); ticket hand-off (`assign`/`note`, `activity` trail, `mine`, resolve → message in customer chat).
 - [x] Help chat + issue threads (`feat/help-and-issues`, ADR 0015): one help chat + N issues per customer; code routes problems to an issue right after triage (`conversations.after_triage`, idempotent); issue status follows outcome/ticket; ticket on dead-letter (no promise without an owner); doc-answered questions skip the resolution call; `T1..` transaction aliases for the model; model warm-up; `make journeys` (a company end to end with real models, `ONLY=ids`).
+- [x] UI/UX redesign (`feat/ui-redesign`): design system in `styles.css` (tokens, buttons, badges, segmented, timeline, queue/detail), Inter, inline icons (`layout/icon.ts`), formatters (`core/format.ts`: human labels, relative time, initials), sidebar shell with live counts, master-detail Tickets/Inbox/Requests, decision trail as a timeline, split-screen auth, phone-stage customer app. Data fixes found in review: agent context no longer stored as the customer's message (`input.context`, data migration), tickets carry `reasons` + `customer_message`, titles without enum prefixes.
 - [ ] Phase 7 — AWS (deferred: not for the hackathon): IaC, ECR, ECS/RDS/S3/SQS, Secrets/KMS, CloudWatch/OTel, staging/prod
 - [ ] Phase 8 — Hardening: golden/adversarial/prompt-injection/cross-tenant/load/chaos/cost tests
 - [ ] Phase 9–10 — Pilot, commercial MVP

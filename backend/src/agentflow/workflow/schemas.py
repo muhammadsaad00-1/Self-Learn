@@ -19,6 +19,9 @@ class CreateWorkflowRequest(BaseModel):
     """A customer request entering the system (from a support inbox, chat, or the dashboard)."""
 
     message: str = Field(min_length=1, max_length=8000)
+    # Earlier turns of a conversation, for the agents only: never shown as the customer's
+    # message (the dashboard and tickets show `message`, what the customer actually wrote).
+    context: str | None = Field(default=None, max_length=6000)
     channel: Literal["web", "email", "chat", "phone"] = "web"
     # The business's own customer id, if known. Never a card or account number.
     customer_ref: str | None = Field(default=None, max_length=100)
@@ -80,7 +83,9 @@ class WorkflowSummary(BaseModel):
 
     id: uuid.UUID
     status: WorkflowStatus
-    message_preview: str
+    message_preview: str  # what the customer wrote (never the agents' context)
+    customer_ref: str | None
+    channel: str
     category: Category | None
     urgency: Urgency | None
     needs_human_review: bool | None

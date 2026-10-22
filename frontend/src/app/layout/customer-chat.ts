@@ -7,6 +7,7 @@ import type { Chat } from '../api/types';
 import { CustomerSession } from '../core/customer-session';
 import { errorMessage } from '../core/errors';
 import { ChatThread } from './chat-thread';
+import { Icon } from './icon';
 
 const POLL_MS = 1500;
 
@@ -22,7 +23,7 @@ const SUGGESTIONS = [
  *  polled while the agents work. */
 @Component({
   selector: 'app-customer-chat',
-  imports: [FormsModule, ChatThread],
+  imports: [FormsModule, ChatThread, Icon],
   template: `
     @if (chat(); as c) {
       @if (c.messages.length === 0 && c.kind === 'help') {
@@ -60,7 +61,9 @@ const SUGGESTIONS = [
         [disabled]="!chat() || recording()"
       />
       @if (draft.trim()) {
-        <button type="submit" aria-label="Send" [disabled]="busy()">➤</button>
+        <button type="submit" aria-label="Send" [disabled]="busy()">
+          <app-icon name="send" [size]="18" />
+        </button>
       } @else {
         <button
           type="button"
@@ -69,7 +72,7 @@ const SUGGESTIONS = [
           (click)="toggleRecording()"
           [disabled]="!chat() || busy()"
         >
-          {{ recording() ? '■' : '🎤' }}
+          <app-icon [name]="recording() ? 'x' : 'mic'" [size]="18" />
         </button>
       }
     </form>

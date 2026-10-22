@@ -192,7 +192,8 @@ async def dead_lettered(session: AsyncSession, wf: Workflow, error: str) -> None
     saved = dict(wf.result or {})
     state = {
         **saved,
-        "message": wf.input["message"],
+        "message": service.agent_message(wf.input),
+        "customer_message": wf.input["message"],
         "customer_ref": wf.input.get("customer_ref"),
         # Someone is waiting and nothing was resolved: high unless triage said more.
         "risk": saved.get("risk") or {"priority": "high"},
@@ -228,7 +229,8 @@ async def process_next(
         await set_tenant_context(session, org_id=claim.org_id)
         wf = await service.get(session, claim.org_id, claim.workflow_id)
         stage, saved, request_id = wf.stage, dict(wf.result or {}), wf.request_id
-        message, customer_ref = wf.input["message"], wf.input.get("customer_ref")
+        message, customer_ref = service.agent_message(wf.input), wf.input.get("customer_ref")
+        customer_message = wf.input["message"]  # what they actually wrote (tickets show it)
         approval = await approvals.get_for_workflow(session, wf.id)
     request_id_var.set(request_id)  # logs of this run correlate with the API request
     log.info("workflow.started", extra={"attempt": claim.attempt, "stage": stage})
@@ -245,7 +247,11 @@ async def process_next(
             if stage == WorkflowStage.ANALYSIS:
                 state = await _run(
                     graphs.analysis,
-                    {"message": message, "customer_ref": customer_ref},
+                    {
+                        "message": message,
+                        "customer_message": customer_message,
+                        "customer_ref": customer_ref,
+                    },
                     config,
                     sessions,
                     claim,
@@ -265,7 +271,12 @@ async def process_next(
                             log.info("workflow.waiting_approval")
                     return True
             else:  # execution stage, resumed after a human decided the approval
-                state = {**saved, "message": message, "customer_ref": customer_ref}
+                state = {
+                    **saved,
+                    "message": message,
+                    "customer_message": customer_message,
+                    "customer_ref": customer_ref,
+                }
                 if approval is not None:
                     state["approval"] = {"id": str(approval.id), "status": approval.status}
             state = await _run(graphs.execution, state, config, sessions, claim)

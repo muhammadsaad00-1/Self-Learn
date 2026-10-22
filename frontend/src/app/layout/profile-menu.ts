@@ -2,20 +2,18 @@ import { Component, computed, ElementRef, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { Auth } from '../core/auth';
+import { initialsOf } from '../core/format';
+import { Icon } from './icon';
 
-/** "Sara Khan" -> "SK"; used for the round avatar badges. */
-export function initialsOf(name: string): string {
-  const words = name.split(/\s+/).filter(Boolean).slice(0, 2);
-  return words.map((w) => w[0]!.toUpperCase()).join('') || '?';
-}
+export { initialsOf } from '../core/format';
 
 /**
- * Chrome-style profile menu: the current company on a button; clicking it lists all of the
- * user's companies to switch between, plus "Add company", "Profile" and "Sign out".
+ * The current company and user at the foot of the sidebar; opens upwards to switch company,
+ * add one, open the profile or sign out (Chrome-style profiles).
  */
 @Component({
   selector: 'app-profile-menu',
-  imports: [RouterLink],
+  imports: [RouterLink, Icon],
   host: {
     // Close when clicking anywhere outside the menu, or on Escape.
     '(document:click)': 'closeIfOutside($event)',
@@ -24,26 +22,31 @@ export function initialsOf(name: string): string {
   template: `
     <button
       type="button"
-      class="profile-button"
+      class="org-button"
       aria-haspopup="menu"
       [attr.aria-expanded]="open()"
       (click)="open.set(!open())"
     >
-      <span class="avatar">{{ userInitials() }}</span>
-      <span>{{ auth.membership()?.org_name }}</span>
-      <span aria-hidden="true">▾</span>
+      <span class="avatar square">{{ initials(auth.membership()?.org_name) }}</span>
+      <span class="grow">
+        <strong class="truncate" style="display: block">{{ auth.membership()?.org_name }}</strong>
+        <small class="muted truncate" style="display: block">{{
+          auth.me()?.user?.full_name
+        }}</small>
+      </span>
+      <app-icon name="chevron-down" />
     </button>
 
     @if (open()) {
-      <div class="menu card" role="menu">
+      <div class="menu" role="menu" style="bottom: calc(100% + 8px); left: 0; right: 0">
         <div class="menu-user">
-          <span class="avatar large">{{ userInitials() }}</span>
-          <div>
+          <span class="avatar">{{ userInitials() }}</span>
+          <div class="grow">
             <strong>{{ auth.me()?.user?.full_name }}</strong>
-            <div class="muted">{{ auth.me()?.user?.email }}</div>
+            <div class="muted truncate">{{ auth.me()?.user?.email }}</div>
           </div>
         </div>
-
+        <hr />
         <div class="menu-label">Companies</div>
         @for (m of auth.me()?.memberships; track m.org_id) {
           <button
@@ -53,13 +56,13 @@ export function initialsOf(name: string): string {
             [attr.aria-checked]="m.org_id === auth.orgId()"
             (click)="switchTo(m.org_id)"
           >
-            <span class="avatar org">{{ initials(m.org_name) }}</span>
+            <span class="avatar sm square">{{ initials(m.org_name) }}</span>
             <span class="grow">
               {{ m.org_name }}
-              <small class="muted">{{ m.role }}</small>
+              <small class="muted"> · {{ m.role }}</small>
             </span>
             @if (m.org_id === auth.orgId()) {
-              <span aria-label="current company">✓</span>
+              <app-icon name="check" />
             }
           </button>
         }
@@ -70,28 +73,26 @@ export function initialsOf(name: string): string {
           fragment="add-company"
           (click)="open.set(false)"
         >
-          + Add company
+          <app-icon name="plus" /> Add company
         </a>
-
         <hr />
-        <a class="menu-item" role="menuitem" routerLink="/profile" (click)="open.set(false)"
-          >Profile</a
-        >
+        <a class="menu-item" role="menuitem" routerLink="/profile" (click)="open.set(false)">
+          <app-icon name="user" /> Profile
+        </a>
         <button type="button" class="menu-item" role="menuitem" (click)="auth.logout()">
-          Sign out
+          <app-icon name="logout" /> Sign out
         </button>
       </div>
     }
   `,
+  styles: ':host { display: block; position: relative }',
 })
 export class ProfileMenu {
   protected readonly auth = inject(Auth);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   protected readonly open = signal(false);
-  protected readonly userInitials = computed(() =>
-    initialsOf(this.auth.me()?.user.full_name ?? ''),
-  );
+  protected readonly userInitials = computed(() => initialsOf(this.auth.me()?.user.full_name));
   protected readonly initials = initialsOf;
 
   protected switchTo(orgId: string): void {

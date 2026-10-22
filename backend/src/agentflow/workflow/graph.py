@@ -63,7 +63,8 @@ SearchFn = Callable[[Sequence[str], str], Awaitable[list[RetrievedChunk]]]
 
 
 class WorkflowState(TypedDict, total=False):
-    message: str  # the customer's request, normalized by intake
+    message: str  # what the agents read: the request (+ conversation context), normalized
+    customer_message: str  # what the customer actually wrote (for people: tickets, UI)
     triage: dict[str, Any]  # TriageResult as JSON
     queries: list[str]  # from the query planner
     sources: list[dict[str, Any]]  # Source[] as JSON

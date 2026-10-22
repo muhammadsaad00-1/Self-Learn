@@ -49,7 +49,7 @@ describe('ApprovalsPage', () => {
     req.flush([PENDING]);
     await settle();
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
-    expect(text).toContain('Refund 5000.00');
+    expect(text).toContain('Refund PKR 5,000');
     expect(text).toContain("need a second officer's approval");
   });
 

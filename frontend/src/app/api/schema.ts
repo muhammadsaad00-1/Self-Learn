@@ -1049,6 +1049,8 @@ export interface components {
         CreateWorkflowRequest: {
             /** Message */
             message: string;
+            /** Context */
+            context?: string | null;
             /**
              * Channel
              * @default web
@@ -1520,6 +1522,10 @@ export interface components {
             title: string;
             /** Description */
             description: string;
+            /** Reasons */
+            reasons: string[];
+            /** Customer Message */
+            customer_message: string | null;
             priority: components["schemas"]["TicketPriority"];
             /** Category */
             category: string | null;
@@ -1640,6 +1646,12 @@ export interface components {
              * @description One neutral sentence for an operations agent
              */
             summary: string;
+            /**
+             * Title
+             * @description 3-7 word title of the request in English, as the customer would name it, e.g. 'Transfer to Ali not received'
+             * @default
+             */
+            title: string;
             details: components["schemas"]["Details"];
             /**
              * Confidence
@@ -1780,6 +1792,10 @@ export interface components {
             status: components["schemas"]["WorkflowStatus"];
             /** Message Preview */
             message_preview: string;
+            /** Customer Ref */
+            customer_ref: string | null;
+            /** Channel */
+            channel: string;
             category: components["schemas"]["Category"] | null;
             urgency: components["schemas"]["Urgency"] | null;
             /** Needs Human Review */

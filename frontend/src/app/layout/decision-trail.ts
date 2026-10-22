@@ -1,129 +1,231 @@
-import { DatePipe } from '@angular/common';
+import { DecimalPipe } from '@angular/common';
 import { Component, computed, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import type { WorkflowResult } from '../api/types';
+import { FORMAT } from '../core/format';
+import { Icon } from './icon';
+import { KnowledgeAnswerView } from './knowledge-answer';
 
-/** Everything the system did after triage, in order: evidence -> proposal -> policy ->
- *  approval -> execution -> reply. This is what a reviewer or an auditor reads. */
+/** What the system did with a request, as a timeline a reviewer or auditor can read top to
+ *  bottom: understood -> policy -> ledger -> risk -> proposal -> decision -> approval ->
+ *  execution -> ticket -> reply. AI steps are violet, code decisions green/amber/red. */
 @Component({
   selector: 'app-decision-trail',
-  imports: [DatePipe, RouterLink],
+  imports: [DecimalPipe, RouterLink, Icon, KnowledgeAnswerView, ...FORMAT],
   template: `
     @let r = result();
-    @if (r.evidence; as ev) {
-      <h3>Ledger evidence</h3>
-      @if (!ev.account_found) {
-        <p class="muted">No customer account identified.</p>
-      } @else {
-        <p class="muted">
-          {{ ev.customer_name }} ({{ ev.customer_ref }}) · {{ ev.reversals_last_24h }} reversals in
-          24h
-        </p>
-        <table class="compact">
-          <tbody>
-            @for (t of ev.transactions; track t.id) {
-              <tr [class.highlight]="duplicates().has(t.reference)">
-                <td>
-                  <code>{{ t.reference }}</code>
-                </td>
-                <td>{{ t.kind }}</td>
-                <td>{{ t.amount }} {{ t.currency }}</td>
-                <td>{{ t.merchant }}</td>
-                <td>{{ t.occurred_at | date: 'short' }}</td>
-                <td>{{ t.status }}</td>
-              </tr>
+    <ol class="timeline">
+      @if (r.triage; as t) {
+        <li>
+          <span class="node" data-tone="ai"><app-icon name="sparkles" [size]="14" /></span>
+          <div class="body">
+            <div class="row">
+              <strong>Understood</strong>
+              <span class="badge">{{ t.category | human }}</span>
+              <span class="badge" [attr.data-tone]="t.urgency | tone">{{ t.urgency | human }}</span>
+            </div>
+            <span class="muted">{{ t.summary }}</span>
+          </div>
+        </li>
+      }
+
+      @if (r.knowledge; as k) {
+        <li>
+          <span class="node" data-tone="ai"><app-icon name="book" [size]="14" /></span>
+          <div class="body">
+            <strong>Checked the company's documents</strong>
+            <app-knowledge-answer [answer]="k" />
+          </div>
+        </li>
+      }
+
+      @if (r.evidence; as ev) {
+        <li>
+          <span class="node" data-tone="brand"><app-icon name="database" [size]="14" /></span>
+          <div class="body">
+            <strong>Checked the ledger</strong>
+            @if (!ev.account_found) {
+              <span class="muted">No customer account identified.</span>
+            } @else {
+              <span class="muted">
+                {{ ev.customer_name }} · {{ ev.customer_ref }} · {{ ev.reversals_last_24h }}
+                reversals in 24 h
+                @if (ev.duplicate_pairs.length) {
+                  · <span class="badge" data-tone="warning">duplicate found</span>
+                }
+              </span>
+              <div class="card table-wrap" style="box-shadow: none">
+                <table>
+                  <tbody>
+                    @for (t of ev.transactions; track t.id) {
+                      <tr
+                        [style.background]="
+                          duplicates().has(t.reference) ? 'var(--warning-soft)' : null
+                        "
+                      >
+                        <td>
+                          {{ t.merchant }}
+                          <div>
+                            <small class="faint mono">{{ t.reference }}</small>
+                          </div>
+                        </td>
+                        <td style="white-space: nowrap; text-align: right">
+                          <strong [style.color]="t.kind === 'credit' ? 'var(--success)' : null">
+                            {{ t.kind === 'credit' ? '+' : '−' }}{{ +t.amount | number: '1.0-0' }}
+                          </strong>
+                          <div>
+                            <small class="faint">{{ t.occurred_at | ago }}</small>
+                          </div>
+                        </td>
+                        <td>
+                          @if (t.transfer_status) {
+                            <span class="badge" [attr.data-transfer]="t.transfer_status">{{
+                              transfer[t.transfer_status]
+                            }}</span>
+                          }
+                          @if (t.status === 'reversed') {
+                            <span class="badge" data-tone="success">reversed</span>
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
             }
-          </tbody>
-        </table>
-        @if (ev.duplicate_pairs.length) {
-          <small class="muted">Highlighted: duplicate debits found by the system.</small>
+          </div>
+        </li>
+      }
+
+      @if (r.risk; as k) {
+        <li>
+          <span
+            class="node"
+            [attr.data-tone]="k.critical ? 'danger' : k.signals.length ? 'warning' : 'success'"
+          >
+            <app-icon name="alert" [size]="14" />
+          </span>
+          <div class="body">
+            <div class="row">
+              <strong>Risk check</strong>
+              <span class="badge" [attr.data-tone]="k.priority | tone"
+                >{{ k.priority | human }} · {{ k.score }}/100</span
+              >
+            </div>
+            @if (k.signals.length) {
+              <ul class="reasons">
+                @for (s of k.signals; track s.id) {
+                  <li>
+                    {{ s.id | human }} <span class="muted">(+{{ s.points }}) {{ s.detail }}</span>
+                  </li>
+                }
+              </ul>
+            } @else {
+              <span class="muted">No risk signals.</span>
+            }
+          </div>
+        </li>
+      }
+
+      @if (r.proposal; as p) {
+        <li>
+          <span class="node" data-tone="ai"><app-icon name="bot" [size]="14" /></span>
+          <div class="body">
+            <div class="row">
+              <strong>Proposed: {{ p.action | human }}</strong>
+              @if (p.transaction_reference && p.amount) {
+                <span class="badge">PKR {{ +p.amount | number: '1.0-0' }}</span>
+              }
+            </div>
+            <span class="muted">{{ p.rationale }}</span>
+          </div>
+        </li>
+      }
+
+      @if (r.decision; as d) {
+        <li>
+          <span class="node" [attr.data-tone]="d.outcome | tone"
+            ><app-icon name="shield" [size]="14"
+          /></span>
+          <div class="body">
+            <div class="row">
+              <strong>Policy</strong>
+              <span class="badge" [attr.data-tone]="d.outcome | tone">{{ d.outcome | human }}</span>
+            </div>
+            <ul class="reasons">
+              @for (reason of d.reasons; track reason) {
+                <li>{{ reason }}</li>
+              }
+            </ul>
+          </div>
+        </li>
+      }
+
+      @if (r.approval; as a) {
+        <li>
+          <span class="node" [attr.data-tone]="a.status | tone"
+            ><app-icon name="check-circle" [size]="14"
+          /></span>
+          <div class="body">
+            <div class="row">
+              <strong>Second officer</strong>
+              <span class="badge" [attr.data-tone]="a.status | tone">{{ a.status | human }}</span>
+            </div>
+          </div>
+        </li>
+      }
+
+      @if (r.execution; as x) {
+        @if (x.status === 'executed' || r.approval) {
+          <li>
+            <span class="node" [attr.data-tone]="x.status | tone"
+              ><app-icon name="zap" [size]="14"
+            /></span>
+            <div class="body">
+              <div class="row">
+                <strong>{{ x.status === 'executed' ? 'Done' : 'Not executed' }}</strong>
+                @if (x.verified) {
+                  <span class="badge" data-tone="success"
+                    ><app-icon name="check" [size]="12" /> verified in ledger</span
+                  >
+                }
+              </div>
+              <span class="muted">{{ x.detail }}</span>
+            </div>
+          </li>
         }
       }
-    }
 
-    @if (r.proposal; as p) {
-      <h3>Proposed action</h3>
-      <p>
-        <strong>{{ actionLabel[p.action] }}</strong>
-        @if (p.transaction_reference && p.amount) {
-          · {{ p.amount }} for <code>{{ p.transaction_reference }}</code>
-        }
-      </p>
-      <p class="muted">
-        <small>{{ p.rationale }}</small>
-      </p>
-    }
+      @if (r.ticket; as t) {
+        <li>
+          <span class="node" data-tone="warning"><app-icon name="ticket" [size]="14" /></span>
+          <div class="body">
+            <div class="row">
+              <strong>Handed to a human</strong>
+              <a routerLink="/tickets" class="badge" [attr.data-tone]="t.priority | tone"
+                >{{ t.code }} · {{ t.priority | human }}</a
+              >
+            </div>
+            <ul class="reasons">
+              @for (reason of t.reasons; track reason) {
+                <li>{{ reason }}</li>
+              }
+            </ul>
+          </div>
+        </li>
+      }
 
-    @if (r.decision; as d) {
-      <h3>Policy decision</h3>
-      <span class="badge" [attr.data-decision]="d.outcome">{{ outcomeLabel[d.outcome] }}</span>
-      <ul class="reasons">
-        @for (reason of d.reasons; track reason) {
-          <li>{{ reason }}</li>
-        }
-      </ul>
-    }
-
-    @if (r.risk; as k) {
-      <h3>Criticality (code)</h3>
-      <p>
-        <span class="badge" [attr.data-urgency]="k.priority"
-          >{{ k.priority }} · score {{ k.score }}</span
-        >
-        @if (!k.signals.length) {
-          <small class="muted">no risk signals</small>
-        }
-      </p>
-      <ul class="reasons">
-        @for (s of k.signals; track s.id) {
-          <li>{{ s.id.replaceAll('_', ' ') }} (+{{ s.points }}): {{ s.detail }}</li>
-        }
-      </ul>
-    }
-
-    @if (r.approval; as a) {
-      <h3>Approval</h3>
-      <span
-        class="badge"
-        [attr.data-status]="
-          a.status === 'approved' ? 'completed' : a.status === 'pending' ? 'queued' : 'failed'
-        "
-      >
-        {{ a.status }}
-      </span>
-    }
-
-    @if (r.execution; as x) {
-      <h3>Execution</h3>
-      <p>
-        <span class="badge" [attr.data-status]="x.status === 'executed' ? 'completed' : 'failed'">{{
-          x.status
-        }}</span>
-        {{ x.detail }}
-        @if (x.verified) {
-          <span class="badge" data-status="completed">verified in ledger</span>
-        }
-      </p>
-    }
-
-    @if (r.ticket; as t) {
-      <h3>Ticket</h3>
-      <p>
-        <span class="badge" [attr.data-urgency]="t.priority">{{ t.code }} · {{ t.priority }}</span>
-        <a routerLink="/tickets">open the ticket queue</a>
-      </p>
-      <ul class="reasons">
-        @for (reason of t.reasons; track reason) {
-          <li>{{ reason }}</li>
-        }
-      </ul>
-    }
-
-    @if (r.reply) {
-      <h3>Draft reply to the customer</h3>
-      <blockquote class="reply">{{ r.reply }}</blockquote>
-    }
+      @if (r.reply) {
+        <li>
+          <span class="node" data-tone="brand"><app-icon name="message" [size]="14" /></span>
+          <div class="body">
+            <strong>Replied to the customer</strong>
+            <p class="quote">{{ r.reply }}</p>
+          </div>
+        </li>
+      }
+    </ol>
   `,
 })
 export class DecisionTrail {
@@ -132,14 +234,9 @@ export class DecisionTrail {
   protected readonly duplicates = computed(
     () => new Set((this.result().evidence?.duplicate_pairs ?? []).flat()),
   );
-  protected readonly actionLabel: Record<string, string> = {
-    refund_transaction: 'Refund',
-    escalate_to_human: 'Escalate to a human',
-    no_action: 'No action (reply only)',
-  };
-  protected readonly outcomeLabel: Record<string, string> = {
-    allow: 'allowed automatically',
-    require_approval: 'needs approval',
-    block: 'not automated',
+  protected readonly transfer: Record<string, string> = {
+    credited: 'delivered',
+    pending: 'in transit',
+    failed: 'failed',
   };
 }

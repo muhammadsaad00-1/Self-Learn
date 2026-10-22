@@ -4,79 +4,123 @@ import { Component, inject } from '@angular/core';
 
 import type { Insights } from '../api/types';
 import { Auth } from '../core/auth';
+import { HumanPipe } from '../core/format';
+import { Icon } from '../layout/icon';
 
 /** Impact at a glance: what the agents resolved alone, money returned, speed, AI cost. */
 @Component({
   selector: 'app-insights-page',
-  imports: [DecimalPipe, KeyValuePipe, PercentPipe],
+  imports: [DecimalPipe, KeyValuePipe, PercentPipe, Icon, HumanPipe],
   template: `
-    <h1>Insights</h1>
-    @if (insights.value(); as i) {
-      <p class="muted">Last {{ i.days }} days · {{ i.requests }} customer requests</p>
-      <div class="tiles">
-        <div class="card tile hero">
-          <span class="big">{{ i.ai_resolution_rate | percent: '1.0-0' }}</span>
-          <span>resolved by AI end to end</span>
-          <small class="muted"
-            >{{ i.resolved_by_ai }} of {{ i.completed }} completed, no human needed</small
-          >
+    <div class="page">
+      <header class="page-header">
+        <div>
+          <h1>Overview</h1>
+          <p class="subtitle">
+            What the agents handled in the last {{ insights.value()?.days ?? 30 }} days, and where
+            your team stepped in.
+          </p>
         </div>
-        <div class="card tile">
-          <span class="big">PKR {{ +i.money_returned | number: '1.0-0' }}</span>
-          <span>returned to customers</span>
-          <small class="muted">refunds and failed-transfer reversals, ledger-verified</small>
-        </div>
-        <div class="card tile">
-          <span class="big">{{ seconds(i.median_seconds_to_resolve) }}</span>
-          <span>median time to resolve</span>
-          <small class="muted">a branch visit or call centre: days</small>
-        </div>
-        <div class="card tile">
-          <span class="big">{{ i.cards_frozen }}</span>
-          <span>cards frozen on fraud</span>
-          <small class="muted">within seconds of the report</small>
-        </div>
-        <div class="card tile">
-          <span class="big">{{ i.waiting_approval }} · {{ i.open_tickets }}</span>
-          <span>awaiting approval · open cases</span>
-          <small class="muted">where humans stay in control</small>
-        </div>
-        <div class="card tile">
-          <span class="big">\${{ +i.ai_cost_per_request_usd | number: '1.4-4' }}</span>
-          <span>AI cost per request</span>
-          <small class="muted"
-            >\${{ +i.ai_cost_usd | number: '1.2-4' }} in total, every model call metered</small
-          >
-        </div>
-      </div>
+      </header>
 
-      <div class="split">
-        <section class="card section">
-          <h3>What customers ask about</h3>
-          @for (c of i.by_category | keyvalue: byCount; track c.key) {
-            <div class="bar-row">
-              <span>{{ c.key.replaceAll('_', ' ') }}</span>
-              <span class="bar"><i [style.width.%]="(100 * c.value) / i.requests"></i></span>
-              <small>{{ c.value }}</small>
+      @if (insights.value(); as i) {
+        @if (i.requests === 0) {
+          <div class="card empty">
+            <span class="empty-icon"><app-icon name="sparkles" [size]="20" /></span>
+            <strong>No customer requests yet</strong>
+            <span>Load demo customers on Requests, then open the customer app from the Inbox.</span>
+          </div>
+        } @else {
+          <div class="tiles">
+            <div class="card tile hero">
+              <span class="tile-head"
+                ><span class="tile-icon"><app-icon name="bot" /></span> Resolved by AI</span
+              >
+              <span class="big">{{ i.ai_resolution_rate | percent: '1.0-0' }}</span>
+              <small class="muted"
+                >{{ i.resolved_by_ai }} of {{ i.completed }} completed with no human</small
+              >
             </div>
-          } @empty {
-            <p class="muted">No requests yet.</p>
-          }
-        </section>
-        <section class="card section">
-          <h3>Channels</h3>
-          @for (c of i.by_channel | keyvalue: byCount; track c.key) {
-            <div class="bar-row">
-              <span>{{ c.key }}</span>
-              <span class="bar"><i [style.width.%]="(100 * c.value) / i.requests"></i></span>
-              <small>{{ c.value }}</small>
+            <div class="card tile">
+              <span class="tile-head"
+                ><span class="tile-icon"><app-icon name="money" /></span> Returned to
+                customers</span
+              >
+              <span class="big">PKR {{ +i.money_returned | number: '1.0-0' }}</span>
+              <small class="muted">Refunds and failed-transfer reversals, ledger-verified</small>
+            </div>
+            <div class="card tile">
+              <span class="tile-head"
+                ><span class="tile-icon"><app-icon name="clock" /></span> Median time to
+                resolve</span
+              >
+              <span class="big">{{ seconds(i.median_seconds_to_resolve) }}</span>
+              <small class="muted">For requests the AI resolved alone</small>
+            </div>
+            <div class="card tile">
+              <span class="tile-head"
+                ><span class="tile-icon"><app-icon name="lock" /></span> Cards frozen on fraud</span
+              >
+              <span class="big">{{ i.cards_frozen }}</span>
+              <small class="muted">Within seconds of the report</small>
+            </div>
+            <div class="card tile">
+              <span class="tile-head"
+                ><span class="tile-icon"><app-icon name="hand" /></span> Waiting for your team</span
+              >
+              <span class="big">{{ i.open_tickets + i.waiting_approval }}</span>
+              <small class="muted"
+                >{{ i.open_tickets }} open tickets · {{ i.waiting_approval }} approvals</small
+              >
+            </div>
+            <div class="card tile">
+              <span class="tile-head"
+                ><span class="tile-icon"><app-icon name="sparkles" /></span> AI cost per
+                request</span
+              >
+              <span class="big">\${{ +i.ai_cost_per_request_usd | number: '1.4-4' }}</span>
+              <small class="muted"
+                >\${{ +i.ai_cost_usd | number: '1.2-4' }} in total · every model call metered</small
+              >
+            </div>
+          </div>
+
+          <div class="split reverse">
+            <section class="card pad">
+              <h2 style="margin-bottom: 12px">What customers ask about</h2>
+              @for (c of i.by_category | keyvalue: byCount; track c.key) {
+                <div class="bar-row">
+                  <span>{{ c.key | human }}</span>
+                  <span class="bar"><i [style.width.%]="(100 * c.value) / i.requests"></i></span>
+                  <small class="muted">{{ c.value }}</small>
+                </div>
+              }
+            </section>
+            <section class="card pad">
+              <h2 style="margin-bottom: 12px">Channels</h2>
+              @for (c of i.by_channel | keyvalue: byCount; track c.key) {
+                <div class="bar-row">
+                  <span>{{ c.key === 'chat' ? 'Customer app' : (c.key | human) }}</span>
+                  <span class="bar"><i [style.width.%]="(100 * c.value) / i.requests"></i></span>
+                  <small class="muted">{{ c.value }}</small>
+                </div>
+              }
+            </section>
+          </div>
+        }
+      } @else if (insights.error()) {
+        <div class="callout" data-tone="danger" role="alert">Couldn't load the overview.</div>
+      } @else {
+        <div class="tiles">
+          @for (n of [1, 2, 3, 4, 5, 6]; track n) {
+            <div class="card tile">
+              <div class="skeleton" style="width: 50%"></div>
+              <div class="skeleton" style="height: 28px; width: 70%"></div>
             </div>
           }
-        </section>
-      </div>
-    } @else if (insights.error()) {
-      <p class="error" role="alert">Couldn't load insights.</p>
-    }
+        </div>
+      }
+    </div>
   `,
 })
 export class InsightsPage {

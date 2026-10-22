@@ -13,6 +13,8 @@ const TICKET: Ticket = {
   workflow_id: 'wf-1',
   title: 'unauthorized_transaction: Customer reports stolen funds',
   description: 'Why a human is needed:\n- Suspected fraud',
+  reasons: ['Suspected fraud: investigate and contact the customer'],
+  customer_message: 'Someone stole my money',
   priority: 'critical',
   category: 'unauthorized_transaction',
   customer_ref: 'CUST-1003',

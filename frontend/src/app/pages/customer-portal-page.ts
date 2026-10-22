@@ -8,6 +8,7 @@ import { firstValueFrom } from 'rxjs';
 import type { Chat, Conversation, CustomerMe, LedgerTransaction } from '../api/types';
 import { CustomerSession } from '../core/customer-session';
 import { errorMessage } from '../core/errors';
+import { Icon } from '../layout/icon';
 import { CustomerChat } from '../layout/customer-chat';
 
 type Tab = 'help' | 'issues' | 'activity';
@@ -35,135 +36,140 @@ const ISSUE_STATUS: Record<Conversation['status'], { label: string; badge: strin
  */
 @Component({
   selector: 'app-customer-portal-page',
-  imports: [DatePipe, DecimalPipe, FormsModule, CustomerChat],
+  imports: [DatePipe, DecimalPipe, FormsModule, CustomerChat, Icon],
   template: `
-    <div class="phone">
-      <header class="phone-head">
-        @if (tab() === 'issues' && openIssue()) {
-          <button
-            type="button"
-            class="link on-accent"
-            aria-label="Back to issues"
-            (click)="openIssue.set(null)"
-          >
-            ←
-          </button>
-        }
-        <div class="avatar">AF</div>
-        <div>
-          <strong>{{ title() }}</strong>
-          <small>
-            {{ me.value()?.customer_name ?? 'AgentFlow Bank' }} ·
-            @if (me.value()?.card_status === 'frozen') {
-              🔒 card frozen
-            } @else {
-              card active
-            }
-          </small>
-        </div>
-        <span class="spacer"></span>
-        <button type="button" class="link on-accent" (click)="logout()">Sign out</button>
-      </header>
-
-      @if (!session.loggedIn()) {
-        <p class="hello">Your session ended. Please sign in again.</p>
-      } @else {
-        @switch (tab()) {
-          @case ('help') {
-            @if (helpId(); as id) {
-              <app-customer-chat
-                [conversationId]="id"
-                (answered)="refresh()"
-                (openIssue)="showIssue($event)"
-              />
-            }
+    <div class="phone-stage">
+      <div class="phone">
+        <header class="phone-head">
+          @if (tab() === 'issues' && openIssue()) {
+            <button
+              type="button"
+              class="link on-accent"
+              aria-label="Back to issues"
+              (click)="openIssue.set(null)"
+            >
+              <app-icon name="chevron-left" [size]="20" />
+            </button>
           }
-          @case ('issues') {
-            @if (openIssue(); as id) {
-              <app-customer-chat [conversationId]="id" (answered)="refresh()" />
-            } @else {
-              <form class="report" (submit)="$event.preventDefault(); report()">
-                <textarea
-                  [(ngModel)]="problem"
-                  name="problem"
-                  rows="2"
-                  maxlength="2000"
-                  placeholder="Something wrong? Describe it, e.g. 'my transfer didn't arrive'"
-                ></textarea>
-                <button type="submit" [disabled]="busy() || !problem.trim()">
-                  Report a problem
-                </button>
-                @if (error()) {
-                  <small class="error" role="alert">{{ error() }}</small>
-                }
-              </form>
+          <div class="avatar"><app-icon name="zap" [size]="16" /></div>
+          <div>
+            <strong>{{ title() }}</strong>
+            <small>
+              {{ me.value()?.customer_name ?? 'AgentFlow Bank' }} ·
+              @if (me.value()?.card_status === 'frozen') {
+                🔒 card frozen
+              } @else {
+                card active
+              }
+            </small>
+          </div>
+          <span class="spacer"></span>
+          <button type="button" class="link on-accent" (click)="logout()" aria-label="Sign out">
+            <app-icon name="logout" [size]="18" />
+          </button>
+        </header>
+
+        @if (!session.loggedIn()) {
+          <p class="hello">Your session ended. Please sign in again.</p>
+        } @else {
+          @switch (tab()) {
+            @case ('help') {
+              @if (helpId(); as id) {
+                <app-customer-chat
+                  [conversationId]="id"
+                  (answered)="refresh()"
+                  (openIssue)="showIssue($event)"
+                />
+              }
+            }
+            @case ('issues') {
+              @if (openIssue(); as id) {
+                <app-customer-chat [conversationId]="id" (answered)="refresh()" />
+              } @else {
+                <form class="report" (submit)="$event.preventDefault(); report()">
+                  <textarea
+                    [(ngModel)]="problem"
+                    name="problem"
+                    rows="2"
+                    maxlength="2000"
+                    placeholder="Something wrong? Describe it, e.g. 'my transfer didn't arrive'"
+                  ></textarea>
+                  <button type="submit" [disabled]="busy() || !problem.trim()">
+                    Report a problem
+                  </button>
+                  @if (error()) {
+                    <small class="error" role="alert">{{ error() }}</small>
+                  }
+                </form>
+                <ul class="activity">
+                  @for (i of issues(); track i.id) {
+                    <li>
+                      <button type="button" class="issue-row" (click)="showIssue(i.id)">
+                        <span>
+                          <strong>{{ i.subject ?? i.last_message?.body ?? 'New issue' }}</strong>
+                          <small class="muted">
+                            {{ i.created_at | date: 'MMM d, h:mm a' }}
+                            @if (i.case_code) {
+                              · case {{ i.case_code }}
+                            }
+                          </small>
+                        </span>
+                        <span class="badge" [attr.data-status]="issueStatus[i.status].badge">
+                          {{ issueStatus[i.status].label }}
+                        </span>
+                      </button>
+                    </li>
+                  } @empty {
+                    <li class="muted">
+                      No issues. If something's wrong, report it above or just text us.
+                    </li>
+                  }
+                </ul>
+              }
+            }
+            @case ('activity') {
               <ul class="activity">
-                @for (i of issues(); track i.id) {
+                @for (t of transactions.value() ?? []; track t.id) {
                   <li>
-                    <button type="button" class="issue-row" (click)="showIssue(i.id)">
-                      <span>
-                        <strong>{{ i.subject ?? i.last_message?.body ?? 'New issue' }}</strong>
-                        <small class="muted">
-                          {{ i.created_at | date: 'MMM d, h:mm a' }}
-                          @if (i.case_code) {
-                            · case {{ i.case_code }}
-                          }
-                        </small>
-                      </span>
-                      <span class="badge" [attr.data-status]="issueStatus[i.status].badge">
-                        {{ issueStatus[i.status].label }}
-                      </span>
-                    </button>
+                    <span>
+                      <strong>{{ t.merchant }}</strong>
+                      <small class="muted">
+                        {{ t.occurred_at | date: 'MMM d, h:mm a' }} · {{ t.reference }}
+                        @if (t.transfer_status) {
+                          ·
+                          <span class="badge" [attr.data-transfer]="t.transfer_status">
+                            {{ transferLabel[t.transfer_status] }}
+                          </span>
+                        }
+                        @if (t.status === 'reversed') {
+                          · <span class="badge">reversed</span>
+                        }
+                      </small>
+                    </span>
+                    <span class="amount" [class.in]="t.kind === 'credit'">
+                      {{ t.kind === 'credit' ? '+' : '−' }}{{ +t.amount | number: '1.0-0' }}
+                    </span>
                   </li>
                 } @empty {
-                  <li class="muted">
-                    No issues. If something's wrong, report it above or just text us.
-                  </li>
+                  <li class="muted">No activity in the last 30 days.</li>
                 }
               </ul>
             }
           }
-          @case ('activity') {
-            <ul class="activity">
-              @for (t of transactions.value() ?? []; track t.id) {
-                <li>
-                  <span>
-                    <strong>{{ t.merchant }}</strong>
-                    <small class="muted">
-                      {{ t.occurred_at | date: 'MMM d, h:mm a' }} · {{ t.reference }}
-                      @if (t.transfer_status) {
-                        ·
-                        <span class="badge" [attr.data-transfer]="t.transfer_status">
-                          {{ transferLabel[t.transfer_status] }}
-                        </span>
-                      }
-                      @if (t.status === 'reversed') {
-                        · <span class="badge">reversed</span>
-                      }
-                    </small>
-                  </span>
-                  <span class="amount" [class.in]="t.kind === 'credit'">
-                    {{ t.kind === 'credit' ? '+' : '−' }}{{ +t.amount | number: '1.0-0' }}
-                  </span>
-                </li>
-              } @empty {
-                <li class="muted">No activity in the last 30 days.</li>
-              }
-            </ul>
-          }
         }
-      }
 
-      <nav class="tabbar">
-        @for (t of tabs; track t.id) {
-          <button type="button" [class.active]="tab() === t.id" (click)="selectTab(t.id)">
-            {{ t.label }}
-            @if (t.id === 'issues' && activeIssues()) {
-              <span class="count">{{ activeIssues() }}</span>
-            }
-          </button>
-        }
-      </nav>
+        <nav class="tabbar">
+          @for (t of tabs; track t.id) {
+            <button type="button" [class.active]="tab() === t.id" (click)="selectTab(t.id)">
+              <app-icon [name]="t.icon" [size]="20" />
+              {{ t.label }}
+              @if (t.id === 'issues' && activeIssues()) {
+                <span class="count">{{ activeIssues() }}</span>
+              }
+            </button>
+          }
+        </nav>
+      </div>
     </div>
   `,
 })
@@ -172,10 +178,10 @@ export class CustomerPortalPage implements OnInit {
   private readonly router = inject(Router);
   private readonly http = inject(HttpClient);
 
-  protected readonly tabs: { id: Tab; label: string }[] = [
-    { id: 'help', label: '💬 Help' },
-    { id: 'issues', label: '🧾 Issues' },
-    { id: 'activity', label: '📊 Activity' },
+  protected readonly tabs: { id: Tab; label: string; icon: string }[] = [
+    { id: 'help', label: 'Help', icon: 'message' },
+    { id: 'issues', label: 'Issues', icon: 'ticket' },
+    { id: 'activity', label: 'Activity', icon: 'activity' },
   ];
   protected readonly tab = signal<Tab>('help');
   protected readonly openIssue = signal<string | null>(null);

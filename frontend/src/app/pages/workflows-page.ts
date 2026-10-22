@@ -1,159 +1,209 @@
-import { DatePipe, DecimalPipe } from '@angular/common';
 import { HttpClient, httpResource } from '@angular/common/http';
-import { Component, effect, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 
 import type { LedgerAccount, Workflow, WorkflowStatus, WorkflowSummary } from '../api/types';
 import { Auth } from '../core/auth';
 import { errorMessage } from '../core/errors';
+import { FORMAT } from '../core/format';
 import { DecisionTrail } from '../layout/decision-trail';
-import { KnowledgeAnswerView } from '../layout/knowledge-answer';
+import { Icon } from '../layout/icon';
 
 const PENDING: WorkflowStatus[] = ['queued', 'running'];
 const POLL_MS = 2000;
 
+/** Every customer request (from the customer app, email or entered by staff) and what the
+ *  agents did with it, as a queue with a detail timeline. */
 @Component({
   selector: 'app-workflows-page',
-  imports: [FormsModule, DatePipe, DecimalPipe, KnowledgeAnswerView, DecisionTrail],
+  imports: [FormsModule, DecisionTrail, Icon, ...FORMAT],
   template: `
-    <h1>Workflows</h1>
-    <p class="muted">Paste a customer request. The triage agent classifies it in the background.</p>
+    <div class="page wide">
+      <header class="page-header">
+        <div>
+          <h1>Requests</h1>
+          <p class="subtitle">Every customer request, and exactly what the agents did with it.</p>
+        </div>
+        <div class="actions">
+          @if (auth.isAdmin() && accounts.value()?.length === 0) {
+            <button type="button" class="secondary" (click)="loadDemoData()">
+              <app-icon name="database" /> Load demo customers
+            </button>
+          }
+          <button type="button" (click)="composing.set(!composing())">
+            <app-icon [name]="composing() ? 'x' : 'plus'" />
+            {{ composing() ? 'Close' : 'New request' }}
+          </button>
+        </div>
+      </header>
 
-    <form class="card composer" (ngSubmit)="submit()">
-      <textarea
-        [(ngModel)]="message"
-        name="message"
-        rows="3"
-        maxlength="8000"
-        placeholder="e.g. I was charged PKR 5,000 twice for transfer TXN-88231 on 3 Oct."
-      ></textarea>
-      <div class="row">
-        <label class="muted">
-          Customer
-          <select [(ngModel)]="customerRef" name="customer">
-            <option value="">(unknown)</option>
-            @for (c of accounts.value() ?? []; track c.customer_ref) {
-              <option [value]="c.customer_ref">{{ c.customer_ref }} · {{ c.customer_name }}</option>
-            }
-          </select>
-        </label>
-        @if (auth.isAdmin() && !(accounts.value() ?? []).length) {
-          <button type="button" class="link" (click)="loadDemoData()">Load demo customers</button>
-        }
-        <span class="spacer"></span>
-        <button type="submit" [disabled]="!message.trim() || submitting()">Submit request</button>
-      </div>
-    </form>
-    @if (error()) {
-      <p class="error" role="alert">{{ error() }}</p>
-    }
+      @if (composing()) {
+        <form class="card pad stack" style="margin-bottom: 16px" (ngSubmit)="submit()">
+          <div>
+            <h2>Log a request</h2>
+            <p class="muted">
+              For requests that arrive by phone or email. The agents take it from here.
+            </p>
+          </div>
+          <textarea
+            [(ngModel)]="message"
+            name="message"
+            rows="3"
+            maxlength="8000"
+            placeholder="e.g. I was charged PKR 5,000 twice for my electricity bill yesterday."
+          ></textarea>
+          <div class="row">
+            <select [(ngModel)]="customerRef" name="customer" aria-label="Customer">
+              <option value="">Unknown customer</option>
+              @for (c of accounts.value() ?? []; track c.customer_ref) {
+                <option [value]="c.customer_ref">
+                  {{ c.customer_name }} · {{ c.customer_ref }}
+                </option>
+              }
+            </select>
+            <span class="spacer"></span>
+            <button type="submit" [disabled]="!message.trim() || submitting()">
+              <app-icon name="send" /> Submit request
+            </button>
+          </div>
+        </form>
+      }
+      @if (error()) {
+        <div class="callout" data-tone="danger" role="alert" style="margin-bottom: 16px">
+          {{ error() }}
+        </div>
+      }
 
-    <div class="split">
-      <table>
-        <thead>
-          <tr>
-            <th>Request</th>
-            <th>Status</th>
-            <th>Category</th>
-            <th>Urgency</th>
-            <th>Received</th>
-          </tr>
-        </thead>
-        <tbody>
+      <div class="split">
+        <section class="card queue">
           @for (w of list.value() ?? []; track w.id) {
-            <tr
-              class="clickable"
-              [class.selected]="w.id === selectedId()"
+            <button
+              type="button"
+              class="queue-item"
+              [class.selected]="w.id === activeId()"
               (click)="selectedId.set(w.id)"
             >
-              <td>{{ w.message_preview }}</td>
-              <td>
-                <span class="badge" [attr.data-status]="w.status">{{ w.status }}</span>
-              </td>
-              <td>{{ w.category ?? '—' }}</td>
-              <td>
-                @if (w.urgency) {
-                  <span class="badge" [attr.data-urgency]="w.urgency">{{ w.urgency }}</span>
-                }
-                @if (w.needs_human_review) {
-                  <span class="badge" title="Needs human review">review</span>
-                }
-              </td>
-              <td>{{ w.created_at | date: 'short' }}</td>
-            </tr>
-          } @empty {
-            <tr>
-              <td colspan="5" class="muted">No requests yet.</td>
-            </tr>
-          }
-        </tbody>
-      </table>
-
-      @if (detail.value(); as wf) {
-        <aside class="card detail">
-          <h2>Workflow</h2>
-          <p class="muted">"{{ wf.input['message'] }}"</p>
-
-          @if (wf.result?.triage; as t) {
-            <dl>
-              <dt>Category</dt>
-              <dd>{{ t.category }}</dd>
-              <dt>Urgency</dt>
-              <dd>
-                <span class="badge" [attr.data-urgency]="t.urgency">{{ t.urgency }}</span>
-                @if (t.needs_human_review) {
-                  <span class="badge">needs human review</span>
-                }
-              </dd>
-              <dt>Summary</dt>
-              <dd>{{ t.summary }}</dd>
-              <dt>Details</dt>
-              <dd>
-                {{ t.details.amount ?? '—' }} {{ t.details.currency ?? '' }} · ref
-                {{ t.details.transaction_reference ?? '—' }}
-              </dd>
-              <dt>Confidence</dt>
-              <dd>{{ t.confidence | number: '1.0-2' }}</dd>
-              <dt>Reasoning</dt>
-              <dd>{{ t.reasoning }}</dd>
-            </dl>
-          } @else if (wf.status === 'failed') {
-            <p class="error">Failed after {{ wf.attempts }} attempts: {{ wf.error }}</p>
-          } @else {
-            <p class="muted">{{ wf.status }}… (attempt {{ wf.attempts }})</p>
-          }
-
-          @if (wf.result; as r) {
-            <app-decision-trail [result]="r" />
-          }
-
-          @if (wf.result?.knowledge; as k) {
-            <h3>Policy answer</h3>
-            <app-knowledge-answer [answer]="k" />
-          }
-
-          <h3>Steps</h3>
-          <ol class="steps">
-            @for (s of wf.steps; track $index) {
-              <li>
-                <code>{{ s.node }}</code>
-                <span class="badge" [attr.data-status]="s.status">{{ s.status }}</span>
-                @if (s.model) {
-                  <small class="muted">
-                    {{ s.model }} · {{ s.input_tokens }}→{{ s.output_tokens }} tokens ·
-                    {{ s.latency_ms }} ms
+              <span class="prio" [attr.data-p]="w.urgency"></span>
+              <span class="stack-sm" style="gap: 4px; min-width: 0">
+                <span class="line">
+                  <span class="title truncate">{{ w.message_preview }}</span>
+                  <span class="time">{{ w.created_at | ago }}</span>
+                </span>
+                <span class="line">
+                  @if (w.status === 'completed') {
+                    @if (w.category) {
+                      <span class="badge">{{ w.category | human }}</span>
+                    }
+                  } @else {
+                    <span class="badge dot" [attr.data-status]="w.status">{{
+                      w.status | human
+                    }}</span>
+                  }
+                  <small class="muted truncate">
+                    {{ w.customer_ref ?? 'Unknown customer' }} ·
+                    {{ w.channel === 'chat' ? 'customer app' : w.channel }}
                   </small>
-                }
-                @if (s.error) {
-                  <small class="error">{{ s.error }}</small>
-                }
-              </li>
-            }
-          </ol>
-          <small class="muted">Request id: {{ wf.request_id }}</small>
-        </aside>
-      }
+                </span>
+              </span>
+            </button>
+          } @empty {
+            <div class="empty">
+              <span class="empty-icon"><app-icon name="inbox" [size]="20" /></span>
+              <strong>No requests yet</strong>
+              <span>They appear here as customers write in.</span>
+            </div>
+          }
+        </section>
+
+        <section class="card detail-sticky">
+          @if (detail.value(); as wf) {
+            <div class="card-head">
+              <div class="grow stack-sm">
+                <div class="row">
+                  <span class="badge dot" [attr.data-status]="wf.status">{{
+                    wf.status | human
+                  }}</span>
+                  <small class="muted">
+                    {{ wf.input['customer_ref'] ?? 'Unknown customer' }} ·
+                    {{ wf.input['channel'] === 'chat' ? 'customer app' : wf.input['channel'] }} ·
+                    {{ wf.created_at | ago }}
+                  </small>
+                </div>
+                <p class="quote" style="font-size: 15px">{{ wf.input['message'] }}</p>
+              </div>
+            </div>
+            <div class="card-body stack">
+              @if (wf.status === 'failed') {
+                <div class="callout" data-tone="danger">
+                  The agents gave up after {{ wf.attempts }} attempts: {{ wf.error }}
+                </div>
+              } @else if (!wf.result) {
+                <div class="stack-sm">
+                  <div class="skeleton" style="width: 60%"></div>
+                  <div class="skeleton" style="width: 80%"></div>
+                  <small class="muted">The agents are working on it…</small>
+                </div>
+              }
+              @if (wf.result; as r) {
+                <app-decision-trail [result]="r" />
+              }
+              <details>
+                <summary class="muted" style="cursor: pointer">
+                  Technical details · {{ wf.steps.length }} steps
+                </summary>
+                <div class="table-wrap" style="margin-top: 8px">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Step</th>
+                        <th>Model</th>
+                        <th>Tokens</th>
+                        <th>Time</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (s of wf.steps; track $index) {
+                        <tr>
+                          <td>
+                            <code>{{ s.node }}</code>
+                            @if (s.status === 'failed') {
+                              <span class="badge" data-tone="danger">failed</span>
+                              <div>
+                                <small class="error">{{ s.error }}</small>
+                              </div>
+                            }
+                          </td>
+                          <td>
+                            <small class="muted">{{ s.model ?? '—' }}</small>
+                          </td>
+                          <td>
+                            <small class="muted">{{
+                              s.model ? s.input_tokens + ' → ' + s.output_tokens : '—'
+                            }}</small>
+                          </td>
+                          <td>
+                            <small class="muted">{{
+                              s.latency_ms !== null ? s.latency_ms + ' ms' : '—'
+                            }}</small>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+                <small class="faint">Request id {{ wf.request_id }}</small>
+              </details>
+            </div>
+          } @else {
+            <div class="empty">
+              <span class="empty-icon"><app-icon name="activity" [size]="20" /></span>
+              <strong>Select a request</strong>
+              <span>See what was understood, checked, decided and done.</span>
+            </div>
+          }
+        </section>
+      </div>
     </div>
   `,
 })
@@ -166,6 +216,10 @@ export class WorkflowsPage {
   protected readonly submitting = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly selectedId = signal<string | null>(null);
+  protected readonly composing = signal(false);
+  /** The chosen request, else the newest: the page never opens on an empty panel. A computed
+   *  (compared by value), so list refreshes don't refetch the same detail. */
+  protected readonly activeId = computed(() => this.selectedId() ?? this.list.value()?.[0]?.id);
 
   // A key per *logical* request: if the POST fails mid-flight and the user clicks again, the
   // same key is sent and the server returns the original workflow instead of a duplicate.
@@ -191,7 +245,7 @@ export class WorkflowsPage {
   }
 
   protected readonly detail = httpResource<Workflow>(() => {
-    const id = this.selectedId();
+    const id = this.activeId();
     const orgId = this.auth.orgId();
     return id && orgId ? { url: `/v1/workflows/${id}`, headers: { 'X-Org-Id': orgId } } : undefined;
   });
@@ -209,7 +263,7 @@ export class WorkflowsPage {
       if (!pending) return;
       const timer = setTimeout(() => {
         this.list.reload();
-        if (this.selectedId()) this.detail.reload();
+        if (this.activeId()) this.detail.reload();
       }, POLL_MS);
       onCleanup(() => clearTimeout(timer));
     });
@@ -232,6 +286,7 @@ export class WorkflowsPage {
         ),
       );
       this.message = '';
+      this.composing.set(false);
       this.idempotencyKey = crypto.randomUUID(); // next request is a new logical request
       this.selectedId.set(wf.id);
       this.list.reload();

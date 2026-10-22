@@ -32,6 +32,8 @@ class TicketOut(BaseModel):
     workflow_id: uuid.UUID | None
     title: str
     description: str
+    reasons: list[str]
+    customer_message: str | None
     priority: TicketPriority
     category: str | None
     customer_ref: str | None

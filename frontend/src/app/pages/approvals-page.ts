@@ -1,81 +1,111 @@
-import { DatePipe } from '@angular/common';
+import { DecimalPipe } from '@angular/common';
 import { HttpClient, httpResource } from '@angular/common/http';
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 
 import type { Approval } from '../api/types';
 import { Auth } from '../core/auth';
 import { errorMessage } from '../core/errors';
+import { FORMAT } from '../core/format';
+import { Icon } from '../layout/icon';
 
 /** Maker-checker inbox: actions the policy engine won't run without a second officer. */
 @Component({
   selector: 'app-approvals-page',
-  imports: [DatePipe, FormsModule, RouterLink],
+  imports: [DecimalPipe, FormsModule, Icon, ...FORMAT],
   template: `
-    <h1>Approvals</h1>
-    <p class="muted">
-      Actions above the automatic limits. Maker-checker: you can't approve a request you submitted
-      yourself.
-    </p>
-    <div class="row">
-      <label
-        ><input type="checkbox" [(ngModel)]="showAll" (change)="reload()" /> show decided</label
-      >
-    </div>
-    @if (error()) {
-      <p class="error" role="alert">{{ error() }}</p>
-    }
-
-    @for (a of approvals.value() ?? []; track a.id) {
-      <section class="card section approval">
-        <div class="answer-head">
-          <span class="badge" [attr.data-status]="badge(a.status)">{{ a.status }}</span>
-          @if (a.urgency) {
-            <span class="badge" [attr.data-urgency]="a.urgency">{{ a.urgency }}</span>
-          }
-          <small class="muted">
-            {{ a.customer_ref }} · {{ a.category }} · requested {{ a.requested_at | date: 'short' }}
-            @if (a.status === 'pending') {
-              · expires {{ a.expires_at | date: 'short' }}
-            }
-          </small>
+    <div class="page">
+      <header class="page-header">
+        <div>
+          <h1>Approvals</h1>
+          <p class="subtitle">
+            Maker-checker: refunds above the automatic limit need a second officer. You can't
+            approve a request you submitted yourself.
+          </p>
         </div>
-        <p>"{{ a.message_preview }}"</p>
-        <p>
-          <strong>Refund {{ a.action['amount'] }}</strong> for
-          <code>{{ a.action['transaction_reference'] }}</code>
-          <br /><small class="muted">{{ a.action['rationale'] }}</small>
-        </p>
-        <ul class="reasons">
-          @for (r of a.policy_reasons; track r) {
-            <li>{{ r }}</li>
-          }
-        </ul>
-        @if (a.status === 'pending') {
-          <div class="row">
-            <input
-              [(ngModel)]="notes[a.id]"
-              [name]="'note-' + a.id"
-              placeholder="Note (optional)"
-              maxlength="500"
-            />
-            <button (click)="decide(a, true)" [disabled]="busy()">Approve</button>
-            <button class="danger-button" (click)="decide(a, false)" [disabled]="busy()">
-              Reject
+        <div class="actions">
+          <div class="segmented">
+            <button type="button" [class.active]="!showAll" (click)="showAll = false; reload()">
+              Pending
+            </button>
+            <button type="button" [class.active]="showAll" (click)="showAll = true; reload()">
+              All
             </button>
           </div>
-        } @else if (a.note) {
-          <p class="muted">
-            <small>Note: {{ a.note }}</small>
-          </p>
+        </div>
+      </header>
+      @if (error()) {
+        <div class="callout" data-tone="danger" role="alert" style="margin-bottom: 12px">
+          {{ error() }}
+        </div>
+      }
+
+      <div class="stack">
+        @for (a of approvals.value() ?? []; track a.id) {
+          <section class="card">
+            <div class="card-head">
+              <span class="avatar lg square"><app-icon name="money" [size]="18" /></span>
+              <div class="grow stack-sm" style="gap: 2px">
+                <h2>Refund PKR {{ amountOf(a) | number: '1.0-0' }}</h2>
+                <small class="muted">
+                  {{ a.customer_ref }} · {{ a.category | human }} · requested
+                  {{ a.requested_at | ago }}
+                  @if (a.status === 'pending') {
+                    · expires {{ a.expires_at | ago }}
+                  }
+                </small>
+              </div>
+              <span class="badge dot" [attr.data-tone]="a.status | tone">{{
+                a.status | human
+              }}</span>
+            </div>
+            <div class="card-body stack">
+              <p class="quote">{{ a.message_preview }}</p>
+              <div class="stack-sm">
+                <h3 class="section-title">Why it needs you</h3>
+                <ul class="reasons">
+                  @for (r of a.policy_reasons; track r) {
+                    <li>{{ r }}</li>
+                  }
+                </ul>
+              </div>
+              <div class="stack-sm">
+                <h3 class="section-title">What the agents found</h3>
+                <span class="muted">{{ a.action['rationale'] }}</span>
+                <small class="faint"
+                  >Transaction
+                  <span class="mono">{{ a.action['transaction_reference'] }}</span></small
+                >
+              </div>
+              @if (a.status === 'pending') {
+                <div class="row" style="border-top: 1px solid var(--border); padding-top: 14px">
+                  <input
+                    class="grow"
+                    [(ngModel)]="notes[a.id]"
+                    [name]="'note-' + a.id"
+                    placeholder="Note (optional)"
+                    maxlength="500"
+                  />
+                  <button class="danger" (click)="decide(a, false)" [disabled]="busy()">
+                    Reject
+                  </button>
+                  <button (click)="decide(a, true)" [disabled]="busy()">Approve</button>
+                </div>
+              } @else if (a.note) {
+                <small class="muted">Note: {{ a.note }}</small>
+              }
+            </div>
+          </section>
+        } @empty {
+          <div class="card empty">
+            <span class="empty-icon"><app-icon name="check-circle" [size]="20" /></span>
+            <strong>Nothing waiting for approval</strong>
+            <span>Refunds within the automatic limit run without one.</span>
+          </div>
         }
-        <small><a routerLink="/workflows">Open workflows</a></small>
-      </section>
-    } @empty {
-      <p class="muted">Nothing waiting for approval.</p>
-    }
+      </div>
+    </div>
   `,
 })
 export class ApprovalsPage {
@@ -95,6 +125,10 @@ export class ApprovalsPage {
     const params: Record<string, string> = this.pendingOnly() ? { status: 'pending' } : {};
     return { url: '/v1/approvals', params, headers: { 'X-Org-Id': orgId } };
   });
+
+  protected amountOf(a: Approval): number {
+    return Number(a.action['amount']);
+  }
 
   protected reload(): void {
     this.pendingOnly.set(!this.showAll);

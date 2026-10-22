@@ -3121,6 +3121,18 @@
             "minLength": 1,
             "title": "Message"
           },
+          "context": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 6000
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context"
+          },
           "channel": {
             "type": "string",
             "enum": [
@@ -4304,6 +4316,24 @@
             "type": "string",
             "title": "Description"
           },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          },
+          "customer_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Message"
+          },
           "priority": {
             "$ref": "#/components/schemas/TicketPriority"
           },
@@ -4388,6 +4418,8 @@
           "workflow_id",
           "title",
           "description",
+          "reasons",
+          "customer_message",
           "priority",
           "category",
           "customer_ref",
@@ -4626,6 +4658,12 @@
             "type": "string",
             "title": "Summary",
             "description": "One neutral sentence for an operations agent"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "3-7 word title of the request in English, as the customer would name it, e.g. 'Transfer to Ali not received'",
+            "default": ""
           },
           "details": {
             "$ref": "#/components/schemas/Details"
@@ -5071,6 +5109,21 @@
             "type": "string",
             "title": "Message Preview"
           },
+          "customer_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Ref"
+          },
+          "channel": {
+            "type": "string",
+            "title": "Channel"
+          },
           "category": {
             "anyOf": [
               {
@@ -5113,6 +5166,8 @@
           "id",
           "status",
           "message_preview",
+          "customer_ref",
+          "channel",
           "category",
           "urgency",
           "needs_human_review",

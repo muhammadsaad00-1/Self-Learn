@@ -4,73 +4,100 @@ import { Router } from '@angular/router';
 
 import { Auth } from '../core/auth';
 import { errorMessage } from '../core/errors';
-import { initialsOf } from '../layout/profile-menu';
+import { initialsOf } from '../core/format';
+import { Icon } from '../layout/icon';
 
 @Component({
   selector: 'app-profile-page',
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, Icon],
   template: `
-    <h1>Profile</h1>
-
-    <!-- Compact account strip with "Add company" directly below it. -->
-    <section class="card section account">
-      <div class="account-row">
-        <span class="avatar large">{{ initials() }}</span>
-        <div class="grow">
-          <strong>{{ auth.me()?.user?.full_name }}</strong>
-          <div class="muted">{{ auth.me()?.user?.email }}</div>
+    <div class="page" style="max-width: 760px">
+      <header class="page-header">
+        <div>
+          <h1>Profile</h1>
+          <p class="subtitle">One login for all your companies.</p>
         </div>
-        <small class="muted">One login for all your companies</small>
-      </div>
+      </header>
 
-      <form id="add-company" class="add-company" [formGroup]="form" (ngSubmit)="add()">
-        <strong>Add company</strong>
-        <input
-          formControlName="orgName"
-          placeholder="Company name"
-          maxlength="200"
-          aria-label="Company name"
-        />
-        <input
-          formControlName="password"
-          type="password"
-          autocomplete="current-password"
-          placeholder="Confirm your password"
-          aria-label="Confirm your password"
-        />
-        <button type="submit" [disabled]="form.invalid || busy()">
-          {{ busy() ? 'Creating…' : 'Create company' }}
-        </button>
-      </form>
-      @if (error()) {
-        <p class="error" role="alert">{{ error() }}</p>
-      }
-      <small class="muted">
-        A new, empty company that you own. Name, email and password stay the same; nothing is copied
-        from your other companies.
-      </small>
-    </section>
+      <section class="card" style="margin-bottom: 16px">
+        <div class="card-head">
+          <span class="avatar lg">{{ initials() }}</span>
+          <div class="grow">
+            <strong>{{ auth.me()?.user?.full_name }}</strong>
+            <div class="muted">{{ auth.me()?.user?.email }}</div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <tbody>
+              @for (m of auth.me()?.memberships; track m.org_id) {
+                <tr>
+                  <td>
+                    <div class="row" style="flex-wrap: nowrap">
+                      <span class="avatar square">{{ initialsOf(m.org_name) }}</span>
+                      <div>
+                        <strong>{{ m.org_name }}</strong>
+                        <div>
+                          <small class="muted">{{ m.role }}</small>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td style="text-align: right">
+                    @if (m.org_id === auth.orgId()) {
+                      <span class="badge" data-tone="brand">Current</span>
+                    } @else {
+                      <button
+                        type="button"
+                        class="secondary sm"
+                        (click)="auth.switchCompany(m.org_id)"
+                      >
+                        Switch
+                      </button>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
 
-    <section class="card section">
-      <h2>Your companies</h2>
-      <ul class="company-list">
-        @for (m of auth.me()?.memberships; track m.org_id) {
-          <li>
-            <span class="avatar org">{{ initialsOf(m.org_name) }}</span>
-            <span class="grow">
-              <strong>{{ m.org_name }}</strong> <small class="muted">{{ m.role }}</small>
-            </span>
-            @if (m.org_id === auth.orgId()) {
-              <span class="badge">current</span>
-            } @else {
-              <button type="button" class="link" (click)="auth.switchCompany(m.org_id)">
-                Switch
-              </button>
-            }
-          </li>
-        }
-      </ul>
-    </section>
+      <section class="card pad">
+        <form id="add-company" class="stack" [formGroup]="form" (ngSubmit)="add()">
+          <div>
+            <h2>Add a company</h2>
+            <p class="muted">
+              A new, empty company that you own. Your login stays the same; nothing is copied from
+              your other companies.
+            </p>
+          </div>
+          <div class="row">
+            <input
+              class="grow"
+              formControlName="orgName"
+              placeholder="Company name"
+              maxlength="200"
+              aria-label="Company name"
+            />
+            <input
+              class="grow"
+              formControlName="password"
+              type="password"
+              autocomplete="current-password"
+              placeholder="Confirm your password"
+              aria-label="Confirm your password"
+            />
+            <button type="submit" [disabled]="form.invalid || busy()">
+              <app-icon name="plus" /> {{ busy() ? 'Creating…' : 'Create company' }}
+            </button>
+          </div>
+          @if (error()) {
+            <div class="callout" data-tone="danger" role="alert">{{ error() }}</div>
+          }
+        </form>
+      </section>
+    </div>
   `,
 })
 export class ProfilePage {

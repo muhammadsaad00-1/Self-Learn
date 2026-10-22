@@ -7,74 +7,132 @@ import { firstValueFrom } from 'rxjs';
 import type { Member, Role } from '../api/types';
 import { Auth } from '../core/auth';
 import { errorMessage } from '../core/errors';
+import { FORMAT } from '../core/format';
+import { Icon } from '../layout/icon';
 
 const ALL_ROLES: Role[] = ['member', 'admin', 'owner'];
 
+/** The team: who works in this company, and their role. */
 @Component({
   selector: 'app-members-page',
-  imports: [ReactiveFormsModule, DatePipe],
+  imports: [ReactiveFormsModule, DatePipe, Icon, ...FORMAT],
   template: `
-    <h1>Members</h1>
+    <div class="page">
+      <header class="page-header">
+        <div>
+          <h1>Team</h1>
+          <p class="subtitle">
+            Everyone here can work the inbox and tickets. Admins also approve refunds and see the
+            audit log.
+          </p>
+        </div>
+      </header>
 
-    @if (auth.isAdmin()) {
-      <form class="card row" [formGroup]="form" (ngSubmit)="add()">
-        <input formControlName="email" type="email" placeholder="colleague@company.com" />
-        <select formControlName="role">
-          @for (r of assignableRoles(); track r) {
-            <option [value]="r">{{ r }}</option>
-          }
-        </select>
-        <button type="submit" [disabled]="form.invalid">Add member</button>
-      </form>
-      <p class="muted">They need an AgentFlow account first. Email invitations come later.</p>
-    }
+      @if (auth.isAdmin()) {
+        <form
+          class="card pad row"
+          style="margin-bottom: 16px"
+          [formGroup]="form"
+          (ngSubmit)="add()"
+        >
+          <span class="avatar"><app-icon name="plus" /></span>
+          <input
+            class="grow"
+            formControlName="email"
+            type="email"
+            placeholder="colleague@company.com"
+            aria-label="Email"
+          />
+          <select formControlName="role" aria-label="Role">
+            @for (r of assignableRoles(); track r) {
+              <option [value]="r">{{ r | human }}</option>
+            }
+          </select>
+          <button type="submit" [disabled]="form.invalid">Add to team</button>
+          <small class="muted" style="flex-basis: 100%; padding-left: 42px">
+            They need an AgentFlow account first; email invitations come later.
+          </small>
+        </form>
+      }
 
-    @if (error()) {
-      <p class="error" role="alert">{{ error() }}</p>
-    }
+      @if (error()) {
+        <div class="callout" data-tone="danger" role="alert" style="margin-bottom: 16px">
+          {{ error() }}
+        </div>
+      }
 
-    @if (members.isLoading()) {
-      <p class="muted">Loading…</p>
-    } @else if (members.error()) {
-      <p class="error">{{ message(members.error()) }}</p>
-    } @else {
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Role</th>
-            <th>Joined</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (m of members.value(); track m.user_id) {
-            <tr>
-              <td>{{ m.full_name }}</td>
-              <td>{{ m.email }}</td>
-              <td>
-                @if (canManage(m)) {
-                  <select (change)="changeRole(m, $any($event.target).value)">
-                    @for (r of assignableRoles(); track r) {
-                      <option [value]="r" [selected]="r === m.role">{{ r }}</option>
-                    }
-                  </select>
-                } @else {
-                  {{ m.role }}
+      <section class="card">
+        @if (members.isLoading()) {
+          <div class="card-body stack-sm">
+            <div class="skeleton"></div>
+            <div class="skeleton" style="width: 60%"></div>
+          </div>
+        } @else if (members.error()) {
+          <div class="card-body">
+            <div class="callout" data-tone="danger">{{ message(members.error()) }}</div>
+          </div>
+        } @else {
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Role</th>
+                  <th>Joined</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (m of members.value(); track m.user_id) {
+                  <tr>
+                    <td>
+                      <div class="row" style="flex-wrap: nowrap">
+                        <span class="avatar">{{ m.full_name | initials }}</span>
+                        <div>
+                          <strong>{{ m.full_name }}</strong>
+                          @if (m.user_id === auth.me()?.user?.id) {
+                            <span class="badge" style="margin-left: 6px">You</span>
+                          }
+                          <div>
+                            <small class="muted">{{ m.email }}</small>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      @if (canManage(m)) {
+                        <select
+                          (change)="changeRole(m, $any($event.target).value)"
+                          aria-label="Role"
+                        >
+                          @for (r of assignableRoles(); track r) {
+                            <option [value]="r" [selected]="r === m.role">{{ r | human }}</option>
+                          }
+                        </select>
+                      } @else {
+                        <span
+                          class="badge"
+                          [attr.data-tone]="m.role === 'owner' ? 'brand' : 'neutral'"
+                          >{{ m.role | human }}</span
+                        >
+                      }
+                    </td>
+                    <td>
+                      <span class="muted">{{ m.joined_at | date: 'mediumDate' }}</span>
+                    </td>
+                    <td style="text-align: right">
+                      @if (canManage(m)) {
+                        <button class="ghost sm" (click)="remove(m)">Remove</button>
+                      }
+                    </td>
+                  </tr>
                 }
-              </td>
-              <td>{{ m.joined_at | date: 'mediumDate' }}</td>
-              <td>
-                @if (canManage(m)) {
-                  <button class="link danger" (click)="remove(m)">Remove</button>
-                }
-              </td>
-            </tr>
-          }
-        </tbody>
-      </table>
-    }
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
+    </div>
   `,
 })
 export class MembersPage {
@@ -96,7 +154,10 @@ export class MembersPage {
   protected readonly assignableRoles = computed(() =>
     this.auth.role() === 'owner' ? ALL_ROLES : ALL_ROLES.filter((r) => r !== 'owner'),
   );
+  /** Admins manage others (owners only by owners); never your own row, so nobody demotes or
+   *  removes themselves by accident. */
   protected canManage(m: Member): boolean {
+    if (m.user_id === this.auth.me()?.user.id) return false;
     return this.auth.isAdmin() && (m.role !== 'owner' || this.auth.role() === 'owner');
   }
 

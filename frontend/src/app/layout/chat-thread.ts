@@ -2,6 +2,7 @@ import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, ElementRef, effect, input, output, viewChild } from '@angular/core';
 
 import type { ChatMessage } from '../api/types';
+import { Icon } from './icon';
 
 /** The facts the backend attaches to a message (conversations.service.outcome_card). */
 interface Card {
@@ -17,7 +18,7 @@ interface Card {
   };
   card_frozen?: boolean;
   review?: { amount: string | null };
-  case?: { code: string; priority: string };
+  case?: { code: string; priority: string; resolved?: boolean };
   sources?: string[];
   /** The orchestrator moved this problem to its own issue thread. */
   issue?: { id: string; subject: string };
@@ -37,7 +38,7 @@ interface Card {
  * Shared by the customer app and the team's inbox. */
 @Component({
   selector: 'app-chat-thread',
-  imports: [DatePipe, DecimalPipe],
+  imports: [DatePipe, DecimalPipe, Icon],
   template: `
     <div class="thread" #scroller>
       @for (m of messages(); track m.id) {
@@ -47,7 +48,7 @@ interface Card {
               <small class="who">Support team</small>
             }
             @if (card(m)?.voice) {
-              <small class="who">🎤 Voice note</small>
+              <small class="who"><app-icon name="mic" [size]="12" /> Voice note</small>
             }
             <p>{{ m.body }}</p>
 
@@ -81,7 +82,8 @@ interface Card {
               }
               @if (c.issue; as i) {
                 <button type="button" class="fact issue-link" (click)="openIssue.emit(i.id)">
-                  🧾 Issue opened: <strong>{{ i.subject }}</strong> · open →
+                  <app-icon name="ticket" [size]="13" /> Issue opened:
+                  <strong>{{ i.subject }}</strong> · open →
                 </button>
               }
               @if (c.records; as rs) {
@@ -100,7 +102,7 @@ interface Card {
                           }}{{ +r.amount | number: '1.0-0' }}</strong
                         >
                         @if (r.transfer_status === 'credited') {
-                          <small class="ok">✓ delivered</small>
+                          <small class="ok">delivered</small>
                         }
                       </span>
                     </div>
@@ -109,23 +111,38 @@ interface Card {
               }
               @if (c.refund; as r) {
                 <div class="fact good">
-                  ✓ {{ r.currency }} {{ r.amount | number: '1.0-0' }} returned
+                  <app-icon name="check" [size]="13" /> {{ r.currency }}
+                  {{ r.amount | number: '1.0-0' }} returned
                   <code>{{ r.reference }}</code>
                 </div>
               }
               @if (c.card_frozen) {
-                <div class="fact warn">🔒 Card frozen: no one can use it</div>
-              }
-              @if (c.review) {
-                <div class="fact wait">⏳ With an officer for sign-off</div>
-              }
-              @if (c.case; as k) {
-                <div class="fact">
-                  🧑‍💼 Case <code>{{ k.code }}</code> · a specialist is on it
+                <div class="fact warn">
+                  <app-icon name="lock" [size]="13" /> Card frozen: no one can use it
                 </div>
               }
+              @if (c.review) {
+                <div class="fact wait">
+                  <app-icon name="clock" [size]="13" /> With an officer for sign-off
+                </div>
+              }
+              @if (c.case; as k) {
+                @if (k.resolved) {
+                  <div class="fact done">
+                    <app-icon name="check-circle" [size]="13" /> Case <code>{{ k.code }}</code> ·
+                    resolved
+                  </div>
+                } @else {
+                  <div class="fact">
+                    <app-icon name="user" [size]="13" /> Case <code>{{ k.code }}</code> · a
+                    specialist is on it
+                  </div>
+                }
+              }
               @if (c.sources; as s) {
-                <small class="sources">From: {{ s.join(', ') }}</small>
+                <small class="sources"
+                  ><app-icon name="book" [size]="11" /> {{ s.join(' · ') }}</small
+                >
               }
             }
             <small class="time">{{ m.created_at | date: 'shortTime' }}</small>

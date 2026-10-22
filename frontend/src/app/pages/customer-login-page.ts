@@ -7,63 +7,82 @@ import { firstValueFrom } from 'rxjs';
 import type { CustomerSession as Session, LoginStartOut } from '../api/types';
 import { CustomerSession } from '../core/customer-session';
 import { errorMessage } from '../core/errors';
+import { Icon } from '../layout/icon';
 
 /** Customer login: mobile number, then a 6-digit one-time code. The bank comes from the
  *  link the bank gives its customers (?bank=<id>). */
 @Component({
   selector: 'app-customer-login-page',
-  imports: [FormsModule],
+  imports: [FormsModule, Icon],
   template: `
-    <div class="phone">
-      <header class="phone-head">
-        <div class="avatar">AF</div>
-        <div><strong>AgentFlow Bank</strong><small>Sign in to your account</small></div>
-      </header>
-      <form
-        class="customer-login"
-        (submit)="$event.preventDefault(); step() === 'phone' ? sendCode() : verify()"
-      >
-        @if (!bankId) {
-          <p class="error" role="alert">
-            This link is missing the bank. Ask your bank for its app link.
-          </p>
-        } @else if (step() === 'phone') {
-          <label>
-            Mobile number
-            <input
-              [(ngModel)]="phone"
-              name="phone"
-              inputmode="tel"
-              placeholder="0300 1234567"
-              required
-            />
-          </label>
-          <button type="submit" [disabled]="busy() || phone.length < 10">Send code</button>
-        } @else {
-          <p class="muted">We sent a 6-digit code to {{ phone }}.</p>
-          @if (devCode()) {
-            <p class="fact wait">
-              Demo mode (no SMS): your code is <strong>{{ devCode() }}</strong>
+    <div class="phone-stage">
+      <div class="phone">
+        <header class="phone-head">
+          <div class="avatar"><app-icon name="zap" [size]="16" /></div>
+          <div><strong>AgentFlow Bank</strong><small>Sign in to your account</small></div>
+        </header>
+        <form
+          class="customer-login"
+          (submit)="$event.preventDefault(); step() === 'phone' ? sendCode() : verify()"
+        >
+          <div class="welcome">
+            <span class="welcome-icon"><app-icon name="message" [size]="26" /></span>
+            <h1>Your bank, by text</h1>
+            <p class="muted">
+              Ask anything, fix a problem, follow your issues: in English, Urdu or Roman Urdu, 24/7.
             </p>
+          </div>
+          @if (!bankId) {
+            <p class="error" role="alert">
+              This link is missing the bank. Ask your bank for its app link.
+            </p>
+          } @else if (step() === 'phone') {
+            <label>
+              Mobile number
+              <input
+                [(ngModel)]="phone"
+                name="phone"
+                inputmode="tel"
+                placeholder="0300 1234567"
+                required
+              />
+            </label>
+            <button type="submit" [disabled]="busy() || phone.length < 10">Send code</button>
+          } @else {
+            <p class="muted">We sent a 6-digit code to {{ phone }}.</p>
+            @if (devCode()) {
+              <p class="fact wait">
+                Demo mode (no SMS): your code is <strong>{{ devCode() }}</strong>
+              </p>
+            }
+            <label>
+              Code
+              <input
+                [(ngModel)]="code"
+                name="code"
+                inputmode="numeric"
+                maxlength="6"
+                autocomplete="one-time-code"
+                required
+              />
+            </label>
+            <button type="submit" [disabled]="busy() || code.length !== 6">Sign in</button>
+            <button type="button" class="link" (click)="step.set('phone')">
+              Use another number
+            </button>
           }
-          <label>
-            Code
-            <input
-              [(ngModel)]="code"
-              name="code"
-              inputmode="numeric"
-              maxlength="6"
-              autocomplete="one-time-code"
-              required
-            />
-          </label>
-          <button type="submit" [disabled]="busy() || code.length !== 6">Sign in</button>
-          <button type="button" class="link" (click)="step.set('phone')">Use another number</button>
-        }
-        @if (error()) {
-          <p class="error" role="alert">{{ error() }}</p>
-        }
-      </form>
+          @if (error()) {
+            <p class="error" role="alert">{{ error() }}</p>
+          }
+          <div class="trust">
+            <app-icon name="shield" [size]="16" />
+            <span
+              >We text you a one-time code. The bank never asks for your PIN, CVV or OTP in chat or
+              on a call.</span
+            >
+          </div>
+        </form>
+      </div>
     </div>
   `,
 })

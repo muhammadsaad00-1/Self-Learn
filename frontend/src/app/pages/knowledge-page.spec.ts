@@ -110,6 +110,6 @@ describe('KnowledgePage', () => {
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('Within 3 business days.');
     expect(text).toContain('[1] Refund policy');
-    expect(text).toContain('verified answer');
+    expect(text).toContain('Verified answer');
   });
 });

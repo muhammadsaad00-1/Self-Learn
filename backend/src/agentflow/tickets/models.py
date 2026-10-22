@@ -43,7 +43,12 @@ class Ticket(TimestampMixin, Base):
     # One ticket per workflow at most (also enforced by the action ledger).
     workflow_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("workflows.id"), unique=True)
     title: Mapped[str] = mapped_column(String(300))
-    description: Mapped[str] = mapped_column(Text)
+    description: Mapped[str] = mapped_column(Text)  # plain-text summary of all of the below
+    # Why a human must own it (policy.ticket_reasons), and the customer's own words.
+    reasons: Mapped[list[str]] = mapped_column(
+        JSONB, default=list, server_default=text("'[]'::jsonb")
+    )
+    customer_message: Mapped[str | None] = mapped_column(Text)
     priority: Mapped[TicketPriority] = mapped_column(str_enum(TicketPriority))
     category: Mapped[str | None] = mapped_column(String(64))
     customer_ref: Mapped[str | None] = mapped_column(String(100))

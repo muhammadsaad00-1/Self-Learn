@@ -1,4 +1,4 @@
-import { DatePipe, JsonPipe } from '@angular/common';
+import { DatePipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Component, effect, inject, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -7,59 +7,105 @@ import { firstValueFrom } from 'rxjs';
 import type { AuditEvent, AuditPage as Page } from '../api/types';
 import { Auth } from '../core/auth';
 import { errorMessage } from '../core/errors';
+import { FORMAT } from '../core/format';
+import { Icon } from '../layout/icon';
 
+/** Every change in the company, append-only: what compliance reads. */
 @Component({
   selector: 'app-audit-page',
-  imports: [DatePipe, JsonPipe, FormsModule],
+  imports: [DatePipe, FormsModule, Icon, ...FORMAT],
   template: `
-    <h1>Audit log</h1>
-    <p class="muted">Every change in this organization. Entries can't be edited or deleted.</p>
+    <div class="page">
+      <header class="page-header">
+        <div>
+          <h1>Audit log</h1>
+          <p class="subtitle">
+            Every change and every action the agents executed. Entries can't be edited or deleted.
+          </p>
+        </div>
+      </header>
 
-    <form class="row" (ngSubmit)="load(true)">
-      <input [(ngModel)]="action" name="action" placeholder="Filter by action, e.g. member.added" />
-      <button type="submit">Filter</button>
-    </form>
+      <form class="toolbar" (ngSubmit)="load(true)">
+        <input
+          [(ngModel)]="action"
+          name="action"
+          placeholder="Filter by action, e.g. tool.refund_executed"
+          style="width: 320px"
+        />
+        <button type="submit" class="secondary"><app-icon name="search" /> Filter</button>
+      </form>
 
-    @if (error()) {
-      <p class="error" role="alert">{{ error() }}</p>
-    }
+      @if (error()) {
+        <div class="callout" data-tone="danger" role="alert" style="margin-bottom: 12px">
+          {{ error() }}
+        </div>
+      }
 
-    <table>
-      <thead>
-        <tr>
-          <th>When</th>
-          <th>Who</th>
-          <th>Action</th>
-          <th>Target</th>
-          <th>Details</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (e of events(); track e.id) {
-          <tr>
-            <td>{{ e.occurred_at | date: 'medium' }}</td>
-            <td>{{ e.actor_email ?? 'system' }}</td>
-            <td>
-              <code>{{ e.action }}</code>
-            </td>
-            <td>
-              {{ e.target_type }} <code class="muted">{{ e.target_id.slice(0, 8) }}</code>
-            </td>
-            <td>
-              <code>{{ e.details | json }}</code>
-            </td>
-          </tr>
-        } @empty {
-          <tr>
-            <td colspan="5" class="muted">No events.</td>
-          </tr>
-        }
-      </tbody>
-    </table>
+      <section class="card table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>When</th>
+              <th>Who</th>
+              <th>What</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (e of events(); track e.id) {
+              <tr>
+                <td style="white-space: nowrap">
+                  {{ e.occurred_at | ago }}
+                  <div>
+                    <small class="faint">{{ e.occurred_at | date: 'MMM d, HH:mm:ss' }}</small>
+                  </div>
+                </td>
+                <td>
+                  @if (e.actor_email) {
+                    {{ e.actor_email }}
+                  } @else {
+                    <span class="badge" data-tone="ai"
+                      ><app-icon name="bot" [size]="12" /> AgentFlow</span
+                    >
+                  }
+                </td>
+                <td style="min-width: 200px">
+                  <strong>{{ e.action | human }}</strong>
+                  <div>
+                    <small class="faint"
+                      >{{ e.target_type }}
+                      <span class="mono">{{ e.target_id.slice(0, 12) }}</span></small
+                    >
+                  </div>
+                </td>
+                <td>
+                  <div class="row" style="gap: 4px">
+                    @for (kv of entries(e.details); track kv[0]) {
+                      <span class="badge" [title]="kv[1]"
+                        ><span class="faint">{{ kv[0] | human }}</span
+                        >&nbsp;{{ kv[1].slice(0, 40) }}</span
+                      >
+                    }
+                  </div>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="4">
+                  <div class="empty"><strong>No events</strong></div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </section>
 
-    @if (nextBeforeId()) {
-      <button (click)="load(false)">Load older</button>
-    }
+      @if (nextBeforeId()) {
+        <div class="row" style="justify-content: center; margin-top: 16px">
+          <button class="secondary" (click)="load(false)">Load older</button>
+        </div>
+      }
+    </div>
   `,
 })
 export class AuditPage {
@@ -67,6 +113,14 @@ export class AuditPage {
   private readonly auth = inject(Auth);
 
   protected action = '';
+
+  /** Details as readable key/value pairs (nested values as JSON). */
+  protected entries(details: Record<string, unknown> | null | undefined): [string, string][] {
+    return Object.entries(details ?? {}).map(([k, v]) => [
+      k,
+      typeof v === 'string' ? v : JSON.stringify(v),
+    ]);
+  }
   protected readonly events = signal<AuditEvent[]>([]);
   protected readonly nextBeforeId = signal<number | null>(null);
   protected readonly error = signal<string | null>(null);

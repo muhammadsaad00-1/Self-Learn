@@ -4,54 +4,109 @@ import { Router, RouterLink } from '@angular/router';
 
 import { Auth } from '../core/auth';
 import { errorMessage } from '../core/errors';
+import { Icon } from '../layout/icon';
 
 /** Login and signup share one page; the route's `data.mode` picks which. */
 @Component({
   selector: 'app-auth-page',
-  imports: [ReactiveFormsModule, RouterLink],
+  imports: [ReactiveFormsModule, RouterLink, Icon],
   template: `
-    <main class="auth">
-      <h1>AgentFlow</h1>
-      <p class="muted">Governed AI agents for financial operations</p>
+    <div class="auth-split">
+      <section class="auth-hero">
+        <div class="brand">
+          <span class="brand-mark"><app-icon name="zap" [size]="16" /></span>
+          AgentFlow
+        </div>
+        <div>
+          <h1>Customers text. AI resolves. Your team decides what matters.</h1>
+          <div class="points">
+            <div>
+              <app-icon name="message" [size]="18" />
+              <span
+                >Answers from your own documents, in English, Urdu or Roman Urdu: typed or voice
+                notes.</span
+              >
+            </div>
+            <div>
+              <app-icon name="zap" [size]="18" />
+              <span
+                >Failed transfers reversed, duplicates refunded, cards frozen on fraud: in
+                seconds.</span
+              >
+            </div>
+            <div>
+              <app-icon name="shield" [size]="18" />
+              <span
+                >Policy in code, maker-checker approvals, exactly-once money movement, full audit
+                trail.</span
+              >
+            </div>
+          </div>
+        </div>
+        <small style="color: rgb(236 253 245 / 0.6)"
+          >Governed AI agents for banks and microfinance</small
+        >
+      </section>
 
-      <form class="card" [formGroup]="form" (ngSubmit)="submit()">
-        <h2>{{ isSignup() ? 'Create your organization' : 'Sign in' }}</h2>
+      <section class="auth-panel">
+        <form class="auth-form" [formGroup]="form" (ngSubmit)="submit()">
+          <div class="stack-sm">
+            <h1>{{ isSignup() ? 'Create your company' : 'Welcome back' }}</h1>
+            <p class="muted">
+              {{
+                isSignup()
+                  ? 'Set up AgentFlow for your team in a minute.'
+                  : 'Sign in to your team workspace.'
+              }}
+            </p>
+          </div>
 
-        @if (isSignup()) {
-          <label>Your name <input formControlName="fullName" autocomplete="name" /></label>
-          <label
-            >Organization <input formControlName="orgName" placeholder="EasyPay Wallet"
-          /></label>
-        }
-        <label>Email <input formControlName="email" type="email" autocomplete="email" /></label>
-        <label>
-          Password
-          <input
-            formControlName="password"
-            type="password"
-            [attr.autocomplete]="isSignup() ? 'new-password' : 'current-password'"
-          />
           @if (isSignup()) {
-            <small class="muted">At least 12 characters. A short sentence works well.</small>
+            <label
+              >Your name
+              <input formControlName="fullName" autocomplete="name" placeholder="Ayesha Khan"
+            /></label>
+            <label
+              >Company <input formControlName="orgName" placeholder="Mehran Microfinance Bank"
+            /></label>
           }
-        </label>
+          <label
+            >Work email
+            <input
+              formControlName="email"
+              type="email"
+              autocomplete="email"
+              placeholder="you@company.com"
+          /></label>
+          <label>
+            Password
+            <input
+              formControlName="password"
+              type="password"
+              [attr.autocomplete]="isSignup() ? 'new-password' : 'current-password'"
+            />
+            @if (isSignup()) {
+              <span class="field-hint">At least 12 characters. A short sentence works well.</span>
+            }
+          </label>
 
-        @if (error()) {
-          <p class="error" role="alert">{{ error() }}</p>
-        }
-        <button type="submit" [disabled]="busy()">
-          {{ isSignup() ? 'Create account' : 'Sign in' }}
-        </button>
-      </form>
+          @if (error()) {
+            <div class="callout" data-tone="danger" role="alert">{{ error() }}</div>
+          }
+          <button type="submit" [disabled]="busy()">
+            {{ busy() ? 'One moment…' : isSignup() ? 'Create company' : 'Sign in' }}
+          </button>
 
-      <p class="muted">
-        @if (isSignup()) {
-          Already have an account? <a routerLink="/login">Sign in</a>
-        } @else {
-          New here? <a routerLink="/signup">Create an organization</a>
-        }
-      </p>
-    </main>
+          <p class="muted" style="text-align: center">
+            @if (isSignup()) {
+              Already have an account? <a routerLink="/login">Sign in</a>
+            } @else {
+              New here? <a routerLink="/signup">Create a company</a>
+            }
+          </p>
+        </form>
+      </section>
+    </div>
   `,
 })
 export class AuthPage {

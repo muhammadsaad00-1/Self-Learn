@@ -170,3 +170,28 @@ async def test_provider_outage_hands_the_customer_to_a_human(
         last = chat(client, customer)["messages"][-1]
         assert ticket["code"] in last["body"]
         assert last["card"]["case"]["code"] == ticket["code"]
+
+
+async def test_people_see_the_customers_words_not_the_agents_context(
+    client_for: Any, settings: Settings, sessions: Sessions, runtime: KnowledgeRuntime
+) -> None:
+    """Found in a UI review: "Earlier in this chat (context only): ..." (the agents' prompt)
+    was shown as the customer's message in the request list and on tickets."""
+    llm = agents(category="unauthorized_transaction")
+    with client_for(llm) as client:
+        owner = await setup_org(client, sessions, settings, runtime)
+        customer = open_chat(client, owner, "CUST-1003")
+        say(client, customer, "hi")
+        await run(sessions, settings, runtime, llm)
+        say(client, customer, "someone stole 85k from me")
+        await run(sessions, settings, runtime, llm)
+
+        assert any("Earlier in this chat" in c["user"] for c in llm.calls)  # agents: context
+        newest = client.get("/v1/workflows", headers=owner.headers()).json()[0]
+        assert newest["message_preview"] == "someone stole 85k from me"
+        assert (newest["customer_ref"], newest["channel"]) == ("CUST-1003", "chat")
+        ticket = client.get("/v1/tickets", headers=owner.headers()).json()[0]  # newest
+        assert ticket["customer_message"] == "someone stole 85k from me"
+        assert ticket["title"] == "Charged twice for a transfer"  # triage's title, no enum
+        assert ticket["reasons"]
+        assert "Earlier in this chat" not in ticket["description"]

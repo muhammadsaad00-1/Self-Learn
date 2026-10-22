@@ -136,17 +136,10 @@ async def messages(session: AsyncSession, conversation_id: uuid.UUID) -> list[Ch
     return list(rows)
 
 
-def _with_context(history: list[ChatMessage], text: str) -> str:
-    """The workflow input: the new message, plus recent turns as context."""
+def _context(history: list[ChatMessage]) -> str | None:
+    """Recent turns, so the agents resolve "it" and "that one"."""
     earlier = [m for m in history if m.body][-CONTEXT_MESSAGES:]
-    if not earlier:
-        return text
-    lines = [f"{m.role.value}: {m.body[:400]}" for m in earlier]
-    return (
-        "Earlier in this chat (context only):\n"
-        + "\n".join(lines)
-        + f"\n\nCustomer's new message:\n{text}"
-    )
+    return "\n".join(f"{m.role.value}: {m.body[:400]}" for m in earlier) or None
 
 
 async def post_customer_message(
@@ -168,7 +161,8 @@ async def post_customer_message(
             user_id=None,
             idempotency_key=f"chat-{message_id}",
             body=CreateWorkflowRequest(
-                message=_with_context(history, text),
+                message=text,
+                context=_context(history),
                 channel="chat",
                 customer_ref=conversation.customer_ref,
             ),

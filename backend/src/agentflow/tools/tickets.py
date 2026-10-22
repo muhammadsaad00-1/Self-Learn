@@ -50,6 +50,7 @@ async def open_ticket(
 
     triage = state.get("triage") or {}
     proposal = state.get("proposal") or {}
+    said = state.get("customer_message") or state.get("message", "")
     # The criticality analysis may have raised the priority above triage's urgency.
     urgency = (state.get("risk") or {}).get("priority") or triage.get("urgency") or "normal"
     category = triage.get("category")
@@ -57,7 +58,7 @@ async def open_ticket(
         "Why a human is needed:",
         *[f"- {r}" for r in reasons],
         "",
-        f"Customer message: {state.get('message', '')}",
+        f"Customer message: {said}",
         f"Customer: {state.get('customer_ref') or 'unknown'}",
     ]
     if signals := (state.get("risk") or {}).get("signals"):
@@ -67,8 +68,10 @@ async def open_ticket(
     ticket = Ticket(
         org_id=org_id,
         workflow_id=workflow_id,
-        title=f"{category or 'request'}: {triage.get('summary') or state.get('message', '')}"[:300],
+        title=(triage.get("title") or triage.get("summary") or said)[:300],
         description="\n".join(lines),
+        reasons=reasons,
+        customer_message=said,
         priority=TicketPriority(urgency),
         category=category,
         customer_ref=state.get("customer_ref"),

@@ -27,6 +27,16 @@ class IdempotencyConflictError(Exception):
     """The Idempotency-Key was already used for a *different* request."""
 
 
+def agent_message(workflow_input: dict[str, Any]) -> str:
+    """What the agents read: the customer's message, after the conversation so far."""
+    message: str = workflow_input["message"]
+    if context := workflow_input.get("context"):
+        return (
+            f"Earlier in this chat (context only):\n{context}\n\nCustomer's new message:\n{message}"
+        )
+    return message
+
+
 # --- Creating and reading --------------------------------------------------------------
 
 
@@ -130,6 +140,8 @@ async def list_recent(
                 id=wf.id,
                 status=wf.status,
                 message_preview=wf.input["message"][:120],
+                customer_ref=wf.input.get("customer_ref"),
+                channel=wf.input.get("channel", "web"),
                 category=triage.get("category"),
                 urgency=triage.get("urgency"),
                 needs_human_review=triage.get("needs_human_review"),
