@@ -1,6 +1,7 @@
-"""Customer chat end to end (real database, fake models): a customer message runs the agents,
-the outcome comes back as a chat message with a card; failed transfers are reversed at once,
-fraud freezes the card; staff can take over; insights add it all up."""
+"""Customer chat end to end (real database, fake models): a customer message runs the agents;
+a problem moves to its own issue thread and the outcome lands there with a card; failed
+transfers are reversed at once, fraud freezes the card; staff can take over; insights add it
+all up."""
 
 from decimal import Decimal
 from typing import Any
@@ -26,14 +27,52 @@ def open_chat(client: TestClient, owner: Account, customer_ref: str) -> dict[str
     return {"Authorization": f"Bearer {resp.json()['customer_token']}"}
 
 
-def say(client: TestClient, customer: dict[str, str], text: str) -> None:
-    resp = client.post("/v1/chat/messages", headers=customer, json={"text": text})
+def conversations(client: TestClient, customer: dict[str, str]) -> list[dict[str, Any]]:
+    """Help chat first, then issues newest first."""
+    resp = client.get("/v1/customer/conversations", headers=customer)
+    assert resp.status_code == 200, resp.text
+    result: list[dict[str, Any]] = resp.json()
+    return result
+
+
+def say(
+    client: TestClient, customer: dict[str, str], text: str, conversation_id: str | None = None
+) -> None:
+    """Write in the help chat (default) or in a given conversation."""
+    cid = conversation_id or conversations(client, customer)[0]["id"]
+    resp = client.post(
+        f"/v1/customer/conversations/{cid}/messages", headers=customer, json={"text": text}
+    )
     assert resp.status_code == 201, resp.text
 
 
-def chat(client: TestClient, customer: dict[str, str]) -> dict[str, Any]:
-    result: dict[str, Any] = client.get("/v1/chat", headers=customer).json()
+def chat(
+    client: TestClient, customer: dict[str, str], conversation_id: str | None = None
+) -> dict[str, Any]:
+    """A conversation with its messages: the help chat by default."""
+    cid = conversation_id or conversations(client, customer)[0]["id"]
+    result: dict[str, Any] = client.get(
+        f"/v1/customer/conversations/{cid}", headers=customer
+    ).json()
     return result
+
+
+def issue(client: TestClient, customer: dict[str, str]) -> dict[str, Any]:
+    """The customer's newest issue thread, with its messages."""
+    newest = next(c for c in conversations(client, customer) if c["kind"] == "issue")
+    return chat(client, customer, newest["id"])
+
+
+def answer(client: TestClient, customer: dict[str, str]) -> dict[str, Any]:
+    """The agents' latest message anywhere (help chat or an issue)."""
+    found = [
+        m
+        for c in conversations(client, customer)
+        for m in chat(client, customer, c["id"])["messages"]
+        if m["role"] in ("assistant", "agent")
+    ]
+    latest: dict[str, Any] = max(found, key=lambda m: m["created_at"])
+    return latest
 
 
 def transfer_of(
@@ -125,12 +164,21 @@ async def test_failed_transfer_is_reversed_in_the_chat(
         assert chat(client, customer)["thinking"] is True
         await run(sessions, settings, runtime, llm)
 
-        convo = chat(client, customer)
-        assert convo["thinking"] is False
-        assert convo["customer_name"] == "Usman Tariq"
-        mine, answer = convo["messages"]
-        assert (mine["role"], answer["role"]) == ("customer", "assistant")
-        card = answer["card"]
+        # The orchestrator moved the problem to its own issue thread...
+        help_chat = chat(client, customer)
+        assert help_chat["thinking"] is False
+        assert help_chat["customer_name"] == "Usman Tariq"
+        mine, routed = help_chat["messages"]
+        assert (mine["role"], routed["role"]) == ("customer", "assistant")
+        assert "separate issue" in routed["body"]
+        # ...and the outcome landed there, with the issue resolved.
+        thread = issue(client, customer)
+        assert routed["card"]["issue"]["id"] == thread["id"]
+        assert (thread["kind"], thread["status"]) == ("issue", "resolved")
+        assert thread["subject"] == "Charged twice for a transfer"  # triage's title
+        copied, outcome = thread["messages"]
+        assert copied["body"] == mine["body"]
+        card = outcome["card"]
         assert Decimal(card["refund"]["amount"]) == Decimal("5000")  # no approval needed
         assert card["transfer"]["network_status"] == "failed"
         assert card["transfer"]["reversed"] is True
@@ -148,9 +196,11 @@ async def test_fraud_freezes_the_card_and_opens_a_case(
         say(client, customer, "I never made these 85k payments!!")
         await run(sessions, settings, runtime, llm)
 
-        card = chat(client, customer)["messages"][-1]["card"]
+        thread = issue(client, customer)
+        card = thread["messages"][-1]["card"]
         assert card["card_frozen"] is True
         assert card["case"]["code"].startswith("TCK-")
+        assert (thread["status"], thread["case_code"]) == ("with_specialist", card["case"]["code"])
         [account] = [
             a
             for a in client.get("/v1/ledger/accounts", headers=owner.headers()).json()
@@ -174,9 +224,11 @@ async def test_large_refund_tells_the_customer_it_is_under_review(
         say(client, customer, "My 5000 bill was charged twice")
         await run(sessions, settings, runtime, llm)
 
-        answer = chat(client, customer)["messages"][-1]
-        assert "second officer" in answer["body"]
-        assert answer["card"]["review"]["amount"] == "5000.00"
+        thread = issue(client, customer)
+        assert thread["status"] == "in_review"
+        reply = thread["messages"][-1]
+        assert "second officer" in reply["body"]
+        assert reply["card"]["review"]["amount"] == "5000.00"
 
 
 async def test_follow_ups_carry_the_conversation_as_context(
@@ -193,7 +245,8 @@ async def test_follow_ups_carry_the_conversation_as_context(
 
         last_triage = next(c["user"] for c in llm.calls if "how long is it valid" in c["user"])
         assert "customer: how do I issue a cheque?" in last_triage
-        assert len(chat(client, customer)["messages"]) == 4
+        assert len(chat(client, customer)["messages"]) == 4  # questions stay in the help chat
+        assert [c["kind"] for c in conversations(client, customer)] == ["help"]
 
 
 # --- Staff side ------------------------------------------------------------------------------
@@ -235,11 +288,13 @@ def test_customer_and_staff_tokens_never_mix(client_for: Any, settings: Settings
         owner = signup(client)
         client.post("/v1/ledger/demo-data", headers=owner.headers())
         customer = open_chat(client, owner, "CUST-1001")
-        assert client.get("/v1/chat", headers=owner.headers()).status_code == 401
+        mine = "/v1/customer/conversations"
+        assert client.get(mine, headers=customer).status_code == 200
+        assert client.get(mine, headers=owner.headers()).status_code == 401
         staff_with_customer_token = {**customer, "X-Org-Id": owner.org_id}
         assert client.get("/v1/conversations", headers=staff_with_customer_token).status_code == 401
-        assert client.get("/v1/chat", headers={"Authorization": "Bearer junk"}).status_code == 401
-        assert client.get("/v1/chat").status_code == 401
+        assert client.get(mine, headers={"Authorization": "Bearer junk"}).status_code == 401
+        assert client.get(mine).status_code == 401
         resp = client.post(
             "/v1/conversations", headers=owner.headers(), json={"customer_ref": "NOPE"}
         )
@@ -260,8 +315,9 @@ async def test_voice_note_is_transcribed_into_the_chat(
 
         client.app.state.transcriber = transcribe
         customer = open_chat(client, owner, "CUST-1002")
+        help_id = conversations(client, customer)[0]["id"]
         resp = client.post(
-            "/v1/chat/voice",
+            f"/v1/customer/conversations/{help_id}/voice",
             headers=customer,
             files={"file": ("note.webm", b"\x1a" * 99, "audio/webm")},
         )

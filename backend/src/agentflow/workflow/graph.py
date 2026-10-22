@@ -247,7 +247,9 @@ def build_knowledge_nodes(
 
 # Categories with an executable tool today, and those that only get a reply.
 ACTIONABLE = {"duplicate_charge", "failed_payment", "refund_request", "unauthorized_transaction"}
-INFORMATIONAL = {"general_inquiry"}
+# Reply-only categories. "other" (thanks, greetings, small talk) is answered, not escalated:
+# anything serious hidden in it is caught by the criticality analysis, which opens a ticket.
+INFORMATIONAL = {"general_inquiry", "other"}
 
 ResearchFn = Callable[[str | None], Awaitable[Evidence]]
 ExecuteFn = Callable[["WorkflowState"], Awaitable[ExecutionResult]]
@@ -276,9 +278,20 @@ def build_graph(llm: StructuredLLM) -> CompiledStateGraph[WorkflowState]:
         triage_result = state.get("triage", {})
         category = triage_result.get("category")
         meta: dict[str, Any] = {}
-        # Account questions ("did my transfer reach Sara?") are answered from the ledger
-        # too, so informational requests with a known customer also go to the agent.
-        if evidence.account_found and (category in ACTIONABLE or category in INFORMATIONAL):
+        answered = (state.get("knowledge") or {}).get("status") == "answered"
+        if category not in ACTIONABLE and answered:
+            # The company's documents answered it (a question, or a topic with no tool such
+            # as "what documents do I need?"): no ledger reasoning, no escalation. Saves a
+            # model call on the most common path; critical risk still opens a ticket.
+            proposal = ProposedAction(
+                action=ActionType.NO_ACTION,
+                transaction_reference=None,
+                amount=None,
+                rationale="Answered from the company's documents",
+            )
+        elif evidence.account_found and (category in ACTIONABLE or category in INFORMATIONAL):
+            # Account questions the documents can't answer ("did my salary arrive?") are
+            # answered from the customer's ledger by the resolution agent.
             result = await resolution.propose(
                 llm, state["message"], triage_result, state.get("knowledge"), evidence
             )

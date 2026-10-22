@@ -137,6 +137,10 @@ async def test_failure_retries_with_backoff_then_dead_letters(
     assert wf["attempts"] == 3
     assert "all models down" in wf["error"]
     assert [s["status"] for s in wf["steps"]] == ["completed", "failed"] * 3  # intake, attempt
+    # A human owns it now: a ticket, so nothing falls through the cracks.
+    [ticket] = client.get("/v1/tickets", headers=owner.headers()).json()
+    assert (ticket["workflow_id"], ticket["priority"]) == (wf_id, "high")
+    assert "Automation failed after 3 attempts: LLMError: all models down" in ticket["description"]
 
 
 async def test_crashed_worker_lease_is_reclaimed(

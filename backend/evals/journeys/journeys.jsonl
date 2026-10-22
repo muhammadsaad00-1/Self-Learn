@@ -1,0 +1,11 @@
+{"id": "doc-loan-documents", "customer": "CUST-1002", "message": "What documents do I need for a Sahulat business loan?", "expect": {"route": "help", "card": ["sources"], "says_any": ["CNIC"]}}
+{"id": "doc-late-fee-roman-urdu", "customer": "CUST-1002", "message": "loan ki qist late ho jaye to kitna jurmana lagta hai?", "expect": {"route": "help", "card": ["sources"], "says_any": ["500"]}}
+{"id": "doc-cheque", "customer": "CUST-1001", "message": "How do I issue a cheque?", "expect": {"route": "help", "card": ["sources"], "says_any": ["sign", "Sign"]}}
+{"id": "records-salary", "customer": "CUST-1002", "message": "did my salary come this month?", "expect": {"route": "help", "card": ["records"], "says_any": ["85,000", "85000", "85 000"]}}
+{"id": "small-talk", "customer": "CUST-1002", "message": "thanks a lot, that was helpful!", "expect": {"route": "help", "no_card": ["case"]}}
+{"id": "failed-transfer-roman-urdu", "customer": "CUST-1004", "message": "Maine Ali ko 5000 rupay bheje the, mere account se kat gaye lekin usko nahi mile", "expect": {"route": "issue", "status": "resolved", "card": ["refund", "transfer"]}}
+{"id": "mistaken-claim-records", "customer": "CUST-1004", "message": "I sent 3000 to Sara yesterday and she says she never got it", "expect": {"route": "issue", "status": "resolved", "card": ["records"], "no_card": ["case", "refund"]}}
+{"id": "duplicate-needs-approval", "customer": "CUST-1001", "message": "My KE electricity bill of 5000 got deducted twice!", "expect": {"route": "issue", "status": "in_review", "card": ["review"]}}
+{"id": "fraud", "customer": "CUST-1003", "message": "I see two payments to Unknown Merchant LLC that I never made, 85k is gone!!", "expect": {"route": "issue", "status": "with_specialist", "card": ["card_frozen", "case"]}}
+{"id": "stuck-transfer", "customer": "CUST-1005", "message": "I sent 15000 to Kamran yesterday through IBFT and he still hasn't received it", "expect": {"route": "issue", "status": "with_specialist", "card": ["case"]}}
+{"id": "otp-scam", "customer": "CUST-1002", "message": "Someone called saying he is from the bank and I told him the OTP code I received", "expect": {"route": "issue", "status": "with_specialist", "card": ["case"], "priority": "critical"}}

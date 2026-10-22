@@ -26,6 +26,7 @@ def triage_result(**overrides: Any) -> TriageResult:
         "category": Category.DUPLICATE_CHARGE,
         "urgency": Urgency.NORMAL,
         "summary": "Customer was charged twice for one transfer.",
+        "title": "Charged twice for a transfer",
         "details": Details(
             amount=None, currency=None, transaction_reference=None, transaction_date=None
         ),

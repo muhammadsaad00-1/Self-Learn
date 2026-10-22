@@ -56,7 +56,7 @@ from agentflow.workflow.graph import (
     WorkflowState,
     build_workflow_graphs,
 )
-from agentflow.workflow.models import WorkflowStage, WorkflowStatus
+from agentflow.workflow.models import Workflow, WorkflowStage, WorkflowStatus
 
 log = logging.getLogger("agentflow.worker")
 
@@ -165,6 +165,8 @@ async def _run(
             async with sessions() as session, session.begin():
                 await set_tenant_context(session, org_id=claim.org_id)
                 await service.record_step(session, claim, node, output, meta)
+                if node == "triage":  # chat orchestration: a problem gets its own thread now
+                    await conversations.after_triage(session, claim.workflow_id, output["triage"])
     return state
 
 
@@ -180,6 +182,31 @@ RESULT_KEYS = (
     "ticket",
     "reply",
 )
+
+
+async def dead_lettered(session: AsyncSession, wf: Workflow, error: str) -> None:
+    """The agents gave up (provider outage, a bug): a human must own the request, so open a
+    ticket (exactly once) and tell the customer its case number. Without the ticket, "a
+    specialist will reply" would be a promise nobody sees: a real provider outage (Groq's
+    daily token limit) showed exactly that."""
+    saved = dict(wf.result or {})
+    state = {
+        **saved,
+        "message": wf.input["message"],
+        "customer_ref": wf.input.get("customer_ref"),
+        # Someone is waiting and nothing was resolved: high unless triage said more.
+        "risk": saved.get("risk") or {"priority": "high"},
+    }
+    ticket = await ticket_tool.open_ticket(
+        session,
+        org_id=wf.org_id,
+        workflow_id=wf.id,
+        reasons=[f"Automation failed after {wf.attempts} attempts: {error[:300]}"],
+        state=state,
+    )
+    await conversations.post_outcome(
+        session, wf, {"ticket": ticket.model_dump(mode="json")}, "failed"
+    )
 
 
 async def process_next(
@@ -255,7 +282,7 @@ async def process_next(
                     max_attempts=settings.workflow_max_attempts,
                 )
                 if locked.status == WorkflowStatus.FAILED:
-                    await conversations.post_outcome(session, locked, {}, "failed")
+                    await dead_lettered(session, locked, f"{type(e).__name__}: {e}")
         return True
 
     async with sessions() as session, session.begin():
@@ -319,6 +346,10 @@ async def run(settings: Settings, stop: asyncio.Event, poll_seconds: float = 1.0
     if settings.env == "local" and isinstance(runtime.store, S3ObjectStore):
         await runtime.store.ensure_bucket()
     graphs = build_workflow_graphs(build_llm(settings))
+    # Load the embedding and reranker models now (seconds; a download on first run), not
+    # inside the first customer's request where it ate the workflow's time budget.
+    await runtime.embedder.embed_query("warm up")
+    await runtime.reranker.score("warm up", ["warm up"])
     log.info("worker.started")
     try:
         while not stop.is_set():

@@ -37,7 +37,7 @@ Python + FastAPI · LangGraph + LangChain · PostgreSQL + pgvector · Redis · S
 - Run tool authorization again at execution time, even after an approval.
 
 ## Commands
-`make help` lists all of them. Key ones: `make install` (deps + git hooks) · `make up`/`down` (Docker stack) · `make run` (API with reload) · `make test` · `make check` (everything CI runs) · `make migrate` · `make migration m="..."` (autogenerate, then review: ADR 0006) · `make worker` (runs workflows; also a compose service) · `make eval` (triage vs real Groq; spends tokens) · `make eval-rag` (retrieval per stage, real models) / `make eval-rag AGENTS=1` (+ agents, tokens) · `make web` (dashboard on :4200) · `make api-types` (after any API change) · `make db-reset`.
+`make help` lists all of them. Key ones: `make install` (deps + git hooks) · `make up`/`down` (Docker stack) · `make run` (API with reload) · `make test` · `make check` (everything CI runs) · `make migrate` · `make migration m="..."` (autogenerate, then review: ADR 0006) · `make worker` (runs workflows; also a compose service) · `make eval` (triage vs real Groq; spends tokens) · `make eval-rag` (retrieval per stage, real models) / `make eval-rag AGENTS=1` (+ agents, tokens) · `make journeys [ONLY=id,id]` (a company end to end vs the running stack, tokens; Groq free tier ≈ 200k tokens/day on 120b) · `make web` (dashboard on :4200) · `make api-types` (after any API change) · `make db-reset`.
 uv lives at `~/.local/bin/uv` (official installer; the Intel Homebrew at /usr/local builds from source and is too slow).
 
 ## Agents and LLM rules
@@ -62,7 +62,7 @@ Claude writes the code into the files, then shows the full code in chat (the use
 - `uv` 0.12 and `gh` 2.102 are in `~/.local/bin`. `codex` is not installed.
 
 ## Branch stack (none merged yet; PRs need `gh auth login`)
-`main` ← feat/phase-1-core-saas (incl. phase 0) ← feat/phase-2-first-agent ← feat/phase-3-rag ← feat/add-company ← feat/phase-4-6-actions ← feat/tickets ← feat/customer-chat ← feat/customer-portal. CI only runs on PRs/main, so it has not run on GitHub yet.
+`main` ← feat/phase-1-core-saas (incl. phase 0) ← feat/phase-2-first-agent ← feat/phase-3-rag ← feat/add-company ← feat/phase-4-6-actions ← feat/tickets ← feat/customer-chat ← feat/customer-portal ← feat/help-and-issues. CI only runs on PRs/main, so it has not run on GitHub yet.
 
 ## Decisions
 - **Purpose is learning.** Build the full spec, including every AWS service, IaC, MCP, evals and the frontend. Don't skip components as "not needed yet". Order still follows the roadmap phases.
@@ -72,7 +72,7 @@ Claude writes the code into the files, then shows the full code in chat (the use
 - **Embeddings:** a local model (fastembed) behind an embedding-provider interface; move to Bedrock later. Bedrock Titan is pay-per-use, though very cheap.
 - **Frontend: Angular + TypeScript**, replacing the spec's Next.js (ADR 0004).
 - **Workflow:** Claude writes all code and the user reviews everything. Work happens on one branch per feature (`feat/...`), pushed to GitHub where the user reviews before merge. Keep diffs reviewable, and explain the design and the reason for each piece in the PR description.
-- **AWS: free-tier account.** Terraform must support spin-up/tear-down per session. Avoid always-on cost such as NAT gateways and idle Fargate tasks.
+- **AWS (updated 2026-10-22): not for the hackathon.** We perfect the existing product and run it locally (Docker Compose). AWS (Phase 7) comes after; when it does: free tier, Terraform spin-up/tear-down per session, no always-on cost such as NAT gateways or idle Fargate tasks.
 - **Domain (updated 2026-10-11): AI in fintech first, other services after.** The first vertical is **financial operations** (transaction disputes, duplicate charges, refunds/reversals with maker-checker approval, failed payments, bank-statement document checks) for payment providers, wallets, microfinance and digital lenders. Bus travel agencies and other local businesses come later as further verticals. The core stays domain-agnostic: verticals are data/config (tools, policies, knowledge, eval sets), not code forks. Synthetic data only, never real PII. Hackathon pitch: `docs/PROPOSAL.md`.
 - **Audience (2026-10-21): banks and microfinance institutions serving Gen Z, a texting generation.** The customer-facing chat (text + voice, English/Urdu/Roman Urdu) is the hero of the demo; the ops dashboard is the governance story behind it.
 - Repo: https://github.com/muhammadsaad00-1/Self-Learn (`main` is protected by convention; never push directly after the initial commit).
@@ -95,7 +95,8 @@ Roadmap phases are in spec 05. Mark items `[x]` as they land.
 - [x] Phase 6 — Approval (ADR 0012): policy engine (`policy/engine.py`), approvals + maker-checker + expiry, waiting_approval/stage resume, re-authorization at execution, dashboard Approvals inbox + decision trail. Old list: policy engine, approval entity + UI, pause/resume, expiry, double authorization
 - [x] Customer chat (`feat/customer-chat`, ADR 0013): Gen Z texting-first customer app (`/chat`, customer token, voice notes via Groq Whisper, fact cards, Urdu/Roman Urdu replies); each message is a `chat` workflow, outcome posted back by the worker; staff inbox `/chats` with take-over/hand-back; failed-transfer reversal (`transfer_status`, policy `failed_transfer_reversal`); `freeze_card` tool (policy `protective_freeze`); customer help guide seeded with demo data; `/v1/insights` + Insights page (default landing page).
 - [x] Customer portal (`feat/customer-portal`, ADR 0014): separate customer app `/customer` (OTP login by phone, Chat/Activity/Cases) vs staff dashboard; criticality analysis in code (`policy/risk.py`, escalate-only, signals in ticket + trail); `answer_from_records` (customer doubts settled from verified ledger rows, no ticket); ticket hand-off (`assign`/`note`, `activity` trail, `mine`, resolve → message in customer chat).
-- [ ] Phase 7 — AWS: IaC, ECR, ECS/RDS/S3/SQS, Secrets/KMS, CloudWatch/OTel, staging/prod
+- [x] Help chat + issue threads (`feat/help-and-issues`, ADR 0015): one help chat + N issues per customer; code routes problems to an issue right after triage (`conversations.after_triage`, idempotent); issue status follows outcome/ticket; ticket on dead-letter (no promise without an owner); doc-answered questions skip the resolution call; `T1..` transaction aliases for the model; model warm-up; `make journeys` (a company end to end with real models, `ONLY=ids`).
+- [ ] Phase 7 — AWS (deferred: not for the hackathon): IaC, ECR, ECS/RDS/S3/SQS, Secrets/KMS, CloudWatch/OTel, staging/prod
 - [ ] Phase 8 — Hardening: golden/adversarial/prompt-injection/cross-tenant/load/chaos/cost tests
 - [ ] Phase 9–10 — Pilot, commercial MVP
 

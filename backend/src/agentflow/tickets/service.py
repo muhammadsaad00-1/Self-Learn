@@ -16,3 +16,11 @@ async def for_customer(session: AsyncSession, org_id: uuid.UUID, customer_ref: s
         .limit(50)
     )
     return list(rows)
+
+
+async def codes(session: AsyncSession, ticket_ids: list[uuid.UUID]) -> dict[uuid.UUID, str]:
+    """Ticket id -> case code (TCK-1042), for showing cases next to conversations."""
+    if not ticket_ids:
+        return {}
+    rows = await session.scalars(select(Ticket).where(Ticket.id.in_(ticket_ids)))
+    return {t.id: t.code for t in rows}

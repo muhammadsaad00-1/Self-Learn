@@ -49,6 +49,11 @@ class TriageResult(BaseModel):
     category: Category
     urgency: Urgency
     summary: str = Field(description="One neutral sentence for an operations agent")
+    title: str = Field(
+        default="",
+        description="3-7 word title of the request in English, as the customer would name "
+        "it, e.g. 'Transfer to Ali not received'",
+    )
     details: Details
     confidence: float = Field(ge=0, le=1, description="How sure you are of the category")
     needs_human_review: bool

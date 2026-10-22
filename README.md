@@ -37,6 +37,32 @@ Sign up at http://localhost:4200/signup.
 6. Workflows → any request → the decision trail (criticality signals, evidence → policy → approval → ledger-verified action → reply); Audit log for the compliance record.
 `make help` lists every command. `make down` stops the stack.
 
+## How a customer message flows
+
+```
+customer app ─ Help chat ───────────► workflow: triage → plan → retrieve+rerank → answer → verify
+                  │                                 │
+                  │   right after triage, CODE decides: a problem (payment category or
+                  │   critical risk)? → open an ISSUE thread, say so in the help chat
+                  ▼                                 ▼
+   answer from the company's docs     research (ledger) → resolve → policy → [approval]
+   or the customer's own records      → execute (refund / reversal / card freeze / records answer)
+   (stays in the help chat)           → ticket if a human must own it → reply in the issue
+                                         issue status: resolved · in review · with a specialist
+team dashboard: Chats (take over / hand back) · Tickets (hand off, resolve → message in the issue)
+                Approvals (maker-checker) · Insights · Audit log
+```
+
+## See it work as a company (real models)
+
+```bash
+make up && make migrate      # the stack, with the worker
+make journeys                # a new company uploads its policy document, 11 customers write in,
+                             # the team approves, hands off and resolves; prints a pass/fail report
+make journeys ONLY=fraud,otp-scam   # just some journeys
+```
+Expectations live in `backend/evals/journeys/journeys.jsonl` (route, issue status, cards, priority, a key fact in the reply). The free Groq tier allows ~200k tokens/day on gpt-oss-120b, roughly 15 full runs across all evals.
+
 ## Test
 
 ```bash

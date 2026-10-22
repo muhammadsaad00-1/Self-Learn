@@ -1,5 +1,5 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { Component, DestroyRef, inject, output, signal } from '@angular/core';
+import { Component, DestroyRef, effect, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 
@@ -18,13 +18,14 @@ const SUGGESTIONS = [
   "I see payments I didn't make!! 😱",
 ];
 
-/** The customer's chat with the bank: text or voice notes, polled while the agents work. */
+/** One of the customer's conversations (the help chat or an issue): text or voice notes,
+ *  polled while the agents work. */
 @Component({
   selector: 'app-customer-chat',
   imports: [FormsModule, ChatThread],
   template: `
     @if (chat(); as c) {
-      @if (c.messages.length === 0) {
+      @if (c.messages.length === 0 && c.kind === 'help') {
         <div class="hello">
           <p>
             Hi {{ c.customer_name?.split(' ')?.[0] ?? 'there' }} 👋 Text or send a voice note, in
@@ -38,7 +39,11 @@ const SUGGESTIONS = [
           </div>
         </div>
       }
-      <app-chat-thread [messages]="c.messages" [thinking]="c.thinking || busy()" />
+      <app-chat-thread
+        [messages]="c.messages"
+        [thinking]="c.thinking || busy()"
+        (openIssue)="openIssue.emit($event)"
+      />
     } @else {
       <p class="muted hello">Loading…</p>
     }
@@ -74,8 +79,10 @@ export class CustomerChat {
   private readonly http = inject(HttpClient);
   private readonly session = inject(CustomerSession);
 
-  /** The agents or the team answered: the portal refreshes cases and card status. */
+  readonly conversationId = input.required<string>();
+  /** The agents or the team answered: the portal refreshes issues and card status. */
   readonly answered = output<Chat>();
+  readonly openIssue = output<string>();
 
   protected readonly suggestions = SUGGESTIONS;
   protected readonly chat = signal<Chat | null>(null);
@@ -87,17 +94,26 @@ export class CustomerChat {
   private recorder: MediaRecorder | null = null;
 
   constructor() {
-    void this.refresh();
+    effect(() => {
+      this.conversationId(); // switched conversation: start fresh
+      this.chat.set(null);
+      void this.refresh();
+    });
     const timer = setInterval(() => void this.refresh(), POLL_MS);
     inject(DestroyRef).onDestroy(() => clearInterval(timer));
+  }
+
+  private url(): string {
+    return `/v1/customer/conversations/${this.conversationId()}`;
   }
 
   private async refresh(): Promise<void> {
     if (!this.session.loggedIn()) return;
     try {
       const next = await firstValueFrom(
-        this.http.get<Chat>('/v1/chat', { headers: this.session.headers() }),
+        this.http.get<Chat>(this.url(), { headers: this.session.headers() }),
       );
+      if (next.id !== this.conversationId()) return; // a late answer for another thread
       const before = this.chat()?.messages.length;
       this.chat.set(next);
       if (before !== undefined && next.messages.length !== before) this.answered.emit(next);
@@ -109,7 +125,7 @@ export class CustomerChat {
   protected async send(text: string): Promise<void> {
     text = text.trim();
     if (!text || this.busy()) return;
-    await this.post('/v1/chat/messages', { text }, () => (this.draft = ''));
+    await this.post(`${this.url()}/messages`, { text }, () => (this.draft = ''));
   }
 
   protected async toggleRecording(): Promise<void> {
@@ -129,7 +145,7 @@ export class CustomerChat {
         const form = new FormData();
         const name = recorder.mimeType.includes('mp4') ? 'voice.m4a' : 'voice.webm';
         form.append('file', new Blob(parts, { type: recorder.mimeType }), name);
-        void this.post('/v1/chat/voice', form);
+        void this.post(`${this.url()}/voice`, form);
       };
       recorder.start();
       this.recorder = recorder;

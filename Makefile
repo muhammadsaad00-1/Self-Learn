@@ -6,7 +6,7 @@ UV := uv --directory backend
 -include .env
 export
 
-.PHONY: help install up down db-reset logs run worker eval eval-rag web api-types migrate migration test lint fmt typecheck check hooks-update
+.PHONY: help install up down db-reset logs run worker eval eval-rag journeys web api-types migrate migration test lint fmt typecheck check hooks-update
 
 help: ## Show this help
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -42,6 +42,9 @@ eval: ## Evaluate the triage agent against the real model (uses Groq tokens)
 
 eval-rag: ## RAG quality per stage with real models; AGENTS=1 also runs the LLM agents (tokens)
 	$(UV) run python evals/rag/run_rag.py $(if $(AGENTS),--agents,)
+
+journeys: ## A company's whole journey vs the running stack + real models: docs, help chat, issues, tickets, team (tokens)
+	$(UV) run python evals/journeys/run_journeys.py $(if $(ONLY),--only $(ONLY),)
 
 web: ## Run the Angular dashboard on http://localhost:4200 (needs `make run` or `make up` for the API)
 	cd frontend && npm start

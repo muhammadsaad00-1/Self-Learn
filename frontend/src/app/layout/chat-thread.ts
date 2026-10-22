@@ -1,5 +1,5 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
-import { Component, ElementRef, effect, input, viewChild } from '@angular/core';
+import { Component, ElementRef, effect, input, output, viewChild } from '@angular/core';
 
 import type { ChatMessage } from '../api/types';
 
@@ -19,6 +19,8 @@ interface Card {
   review?: { amount: string | null };
   case?: { code: string; priority: string };
   sources?: string[];
+  /** The orchestrator moved this problem to its own issue thread. */
+  issue?: { id: string; subject: string };
   /** The customer's own transactions the answer is based on (answer_from_records). */
   records?: {
     reference: string;
@@ -76,6 +78,11 @@ interface Card {
                     }
                   </ol>
                 </div>
+              }
+              @if (c.issue; as i) {
+                <button type="button" class="fact issue-link" (click)="openIssue.emit(i.id)">
+                  🧾 Issue opened: <strong>{{ i.subject }}</strong> · open →
+                </button>
               }
               @if (c.records; as rs) {
                 <div class="fact records">
@@ -138,6 +145,8 @@ export class ChatThread {
   readonly thinking = input(false);
   /** Whose bubbles sit on the right: the customer in the app, the team in the inbox. */
   readonly mine = input<ChatMessage['role']>('customer');
+  /** The customer (or staff member) clicked an "issue opened" card. */
+  readonly openIssue = output<string>();
 
   protected card(m: ChatMessage): Card | null {
     return m.card as Card | null;

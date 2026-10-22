@@ -1,13 +1,16 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { HttpClient, httpResource } from '@angular/common/http';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 
-import type { CustomerCase, CustomerMe, LedgerTransaction } from '../api/types';
+import type { Chat, Conversation, CustomerMe, LedgerTransaction } from '../api/types';
 import { CustomerSession } from '../core/customer-session';
+import { errorMessage } from '../core/errors';
 import { CustomerChat } from '../layout/customer-chat';
 
-type Tab = 'chat' | 'activity' | 'cases';
+type Tab = 'help' | 'issues' | 'activity';
 
 const TRANSFER_LABEL: Record<string, string> = {
   credited: 'Delivered',
@@ -15,22 +18,42 @@ const TRANSFER_LABEL: Record<string, string> = {
   failed: 'Failed',
 };
 
+const ISSUE_STATUS: Record<Conversation['status'], { label: string; badge: string }> = {
+  open: { label: 'working on it', badge: 'queued' },
+  in_review: { label: 'with an officer', badge: 'queued' },
+  with_specialist: { label: 'specialist on it', badge: 'queued' },
+  resolved: { label: 'resolved', badge: 'completed' },
+};
+
 /**
- * The customer's own app: chat with the bank, their recent activity (the same ledger the
- * agents read), and the status of their support cases. Opened after the OTP login, or from a
- * staff-issued link (/chat#<token>).
+ * The customer's own app (never the staff dashboard):
+ * - Help: questions, answered from the bank's documents and the customer's own records.
+ * - Issues: one thread per problem, opened by the customer or by the agents when a help
+ *   message turns out to be a problem; each shows its status and case number.
+ * - Activity: their transactions (the same ledger the agents read).
+ * Opened after the OTP login, or from a staff-issued link (/chat#<token>).
  */
 @Component({
   selector: 'app-customer-portal-page',
-  imports: [DatePipe, DecimalPipe, CustomerChat],
+  imports: [DatePipe, DecimalPipe, FormsModule, CustomerChat],
   template: `
     <div class="phone">
       <header class="phone-head">
+        @if (tab() === 'issues' && openIssue()) {
+          <button
+            type="button"
+            class="link on-accent"
+            aria-label="Back to issues"
+            (click)="openIssue.set(null)"
+          >
+            ←
+          </button>
+        }
         <div class="avatar">AF</div>
         <div>
-          <strong>{{ me.value()?.customer_name ?? 'AgentFlow Bank' }}</strong>
+          <strong>{{ title() }}</strong>
           <small>
-            AgentFlow Bank ·
+            {{ me.value()?.customer_name ?? 'AgentFlow Bank' }} ·
             @if (me.value()?.card_status === 'frozen') {
               🔒 card frozen
             } @else {
@@ -46,8 +69,59 @@ const TRANSFER_LABEL: Record<string, string> = {
         <p class="hello">Your session ended. Please sign in again.</p>
       } @else {
         @switch (tab()) {
-          @case ('chat') {
-            <app-customer-chat (answered)="refresh()" />
+          @case ('help') {
+            @if (helpId(); as id) {
+              <app-customer-chat
+                [conversationId]="id"
+                (answered)="refresh()"
+                (openIssue)="showIssue($event)"
+              />
+            }
+          }
+          @case ('issues') {
+            @if (openIssue(); as id) {
+              <app-customer-chat [conversationId]="id" (answered)="refresh()" />
+            } @else {
+              <form class="report" (submit)="$event.preventDefault(); report()">
+                <textarea
+                  [(ngModel)]="problem"
+                  name="problem"
+                  rows="2"
+                  maxlength="2000"
+                  placeholder="Something wrong? Describe it, e.g. 'my transfer didn't arrive'"
+                ></textarea>
+                <button type="submit" [disabled]="busy() || !problem.trim()">
+                  Report a problem
+                </button>
+                @if (error()) {
+                  <small class="error" role="alert">{{ error() }}</small>
+                }
+              </form>
+              <ul class="activity">
+                @for (i of issues(); track i.id) {
+                  <li>
+                    <button type="button" class="issue-row" (click)="showIssue(i.id)">
+                      <span>
+                        <strong>{{ i.subject ?? i.last_message?.body ?? 'New issue' }}</strong>
+                        <small class="muted">
+                          {{ i.created_at | date: 'MMM d, h:mm a' }}
+                          @if (i.case_code) {
+                            · case {{ i.case_code }}
+                          }
+                        </small>
+                      </span>
+                      <span class="badge" [attr.data-status]="issueStatus[i.status].badge">
+                        {{ issueStatus[i.status].label }}
+                      </span>
+                    </button>
+                  </li>
+                } @empty {
+                  <li class="muted">
+                    No issues. If something's wrong, report it above or just text us.
+                  </li>
+                }
+              </ul>
+            }
           }
           @case ('activity') {
             <ul class="activity">
@@ -77,36 +151,16 @@ const TRANSFER_LABEL: Record<string, string> = {
               }
             </ul>
           }
-          @case ('cases') {
-            <ul class="activity">
-              @for (c of cases.value() ?? []; track c.code) {
-                <li>
-                  <span>
-                    <strong>{{ c.code }}</strong>
-                    <small class="muted">
-                      {{ (c.category ?? 'request').replaceAll('_', ' ') }} · opened
-                      {{ c.created_at | date: 'MMM d' }}
-                    </small>
-                  </span>
-                  <span
-                    class="badge"
-                    [attr.data-status]="c.status === 'resolved' ? 'completed' : 'queued'"
-                  >
-                    {{ c.status === 'resolved' ? 'resolved' : 'a specialist is on it' }}
-                  </span>
-                </li>
-              } @empty {
-                <li class="muted">No open cases. If something's wrong, just text us.</li>
-              }
-            </ul>
-          }
         }
       }
 
       <nav class="tabbar">
         @for (t of tabs; track t.id) {
-          <button type="button" [class.active]="tab() === t.id" (click)="tab.set(t.id)">
+          <button type="button" [class.active]="tab() === t.id" (click)="selectTab(t.id)">
             {{ t.label }}
+            @if (t.id === 'issues' && activeIssues()) {
+              <span class="count">{{ activeIssues() }}</span>
+            }
           </button>
         }
       </nav>
@@ -119,12 +173,17 @@ export class CustomerPortalPage implements OnInit {
   private readonly http = inject(HttpClient);
 
   protected readonly tabs: { id: Tab; label: string }[] = [
-    { id: 'chat', label: '💬 Chat' },
+    { id: 'help', label: '💬 Help' },
+    { id: 'issues', label: '🧾 Issues' },
     { id: 'activity', label: '📊 Activity' },
-    { id: 'cases', label: '🗂 Cases' },
   ];
-  protected readonly tab = signal<Tab>('chat');
+  protected readonly tab = signal<Tab>('help');
+  protected readonly openIssue = signal<string | null>(null);
+  protected readonly busy = signal(false);
+  protected readonly error = signal<string | null>(null);
   protected readonly transferLabel = TRANSFER_LABEL;
+  protected readonly issueStatus = ISSUE_STATUS;
+  protected problem = '';
 
   private resource<T>(url: string) {
     return httpResource<T>(() =>
@@ -134,7 +193,24 @@ export class CustomerPortalPage implements OnInit {
 
   protected readonly me = this.resource<CustomerMe>('/v1/customer/me');
   protected readonly transactions = this.resource<LedgerTransaction[]>('/v1/customer/transactions');
-  protected readonly cases = this.resource<CustomerCase[]>('/v1/customer/cases');
+  protected readonly conversations = this.resource<Conversation[]>('/v1/customer/conversations');
+
+  protected readonly helpId = computed(
+    () => this.conversations.value()?.find((c) => c.kind === 'help')?.id ?? null,
+  );
+  protected readonly issues = computed(
+    () => this.conversations.value()?.filter((c) => c.kind === 'issue') ?? [],
+  );
+  protected readonly activeIssues = computed(
+    () => this.issues().filter((i) => i.status !== 'resolved').length,
+  );
+  protected readonly title = computed(() => {
+    if (this.tab() === 'issues') {
+      const open = this.issues().find((i) => i.id === this.openIssue());
+      return open ? (open.subject ?? 'Issue') : 'Your issues';
+    }
+    return this.tab() === 'activity' ? 'Activity' : 'AgentFlow Bank';
+  });
 
   ngOnInit(): void {
     // A staff-issued link carries the token in the #fragment (never sent to servers).
@@ -146,11 +222,42 @@ export class CustomerPortalPage implements OnInit {
     if (!this.session.loggedIn()) void this.router.navigateByUrl('/customer/login');
   }
 
-  /** The chat moved on (a refund, a frozen card, a case): reload the rest of the app. */
+  protected selectTab(tab: Tab): void {
+    this.tab.set(tab);
+    if (tab === 'issues') this.openIssue.set(null);
+  }
+
+  protected showIssue(id: string): void {
+    this.tab.set('issues');
+    this.openIssue.set(id);
+    this.conversations.reload();
+  }
+
+  /** The chat moved on (a refund, a frozen card, a new issue): reload the rest of the app. */
   protected refresh(): void {
     this.me.reload();
     this.transactions.reload();
-    this.cases.reload();
+    this.conversations.reload();
+  }
+
+  protected async report(): Promise<void> {
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      const issue = await firstValueFrom(
+        this.http.post<Chat>(
+          '/v1/customer/issues',
+          { text: this.problem.trim() },
+          { headers: this.session.headers() },
+        ),
+      );
+      this.problem = '';
+      this.showIssue(issue.id);
+    } catch (err) {
+      this.error.set(errorMessage(err));
+    } finally {
+      this.busy.set(false);
+    }
   }
 
   protected logout(): void {

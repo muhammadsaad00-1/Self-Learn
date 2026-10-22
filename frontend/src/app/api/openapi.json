@@ -1572,134 +1572,14 @@
         }
       }
     },
-    "/v1/chat": {
-      "get": {
-        "tags": [
-          "chat"
-        ],
-        "summary": "Get Chat",
-        "description": "The whole conversation. Poll it while `thinking` is true.",
-        "operationId": "get_chat_v1_chat_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ChatOut"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/v1/chat/messages": {
-      "post": {
-        "tags": [
-          "chat"
-        ],
-        "summary": "Send Message",
-        "operationId": "send_message_v1_chat_messages_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TextIn"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MessageOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/v1/chat/voice": {
-      "post": {
-        "tags": [
-          "chat"
-        ],
-        "summary": "Send Voice Note",
-        "description": "Voice note -> Whisper transcript -> the same pipeline as a typed message.",
-        "operationId": "send_voice_note_v1_chat_voice_post",
-        "requestBody": {
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "$ref": "#/components/schemas/Body_send_voice_note_v1_chat_voice_post"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MessageOut"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
     "/v1/conversations": {
       "post": {
         "tags": [
           "conversations"
         ],
-        "summary": "Open Chat",
-        "description": "Open (or reopen) a customer's chat and issue a customer token for it. In production\nthe bank's app does this after its own customer login; here staff use it for demos.",
-        "operationId": "open_chat_v1_conversations_post",
+        "summary": "Open Customer App",
+        "description": "Issue a customer token to open the customer app as this customer (demos and\nassisted support). In production customers sign in themselves (phone + code).",
+        "operationId": "open_customer_app_v1_conversations_post",
         "security": [
           {
             "OAuth2PasswordBearer": []
@@ -1757,7 +1637,7 @@
           "conversations"
         ],
         "summary": "List Conversations",
-        "description": "The 50 most recently active conversations, newest first.",
+        "description": "The 50 most recently active conversations (help chats and issues), newest first.",
         "operationId": "list_conversations_v1_conversations_get",
         "security": [
           {
@@ -1997,6 +1877,307 @@
         }
       }
     },
+    "/v1/customer/conversations": {
+      "get": {
+        "tags": [
+          "customer"
+        ],
+        "summary": "My Conversations",
+        "description": "The help chat first, then my issues (newest first).",
+        "operationId": "my_conversations_v1_customer_conversations_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ConversationOut"
+                  },
+                  "type": "array",
+                  "title": "Response My Conversations V1 Customer Conversations Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/customer/issues": {
+      "post": {
+        "tags": [
+          "customer"
+        ],
+        "summary": "Report Issue",
+        "description": "Report a problem: a new issue thread, the agents start on it at once.",
+        "operationId": "report_issue_v1_customer_issues_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TextIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/customer/conversations/{conversation_id}": {
+      "get": {
+        "tags": [
+          "customer"
+        ],
+        "summary": "My Conversation",
+        "description": "The whole conversation. Poll it while `thinking` is true.",
+        "operationId": "my_conversation_v1_customer_conversations__conversation_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/customer/conversations/{conversation_id}/messages": {
+      "post": {
+        "tags": [
+          "customer"
+        ],
+        "summary": "Send Message",
+        "operationId": "send_message_v1_customer_conversations__conversation_id__messages_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TextIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/customer/conversations/{conversation_id}/voice": {
+      "post": {
+        "tags": [
+          "customer"
+        ],
+        "summary": "Send Voice Note",
+        "description": "Voice note -> Whisper transcript -> the same pipeline as a typed message.",
+        "operationId": "send_voice_note_v1_customer_conversations__conversation_id__voice_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_send_voice_note_v1_customer_conversations__conversation_id__voice_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/customer/me": {
+      "get": {
+        "tags": [
+          "customer"
+        ],
+        "summary": "Customer Me",
+        "operationId": "customer_me_v1_customer_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomerMe"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/customer/transactions": {
+      "get": {
+        "tags": [
+          "customer"
+        ],
+        "summary": "Customer Transactions",
+        "description": "The customer's last 30 days, newest first: the same data the agents read.",
+        "operationId": "customer_transactions_v1_customer_transactions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TransactionOut"
+                  },
+                  "type": "array",
+                  "title": "Response Customer Transactions V1 Customer Transactions Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/v1/customer/login/start": {
       "post": {
         "tags": [
@@ -2079,94 +2260,6 @@
             }
           }
         }
-      }
-    },
-    "/v1/customer/me": {
-      "get": {
-        "tags": [
-          "customer"
-        ],
-        "summary": "Customer Me",
-        "operationId": "customer_me_v1_customer_me_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/CustomerMe"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/v1/customer/transactions": {
-      "get": {
-        "tags": [
-          "customer"
-        ],
-        "summary": "Customer Transactions",
-        "description": "The customer's last 30 days, newest first: the same data the agents read.",
-        "operationId": "customer_transactions_v1_customer_transactions_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/TransactionOut"
-                  },
-                  "type": "array",
-                  "title": "Response Customer Transactions V1 Customer Transactions Get"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
-      }
-    },
-    "/v1/customer/cases": {
-      "get": {
-        "tags": [
-          "customer"
-        ],
-        "summary": "Customer Cases",
-        "description": "The customer's support cases. Internal notes and titles stay with the team.",
-        "operationId": "customer_cases_v1_customer_cases_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "items": {
-                    "$ref": "#/components/schemas/CustomerCase"
-                  },
-                  "type": "array",
-                  "title": "Response Customer Cases V1 Customer Cases Get"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ]
       }
     },
     "/v1/insights": {
@@ -2687,7 +2780,7 @@
         ],
         "title": "Body_login_v1_auth_login_post"
       },
-      "Body_send_voice_note_v1_chat_voice_post": {
+      "Body_send_voice_note_v1_customer_conversations__conversation_id__voice_post": {
         "properties": {
           "file": {
             "type": "string",
@@ -2700,7 +2793,7 @@
         "required": [
           "file"
         ],
-        "title": "Body_send_voice_note_v1_chat_voice_post"
+        "title": "Body_send_voice_note_v1_customer_conversations__conversation_id__voice_post"
       },
       "Body_upload_document_v1_knowledge_documents_post": {
         "properties": {
@@ -2766,6 +2859,18 @@
       },
       "ChatOut": {
         "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ConversationKind"
+          },
+          "customer_ref": {
+            "type": "string",
+            "title": "Customer Ref"
+          },
           "customer_name": {
             "anyOf": [
               {
@@ -2779,6 +2884,51 @@
           },
           "mode": {
             "$ref": "#/components/schemas/ConversationMode"
+          },
+          "status": {
+            "$ref": "#/components/schemas/IssueStatus"
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject"
+          },
+          "case_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Case Code"
+          },
+          "last_message": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MessageOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
           },
           "thinking": {
             "type": "boolean",
@@ -2794,8 +2944,17 @@
         },
         "type": "object",
         "required": [
+          "id",
+          "kind",
+          "customer_ref",
           "customer_name",
           "mode",
+          "status",
+          "subject",
+          "case_code",
+          "last_message",
+          "created_at",
+          "updated_at",
           "thinking",
           "messages"
         ],
@@ -2848,6 +3007,14 @@
         ],
         "title": "Citation"
       },
+      "ConversationKind": {
+        "type": "string",
+        "enum": [
+          "help",
+          "issue"
+        ],
+        "title": "ConversationKind"
+      },
       "ConversationMode": {
         "type": "string",
         "enum": [
@@ -2862,6 +3029,9 @@
             "type": "string",
             "format": "uuid",
             "title": "Id"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ConversationKind"
           },
           "customer_ref": {
             "type": "string",
@@ -2881,6 +3051,31 @@
           "mode": {
             "$ref": "#/components/schemas/ConversationMode"
           },
+          "status": {
+            "$ref": "#/components/schemas/IssueStatus"
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject"
+          },
+          "case_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Case Code"
+          },
           "last_message": {
             "anyOf": [
               {
@@ -2891,6 +3086,11 @@
               }
             ]
           },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
           "updated_at": {
             "type": "string",
             "format": "date-time",
@@ -2900,10 +3100,15 @@
         "type": "object",
         "required": [
           "id",
+          "kind",
           "customer_ref",
           "customer_name",
           "mode",
+          "status",
+          "subject",
+          "case_code",
           "last_message",
+          "created_at",
           "updated_at"
         ],
         "title": "ConversationOut"
@@ -2946,54 +3151,6 @@
         ],
         "title": "CreateWorkflowRequest",
         "description": "A customer request entering the system (from a support inbox, chat, or the dashboard)."
-      },
-      "CustomerCase": {
-        "properties": {
-          "code": {
-            "type": "string",
-            "title": "Code"
-          },
-          "status": {
-            "$ref": "#/components/schemas/TicketStatus"
-          },
-          "category": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Category"
-          },
-          "created_at": {
-            "type": "string",
-            "format": "date-time",
-            "title": "Created At"
-          },
-          "resolved_at": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Resolved At"
-          }
-        },
-        "type": "object",
-        "required": [
-          "code",
-          "status",
-          "category",
-          "created_at",
-          "resolved_at"
-        ],
-        "title": "CustomerCase"
       },
       "CustomerMe": {
         "properties": {
@@ -3462,6 +3619,16 @@
         ],
         "title": "Insights"
       },
+      "IssueStatus": {
+        "type": "string",
+        "enum": [
+          "open",
+          "in_review",
+          "with_specialist",
+          "resolved"
+        ],
+        "title": "IssueStatus"
+      },
       "KnowledgeAnswer": {
         "properties": {
           "status": {
@@ -3809,7 +3976,7 @@
               }
             ],
             "title": "Transaction Reference",
-            "description": "Debit to refund, if refunding"
+            "description": "The ref (T1, T2, ...) of the debit to refund, if refunding"
           },
           "amount": {
             "anyOf": [
@@ -3835,7 +4002,7 @@
             },
             "type": "array",
             "title": "Record References",
-            "description": "For answer_from_records: references of the transactions that answer it",
+            "description": "For answer_from_records: the refs (T1, T2, ...) of the transactions",
             "default": []
           }
         },
@@ -4967,7 +5134,7 @@
       },
       "HTTPBearer": {
         "type": "http",
-        "description": "Customer token from POST /v1/conversations",
+        "description": "Customer token from the customer login",
         "scheme": "bearer"
       }
     }

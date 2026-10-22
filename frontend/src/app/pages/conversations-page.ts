@@ -1,6 +1,6 @@
 import { DatePipe } from '@angular/common';
 import { HttpClient, httpResource } from '@angular/common/http';
-import { Component, DestroyRef, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 
@@ -11,7 +11,10 @@ import { ChatThread } from '../layout/chat-thread';
 
 const POLL_MS = 2500;
 
-/** The team's inbox of customer chats: watch the agents work, take over, hand back. */
+type Filter = 'all' | 'issues' | 'help';
+
+/** The team's inbox: help chats and issue threads. Watch the agents work, take over, hand
+ *  back; open issues (not resolved by the agents) are one click away. */
 @Component({
   selector: 'app-conversations-page',
   imports: [DatePipe, FormsModule, ChatThread],
@@ -36,13 +39,38 @@ const POLL_MS = 2500;
       <p class="error" role="alert">{{ error() }}</p>
     }
 
+    <div class="row">
+      @for (f of filters; track f.id) {
+        <button
+          type="button"
+          class="link"
+          [class.active-tab]="filter() === f.id"
+          (click)="filter.set(f.id)"
+        >
+          {{ f.label }}
+        </button>
+      }
+    </div>
+
     <div class="inbox-split">
       <ul class="list">
-        @for (c of conversations.value() ?? []; track c.id) {
+        @for (c of shown(); track c.id) {
           <li>
             <button class="list-item" [class.selected]="c.id === selected()" (click)="select(c.id)">
               <span class="answer-head">
                 <strong>{{ c.customer_name ?? c.customer_ref }}</strong>
+                <span class="badge">{{ c.kind === 'issue' ? '🧾 issue' : '💬 help' }}</span>
+                @if (c.kind === 'issue') {
+                  <span
+                    class="badge"
+                    [attr.data-status]="c.status === 'resolved' ? 'completed' : 'queued'"
+                  >
+                    {{ c.status.replaceAll('_', ' ') }}
+                  </span>
+                }
+                @if (c.case_code) {
+                  <span class="badge" data-urgency="high">{{ c.case_code }}</span>
+                }
                 <span
                   class="badge"
                   [attr.data-status]="c.mode === 'human' ? 'queued' : 'completed'"
@@ -50,6 +78,9 @@ const POLL_MS = 2500;
                   {{ c.mode === 'human' ? 'you' : 'AI' }}
                 </span>
               </span>
+              @if (c.subject) {
+                <small>{{ c.subject }}</small>
+              }
               <small class="muted">
                 {{ c.last_message?.body?.slice(0, 70) ?? 'No messages yet' }}
               </small>
@@ -72,7 +103,15 @@ const POLL_MS = 2500;
               <span class="muted">The agents are answering. Writing a reply takes over.</span>
             }
           </div>
-          <app-chat-thread [messages]="t.messages" [thinking]="t.thinking" mine="agent" />
+          @if (t.subject) {
+            <p class="muted">{{ t.kind === 'issue' ? 'Issue' : 'Help chat' }}: {{ t.subject }}</p>
+          }
+          <app-chat-thread
+            [messages]="t.messages"
+            [thinking]="t.thinking"
+            mine="agent"
+            (openIssue)="select($event)"
+          />
           <form class="composer" (submit)="$event.preventDefault(); reply()">
             <input
               [(ngModel)]="draft"
@@ -98,6 +137,18 @@ export class ConversationsPage {
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly selected = signal<string | null>(null);
+  protected readonly filters: { id: Filter; label: string }[] = [
+    { id: 'all', label: 'all' },
+    { id: 'issues', label: 'open issues' },
+    { id: 'help', label: 'help chats' },
+  ];
+  protected readonly filter = signal<Filter>('all');
+  protected readonly shown = computed(() => {
+    const all = this.conversations.value() ?? [];
+    const f = this.filter();
+    if (f === 'issues') return all.filter((c) => c.kind === 'issue' && c.status !== 'resolved');
+    return f === 'help' ? all.filter((c) => c.kind === 'help') : all;
+  });
   protected readonly thread = signal<Chat | null>(null);
 
   protected portalLink(): string {

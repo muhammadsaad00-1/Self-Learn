@@ -435,63 +435,6 @@ export interface paths {
         patch: operations["update_ticket_v1_tickets__ticket_id__patch"];
         trace?: never;
     };
-    "/v1/chat": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Chat
-         * @description The whole conversation. Poll it while `thinking` is true.
-         */
-        get: operations["get_chat_v1_chat_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/chat/messages": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Send Message */
-        post: operations["send_message_v1_chat_messages_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/chat/voice": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Send Voice Note
-         * @description Voice note -> Whisper transcript -> the same pipeline as a typed message.
-         */
-        post: operations["send_voice_note_v1_chat_voice_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/conversations": {
         parameters: {
             query?: never;
@@ -501,16 +444,16 @@ export interface paths {
         };
         /**
          * List Conversations
-         * @description The 50 most recently active conversations, newest first.
+         * @description The 50 most recently active conversations (help chats and issues), newest first.
          */
         get: operations["list_conversations_v1_conversations_get"];
         put?: never;
         /**
-         * Open Chat
-         * @description Open (or reopen) a customer's chat and issue a customer token for it. In production
-         *     the bank's app does this after its own customer login; here staff use it for demos.
+         * Open Customer App
+         * @description Issue a customer token to open the customer app as this customer (demos and
+         *     assisted support). In production customers sign in themselves (phone + code).
          */
-        post: operations["open_chat_v1_conversations_post"];
+        post: operations["open_customer_app_v1_conversations_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -571,27 +514,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/customer/login/start": {
+    "/v1/customer/conversations": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        put?: never;
         /**
-         * Login Start
-         * @description Send a 6-digit one-time code to the customer's registered mobile number.
+         * My Conversations
+         * @description The help chat first, then my issues (newest first).
          */
-        post: operations["login_start_v1_customer_login_start_post"];
+        get: operations["my_conversations_v1_customer_conversations_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/customer/login/verify": {
+    "/v1/customer/issues": {
         parameters: {
             query?: never;
             header?: never;
@@ -601,10 +544,67 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Login Verify
-         * @description Exchange the one-time code for a customer token (the customer's session).
+         * Report Issue
+         * @description Report a problem: a new issue thread, the agents start on it at once.
          */
-        post: operations["login_verify_v1_customer_login_verify_post"];
+        post: operations["report_issue_v1_customer_issues_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/customer/conversations/{conversation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My Conversation
+         * @description The whole conversation. Poll it while `thinking` is true.
+         */
+        get: operations["my_conversation_v1_customer_conversations__conversation_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/customer/conversations/{conversation_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send Message */
+        post: operations["send_message_v1_customer_conversations__conversation_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/customer/conversations/{conversation_id}/voice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Send Voice Note
+         * @description Voice note -> Whisper transcript -> the same pipeline as a typed message.
+         */
+        post: operations["send_voice_note_v1_customer_conversations__conversation_id__voice_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -648,20 +648,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/customer/cases": {
+    "/v1/customer/login/start": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /**
-         * Customer Cases
-         * @description The customer's support cases. Internal notes and titles stay with the team.
-         */
-        get: operations["customer_cases_v1_customer_cases_get"];
+        get?: never;
         put?: never;
-        post?: never;
+        /**
+         * Login Start
+         * @description Send a 6-digit one-time code to the customer's registered mobile number.
+         */
+        post: operations["login_start_v1_customer_login_start_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/customer/login/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Login Verify
+         * @description Exchange the one-time code for a customer token (the customer's session).
+         */
+        post: operations["login_verify_v1_customer_login_verify_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -895,8 +915,8 @@ export interface components {
              */
             client_secret?: string | null;
         };
-        /** Body_send_voice_note_v1_chat_voice_post */
-        Body_send_voice_note_v1_chat_voice_post: {
+        /** Body_send_voice_note_v1_customer_conversations__conversation_id__voice_post */
+        Body_send_voice_note_v1_customer_conversations__conversation_id__voice_post: {
             /**
              * File
              * @description Recorded audio (webm/ogg/m4a/mp3/wav)
@@ -929,9 +949,33 @@ export interface components {
         };
         /** ChatOut */
         ChatOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            kind: components["schemas"]["ConversationKind"];
+            /** Customer Ref */
+            customer_ref: string;
             /** Customer Name */
             customer_name: string | null;
             mode: components["schemas"]["ConversationMode"];
+            status: components["schemas"]["IssueStatus"];
+            /** Subject */
+            subject: string | null;
+            /** Case Code */
+            case_code: string | null;
+            last_message: components["schemas"]["MessageOut"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
             /** Thinking */
             thinking: boolean;
             /** Messages */
@@ -959,6 +1003,11 @@ export interface components {
             excerpt: string;
         };
         /**
+         * ConversationKind
+         * @enum {string}
+         */
+        ConversationKind: "help" | "issue";
+        /**
          * ConversationMode
          * @enum {string}
          */
@@ -970,12 +1019,23 @@ export interface components {
              * Format: uuid
              */
             id: string;
+            kind: components["schemas"]["ConversationKind"];
             /** Customer Ref */
             customer_ref: string;
             /** Customer Name */
             customer_name: string | null;
             mode: components["schemas"]["ConversationMode"];
+            status: components["schemas"]["IssueStatus"];
+            /** Subject */
+            subject: string | null;
+            /** Case Code */
+            case_code: string | null;
             last_message: components["schemas"]["MessageOut"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
             /**
              * Updated At
              * Format: date-time
@@ -997,21 +1057,6 @@ export interface components {
             channel: "web" | "email" | "chat" | "phone";
             /** Customer Ref */
             customer_ref?: string | null;
-        };
-        /** CustomerCase */
-        CustomerCase: {
-            /** Code */
-            code: string;
-            status: components["schemas"]["TicketStatus"];
-            /** Category */
-            category: string | null;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /** Resolved At */
-            resolved_at: string | null;
         };
         /** CustomerMe */
         CustomerMe: {
@@ -1191,6 +1236,11 @@ export interface components {
             };
         };
         /**
+         * IssueStatus
+         * @enum {string}
+         */
+        IssueStatus: "open" | "in_review" | "with_specialist" | "resolved";
+        /**
          * KnowledgeAnswer
          * @description Outcome of the knowledge agents for one question.
          *
@@ -1333,7 +1383,7 @@ export interface components {
             action: components["schemas"]["ActionType"];
             /**
              * Transaction Reference
-             * @description Debit to refund, if refunding
+             * @description The ref (T1, T2, ...) of the debit to refund, if refunding
              */
             transaction_reference: string | null;
             /**
@@ -1348,7 +1398,7 @@ export interface components {
             rationale: string;
             /**
              * Record References
-             * @description For answer_from_records: references of the transactions that answer it
+             * @description For answer_from_records: the refs (T1, T2, ...) of the transactions
              * @default []
              */
             record_references: string[];
@@ -2633,92 +2683,6 @@ export interface operations {
             };
         };
     };
-    get_chat_v1_chat_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ChatOut"];
-                };
-            };
-        };
-    };
-    send_message_v1_chat_messages_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["TextIn"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MessageOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    send_voice_note_v1_chat_voice_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "multipart/form-data": components["schemas"]["Body_send_voice_note_v1_chat_voice_post"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MessageOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     list_conversations_v1_conversations_get: {
         parameters: {
             query?: never;
@@ -2751,7 +2715,7 @@ export interface operations {
             };
         };
     };
-    open_chat_v1_conversations_post: {
+    open_customer_app_v1_conversations_post: {
         parameters: {
             query?: never;
             header: {
@@ -2893,6 +2857,200 @@ export interface operations {
             };
         };
     };
+    my_conversations_v1_customer_conversations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationOut"][];
+                };
+            };
+        };
+    };
+    report_issue_v1_customer_issues_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TextIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_conversation_v1_customer_conversations__conversation_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_message_v1_customer_conversations__conversation_id__messages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TextIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_voice_note_v1_customer_conversations__conversation_id__voice_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                conversation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_send_voice_note_v1_customer_conversations__conversation_id__voice_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    customer_me_v1_customer_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CustomerMe"];
+                };
+            };
+        };
+    };
+    customer_transactions_v1_customer_transactions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TransactionOut"][];
+                };
+            };
+        };
+    };
     login_start_v1_customer_login_start_post: {
         parameters: {
             query?: never;
@@ -2955,66 +3113,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    customer_me_v1_customer_me_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CustomerMe"];
-                };
-            };
-        };
-    };
-    customer_transactions_v1_customer_transactions_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TransactionOut"][];
-                };
-            };
-        };
-    };
-    customer_cases_v1_customer_cases_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CustomerCase"][];
                 };
             };
         };

@@ -1,20 +1,40 @@
-"""Customer chat: one conversation per customer, the messages in it (tenant data, RLS)."""
+"""Customer conversations (tenant data, RLS).
+
+Two kinds:
+- **help**: one per customer. Questions answered from the company's documents and the
+  customer's own records.
+- **issue**: one per problem ("my transfer didn't arrive"). Opened by the customer, or by
+  the orchestrator when a help message turns out to be a problem. It has a status and, when
+  a human must own it, a ticket.
+"""
 
 import uuid
 from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Index, String, Text, UniqueConstraint, func
+from sqlalchemy import DateTime, ForeignKey, Index, String, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from agentflow.db import Base, TimestampMixin, enum_check, str_enum
 
 
+class ConversationKind(StrEnum):
+    HELP = "help"
+    ISSUE = "issue"
+
+
 class ConversationMode(StrEnum):
     AI = "ai"  # each customer message runs the agents
     HUMAN = "human"  # a staff member took over: the agents stay quiet
+
+
+class IssueStatus(StrEnum):
+    OPEN = "open"  # the agents are on it, or the customer replied again
+    IN_REVIEW = "in_review"  # an action waits for an officer's approval
+    WITH_SPECIALIST = "with_specialist"  # a ticket: a human owns it
+    RESOLVED = "resolved"
 
 
 class MessageRole(StrEnum):
@@ -26,16 +46,37 @@ class MessageRole(StrEnum):
 class Conversation(TimestampMixin, Base):
     __tablename__ = "conversations"
     __table_args__ = (
-        UniqueConstraint("org_id", "customer_ref"),
+        enum_check("kind", ConversationKind),
         enum_check("mode", ConversationMode),
+        enum_check("status", IssueStatus),
+        # One help conversation per customer; any number of issues.
+        Index(
+            "uq_conversations_help_per_customer",
+            "org_id",
+            "customer_ref",
+            unique=True,
+            postgresql_where=text("kind = 'help'"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     org_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("organizations.id"))
     customer_ref: Mapped[str] = mapped_column(String(100))
+    kind: Mapped[ConversationKind] = mapped_column(
+        str_enum(ConversationKind), default=ConversationKind.HELP
+    )
     mode: Mapped[ConversationMode] = mapped_column(
         str_enum(ConversationMode), default=ConversationMode.AI
     )
+    # Issues only (help conversations stay 'open').
+    status: Mapped[IssueStatus] = mapped_column(str_enum(IssueStatus), default=IssueStatus.OPEN)
+    subject: Mapped[str | None] = mapped_column(String(300))  # triage's one-line summary
+    # The help-chat workflow the orchestrator opened this issue from (unique: a retried
+    # workflow never opens a second issue).
+    origin_workflow_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("workflows.id"), unique=True
+    )
+    ticket_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("tickets.id"))
 
 
 class ChatMessage(Base):

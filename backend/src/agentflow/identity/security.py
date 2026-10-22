@@ -71,10 +71,10 @@ def decode_access_token(token: str, settings: Settings) -> uuid.UUID | None:
 _CUSTOMER_AUDIENCE = "customer-chat"
 
 
-def create_customer_token(org_id: uuid.UUID, conversation_id: uuid.UUID, settings: Settings) -> str:
+def create_customer_token(org_id: uuid.UUID, customer_ref: str, settings: Settings) -> str:
     now = datetime.now(UTC)
     claims = {
-        "sub": str(conversation_id),
+        "sub": customer_ref,  # the bank's customer id: their help chat, issues and records
         "org": str(org_id),
         "aud": _CUSTOMER_AUDIENCE,
         "iss": _ISSUER,
@@ -84,8 +84,8 @@ def create_customer_token(org_id: uuid.UUID, conversation_id: uuid.UUID, setting
     return jwt.encode(claims, settings.jwt_secret.get_secret_value(), algorithm=_ALGORITHM)
 
 
-def decode_customer_token(token: str, settings: Settings) -> tuple[uuid.UUID, uuid.UUID] | None:
-    """(org id, conversation id) from a valid customer token, else None."""
+def decode_customer_token(token: str, settings: Settings) -> tuple[uuid.UUID, str] | None:
+    """(org id, customer ref) from a valid customer token, else None."""
     try:
         claims = jwt.decode(
             token,
@@ -95,6 +95,6 @@ def decode_customer_token(token: str, settings: Settings) -> tuple[uuid.UUID, uu
             audience=_CUSTOMER_AUDIENCE,
             options={"require": ["sub", "org", "aud", "exp", "iat", "iss"]},
         )
-        return uuid.UUID(claims["org"]), uuid.UUID(claims["sub"])
+        return uuid.UUID(claims["org"]), str(claims["sub"])
     except (jwt.InvalidTokenError, ValueError):
         return None

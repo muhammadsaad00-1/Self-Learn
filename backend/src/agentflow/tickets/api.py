@@ -13,6 +13,7 @@ from sqlalchemy import select
 
 from agentflow.audit import service as audit
 from agentflow.conversations import service as conversations
+from agentflow.conversations.models import IssueStatus
 from agentflow.db import SessionDep
 from agentflow.identity import service as identity
 from agentflow.identity.deps import OrgContextDep
@@ -111,19 +112,23 @@ async def update_ticket(
         ticket.status, ticket.resolution_note = TicketStatus.RESOLVED, note
         ticket.resolved_at = datetime.now(UTC)
         ticket.assignee_id = ticket.assignee_id or ctx.user.id
-        customer_message = (body.customer_message or "").strip()
-        if customer_message and ticket.customer_ref:
-            await conversations.post_team_update(
+        customer_message = (body.customer_message or "").strip() or None
+        if ticket.customer_ref:
+            await conversations.ticket_resolved(
                 session,
                 org_id=ctx.org_id,
+                ticket_id=ticket.id,
                 customer_ref=ticket.customer_ref,
                 user_id=ctx.user.id,
-                text=customer_message,
+                customer_message=customer_message,
                 card={"case": {"code": ticket.code, "priority": ticket.priority, "resolved": True}},
             )
+        if customer_message:
             event["customer_message"] = customer_message
     else:
         ticket.status, ticket.resolved_at = TicketStatus.OPEN, None
+        if issue := await conversations.issue_for_ticket(session, ticket.id):
+            issue.status = IssueStatus.WITH_SPECIALIST
     ticket.activity = [*ticket.activity, event]  # new list: JSONB changes need reassignment
     await audit.record(
         session,

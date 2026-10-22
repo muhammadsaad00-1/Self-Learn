@@ -16,7 +16,7 @@ from agentflow.policy.risk import assess
 from tests.fakes import FakeLLM, proposal
 from tests.helpers import signup
 from tests.test_actions import Sessions, agents, run, setup_org
-from tests.test_chat import chat, evidence, open_chat, say
+from tests.test_chat import chat, conversations, evidence, issue, open_chat, say
 
 # --- Criticality analysis (pure) --------------------------------------------------------------
 
@@ -96,16 +96,18 @@ async def test_mistaken_claim_is_settled_from_records_without_a_human(
         say(client, customer, "I sent 3000 to Sara yesterday and she didn't get it")
         await run(sessions, settings, runtime, llm)
 
-        answer = chat(client, customer)["messages"][-1]
-        [record] = answer["card"]["records"]
+        thread = issue(client, customer)
+        assert thread["status"] == "resolved"  # settled by the records: nobody had to look
+        reply = thread["messages"][-1]
+        [record] = reply["card"]["records"]
         assert (record["reference"], record["transfer_status"]) == (sara["reference"], "credited")
-        assert "case" not in answer["card"]  # no ticket: nobody had to look
+        assert "case" not in reply["card"]
         reply_call = next(c for c in llm.calls if '"records"' in c["user"])
         assert sara["reference"] in reply_call["user"]  # the reply agent saw the facts
         # ...and no policy text to promise from (a real model once promised a reversal).
         assert "Relevant policy:\n(none found)" in reply_call["user"]
         assert '"finding"' in reply_call["user"]
-        assert "transfer" not in answer["card"]  # only the records in question
+        assert "transfer" not in reply["card"]  # only the records in question
 
 
 async def test_critical_risk_opens_a_ticket_even_when_triage_says_normal(
@@ -120,8 +122,11 @@ async def test_critical_risk_opens_a_ticket_even_when_triage_says_normal(
         say(client, customer, "A caller from the bank asked and I shared my OTP with him")
         await run(sessions, settings, runtime, llm)
 
-        card = chat(client, customer)["messages"][-1]["card"]
+        # Not a payment category, but critical: it still gets its own issue and a ticket.
+        thread = issue(client, customer)
+        card = thread["messages"][-1]["card"]
         assert card["case"]["priority"] == "critical"
+        assert thread["status"] == "with_specialist"
         [ticket] = client.get("/v1/tickets", headers=owner.headers()).json()
         assert "credentials_shared" in ticket["description"]
 
@@ -152,8 +157,8 @@ def test_customer_logs_in_with_phone_and_sees_only_their_own_data(client_for: An
         txns = client.get("/v1/customer/transactions", headers=me).json()
         assert {t["merchant"] for t in txns} >= {"IBFT to Ali Raza (HBL)"}
         assert all("Careem" not in t["merchant"] for t in txns)  # another customer's
-        assert client.get("/v1/customer/cases", headers=me).json() == []
-        assert client.get("/v1/chat", headers=me).json()["customer_name"] == "Usman Tariq"
+        assert [c["kind"] for c in conversations(client, me)] == ["help"]  # no issues yet
+        assert chat(client, me)["customer_name"] == "Usman Tariq"
         # A customer token is no staff token.
         assert (
             client.get("/v1/tickets", headers={**me, "X-Org-Id": owner.org_id}).status_code == 401
@@ -219,8 +224,8 @@ async def test_team_hands_off_a_case_and_closes_it_with_the_customer(
         me = login(client, owner.org_id, "923001234503")  # Hina, CUST-1003
         say(client, me, "I never made these payments!")
         await run(sessions, settings, runtime, llm)
-        [case] = client.get("/v1/customer/cases", headers=me).json()
-        assert case["status"] == "open"
+        reported = issue(client, me)
+        assert reported["status"] == "with_specialist"
 
         teammate = signup(client)
         client.post("/v1/members", headers=owner.headers(), json={"email": teammate.email})
@@ -258,7 +263,25 @@ async def test_team_hands_off_a_case_and_closes_it_with_the_customer(
             },
         ).json()
         assert [e["kind"] for e in done["activity"]] == ["assign", "resolve"]
-        last = chat(client, me)["messages"][-1]
+        closed = issue(client, me)
+        assert closed["id"] == reported["id"]
+        assert closed["status"] == "resolved"
+        last = closed["messages"][-1]  # the team's message lands in the issue itself
         assert (last["role"], last["card"]["case"]["resolved"]) == ("agent", True)
-        assert chat(client, me)["mode"] == "ai"  # a team update doesn't take the chat over
-        assert client.get("/v1/customer/cases", headers=me).json()[0]["status"] == "resolved"
+        assert closed["mode"] == "ai"  # a team update doesn't take the issue over
+
+
+async def test_model_sees_short_refs_and_code_maps_them_back() -> None:
+    """Real-model finding: the model dropped a character copying TXN-1004-DD6FBA-2."""
+    from agentflow.agents.resolution import propose
+
+    llm = FakeLLM(
+        proposal(action="answer_from_records").model_copy(update={"record_references": ["T1"]})
+    )
+    ev = evidence("credited")
+    result = await propose(llm, "did it arrive?", {"category": "failed_payment"}, None, ev)
+
+    assert result.value.record_references == ["TXN-1"]  # the real reference
+    [call] = llm.calls
+    assert '"ref": "T1"' in call["user"]
+    assert "TXN-1" not in call["user"]  # the model never sees the long id
