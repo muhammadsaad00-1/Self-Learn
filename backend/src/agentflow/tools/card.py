@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from agentflow.agents.resolution import ProposedAction
 from agentflow.audit import service as audit
 from agentflow.ledger import service as ledger
+from agentflow.policy import dispute
 from agentflow.policy.engine import Outcome, evaluate
 from agentflow.tools.models import ActionExecution
 from agentflow.tools.refund import ExecutionResult
@@ -43,9 +44,13 @@ async def freeze(
         category=category,
         needs_human_review=False,
         knowledge_status=None,
+        # Re-assessed on fresh ledger data, like every other check at execution time.
+        dispute_verdict=dispute.assess(evidence, proposal.record_references).verdict,
     )
     if decision.outcome != Outcome.ALLOW or not evidence.account_found:
-        return ExecutionResult(status="not_executed", detail="Card freeze not authorized")
+        return ExecutionResult(
+            status="not_executed", detail="; ".join(decision.reasons) or "Not authorized"
+        )
 
     account = await ledger.get_account(session, org_id, customer_ref or "")
     was_active = await ledger.freeze_card(session, account)

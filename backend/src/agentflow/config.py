@@ -44,6 +44,14 @@ class Settings(BaseSettings):
     groq_api_key: SecretStr | None = Field(
         default=None, validation_alias=AliasChoices("AGENTFLOW_GROQ_API_KEY", "GROQ_API_KEY")
     )
+    # Optional second provider serving the same open models (gpt-oss): when set, its models
+    # join every route after Groq's first choice, so a Groq rate limit falls through to it.
+    cerebras_api_key: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices("AGENTFLOW_CEREBRAS_API_KEY", "CEREBRAS_API_KEY"),
+    )
+    cerebras_base_url: str = "https://api.cerebras.ai/v1"
+    llm_cooldown_seconds: float = 60  # skip a rate-limited model this long
     # Model routes, tried in order: the next model is used when the previous is rate-limited
     # or down. All enforce our JSON schema strictly on Groq (others only try to) and have
     # separate rate-limit budgets. They share one provider, so surviving a Groq outage needs a

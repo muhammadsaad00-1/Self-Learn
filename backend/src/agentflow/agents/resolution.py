@@ -57,7 +57,9 @@ Choose exactly one action:
   listed, more than its amount, or one already reversed.
 - freeze_card: the customer reports payments they did not make (suspected fraud) and the
   card is still active. Freezing stops further losses; a specialist investigates the
-  disputed debits afterwards. Leave transaction_reference and amount empty.
+  disputed debits afterwards. Leave transaction_reference and amount empty, and list the
+  payments the customer disputes in record_references (the system checks them against the
+  device and OTP records before freezing).
 - answer_from_records: the customer's own transactions answer the question or show the
   claim is mistaken, e.g. the "missing" transfer has transfer_status "credited", there is
   only one charge (no duplicate pair), or they ask whether a payment or salary arrived. List
@@ -145,7 +147,14 @@ def validate(proposal: ProposedAction, evidence: Evidence, category: str | None)
             return escalate("cards are frozen automatically only for suspected fraud")
         if evidence.card_status != "active":
             return escalate("the card is not active")
-        return proposal.model_copy(update={"transaction_reference": None, "amount": None})
+        known = {t.reference for t in evidence.transactions}
+        return proposal.model_copy(
+            update={
+                "transaction_reference": None,
+                "amount": None,
+                "record_references": [r for r in proposal.record_references if r in known],
+            }
+        )
     if proposal.action == ActionType.ANSWER_FROM_RECORDS:
         known = {t.reference for t in evidence.transactions}
         unknown = [r for r in proposal.record_references if r not in known]

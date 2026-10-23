@@ -46,6 +46,7 @@ def evaluate(
     category: str | None,
     needs_human_review: bool,
     knowledge_status: str | None,
+    dispute_verdict: str | None = None,
     config: PolicyConfig = PolicyConfig(),  # noqa: B008 (immutable)
 ) -> PolicyDecision:
     if proposal.action == ActionType.ANSWER_FROM_RECORDS:
@@ -57,6 +58,15 @@ def evaluate(
     if proposal.action == ActionType.NO_ACTION:
         return PolicyDecision(
             outcome=Outcome.ALLOW, reasons=["No action to execute"], rules=["no_action"]
+        )
+    if proposal.action == ActionType.FREEZE_CARD and dispute_verdict == "likely_customer_made":
+        return PolicyDecision(
+            outcome=Outcome.BLOCK,
+            reasons=[
+                "The disputed payments look customer-made (own device, OTP-verified, known "
+                "merchant): a specialist reviews before any freeze or refund"
+            ],
+            rules=["dispute_review"],
         )
     if proposal.action == ActionType.FREEZE_CARD:
         return PolicyDecision(
@@ -151,6 +161,7 @@ def ticket_reasons(
     execution_detail: str | None,
     risk_critical: bool = False,
     risk_signals: list[str] | None = None,
+    dispute_summary: str | None = None,
 ) -> list[str]:
     """Why a human must own this case as a ticket (empty list = no ticket).
 
@@ -160,6 +171,8 @@ def ticket_reasons(
     reasons = []
     if category == "unauthorized_transaction":
         reasons.append("Suspected fraud: investigate and contact the customer")
+        if dispute_summary:
+            reasons.append(f"Dispute check: {dispute_summary}")
     if urgency == "critical":
         reasons.append("Critical urgency")
     elif risk_critical:

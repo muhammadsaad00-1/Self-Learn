@@ -173,6 +173,7 @@ async def _run(
 RESULT_KEYS = (
     "triage",
     "risk",
+    "dispute",
     "knowledge",
     "evidence",
     "proposal",

@@ -36,6 +36,11 @@ export type CustomerMe = Schemas['CustomerMe'];
 export type LoginStartOut = Schemas['LoginStartOut'];
 export type CustomerSession = Schemas['CustomerSession'];
 export type RiskAssessment = Schemas['RiskAssessment'];
+export type BusinessProfile = Schemas['BusinessProfile'];
+export type Industry = Schemas['Industry'];
+export type OrgProfile = Schemas['OrgProfileOut'];
+export type InboundAddress = Schemas['InboundAddress'];
+export type DisputeAssessment = Schemas['DisputeAssessment'];
 
 /** Error body FastAPI returns for HTTPException: {"detail": "..."} */
 export interface ApiError {

@@ -100,9 +100,14 @@ const POLL_MS = 2000;
                       w.status | human
                     }}</span>
                   }
-                  <small class="muted truncate">
-                    {{ w.customer_ref ?? 'Unknown customer' }} ·
-                    {{ w.channel === 'chat' ? 'customer app' : w.channel }}
+                  <small class="muted truncate row" style="gap: 4px; flex-wrap: nowrap">
+                    <app-icon
+                      [name]="
+                        w.channel === 'email' ? 'message' : w.channel === 'chat' ? 'inbox' : 'user'
+                      "
+                      [size]="12"
+                    />
+                    {{ w.customer_ref ?? 'Unknown sender' }} · {{ channelLabel(w.channel) }}
                   </small>
                 </span>
               </span>
@@ -217,6 +222,10 @@ export class WorkflowsPage {
   protected readonly error = signal<string | null>(null);
   protected readonly selectedId = signal<string | null>(null);
   protected readonly composing = signal(false);
+
+  protected channelLabel(channel: string): string {
+    return channel === 'chat' ? 'customer app' : channel === 'web' ? 'logged by staff' : channel;
+  }
   /** The chosen request, else the newest: the page never opens on an empty panel. A computed
    *  (compared by value), so list refreshes don't refetch the same detail. */
   protected readonly activeId = computed(() => this.selectedId() ?? this.list.value()?.[0]?.id);

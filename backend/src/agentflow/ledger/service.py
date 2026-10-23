@@ -162,21 +162,35 @@ async def freeze_card(session: AsyncSession, account: Account) -> bool:
     return was_active
 
 
-# (merchant, amount, seconds after "3 hours ago", transfer status or None). Amounts
-# starting with "+" are credits (money in).
-DemoTxn = tuple[str, str, int, TransferStatus | None]
+@dataclass(frozen=True)
+class Demo:
+    """One demo transaction. Amounts starting with "+" are credits; `offset` is seconds
+    after "3 hours ago". By default a payment the customer made themselves: from their
+    registered phone, OTP-verified."""
+
+    merchant: str
+    amount: str
+    offset: int
+    transfer: TransferStatus | None = None
+    channel: str = "card_online"
+    device: str = "Registered phone"
+    device_known: bool = True
+    verified: bool = True
+
 
 DAY = 86400
-DEMO_CUSTOMERS: list[tuple[str, str, str, list[DemoTxn]]] = [
+STRANGER = "Unrecognised device: Windows PC, IP in Lagos, Nigeria"
+
+DEMO_CUSTOMERS: list[tuple[str, str, str, list[Demo]]] = [
     (
         "CUST-1001",
         "Ayesha Khan",
         "923001234501",
         [
-            ("KE-Bills", "5000.00", 0, None),
-            ("KE-Bills", "5000.00", 40, None),
-            ("Daraz", "2350.00", 7200, None),
-            ("Salary - Systems Ltd", "+120000.00", -5 * DAY, None),
+            Demo("KE-Bills", "5000.00", 0, channel="app"),
+            Demo("KE-Bills", "5000.00", 40, channel="app"),
+            Demo("Daraz", "2350.00", 7200),
+            Demo("Salary - Systems Ltd", "+120000.00", -5 * DAY, channel="ibft"),
         ],
     ),
     (
@@ -184,11 +198,11 @@ DEMO_CUSTOMERS: list[tuple[str, str, str, list[DemoTxn]]] = [
         "Bilal Ahmed",
         "923001234502",
         [
-            ("Careem", "1200.00", 0, None),
-            ("Careem", "1200.00", 25, None),
-            ("Foodpanda", "850.00", 9000, None),
-            ("Salary - Arbisoft", "+85000.00", -2 * DAY, None),
-            ("RAAST from Ahmed Raza", "+4500.00", -DAY, TransferStatus.CREDITED),
+            Demo("Careem", "1200.00", 0),
+            Demo("Careem", "1200.00", 25),
+            Demo("Foodpanda", "850.00", 9000),
+            Demo("Salary - Arbisoft", "+85000.00", -2 * DAY, channel="ibft"),
+            Demo("RAAST from Ahmed Raza", "+4500.00", -DAY, TransferStatus.CREDITED, "raast"),
         ],
     ),
     (
@@ -196,9 +210,27 @@ DEMO_CUSTOMERS: list[tuple[str, str, str, list[DemoTxn]]] = [
         "Hina Raza",
         "923001234503",
         [
-            ("Unknown Merchant LLC", "45000.00", 0, None),
-            ("Unknown Merchant LLC", "40000.00", 600, None),
-            ("Salary - Jazz", "+95000.00", -3 * DAY, None),
+            # Genuine fraud: a new merchant, an unrecognised device abroad, no OTP, in a burst.
+            Demo(
+                "Unknown Merchant LLC",
+                "45000.00",
+                0,
+                device=STRANGER,
+                device_known=False,
+                verified=False,
+            ),
+            Demo(
+                "Unknown Merchant LLC",
+                "40000.00",
+                600,
+                device=STRANGER,
+                device_known=False,
+                verified=False,
+            ),
+            Demo(
+                "Imtiaz Supermarket", "3200.00", -2 * DAY, channel="pos", device="Card at the till"
+            ),
+            Demo("Salary - Jazz", "+95000.00", -3 * DAY, channel="ibft"),
         ],
     ),
     (
@@ -206,11 +238,11 @@ DEMO_CUSTOMERS: list[tuple[str, str, str, list[DemoTxn]]] = [
         "Usman Tariq",
         "923001234504",
         [
-            ("IBFT to Ali Raza (HBL)", "5000.00", 0, TransferStatus.FAILED),
+            Demo("IBFT to Ali Raza (HBL)", "5000.00", 0, TransferStatus.FAILED, "app"),
             # Reached the recipient: "my 3000 to Sara didn't arrive" is answered from records.
-            ("RAAST to Sara Malik (Meezan)", "3000.00", -DAY, TransferStatus.CREDITED),
-            ("Jazz top-up", "500.00", 3600, None),
-            ("Microfinance loan disbursal", "+50000.00", -10 * DAY, None),
+            Demo("RAAST to Sara Malik (Meezan)", "3000.00", -DAY, TransferStatus.CREDITED, "app"),
+            Demo("Jazz top-up", "500.00", 3600, channel="app"),
+            Demo("Microfinance loan disbursal", "+50000.00", -10 * DAY, channel="ibft"),
         ],
     ),
     (
@@ -219,7 +251,21 @@ DEMO_CUSTOMERS: list[tuple[str, str, str, list[DemoTxn]]] = [
         "923001234505",
         [
             # Sent ~27 hours ago and still in transit: past the 24-hour window.
-            ("IBFT to Kamran Shah (UBL)", "15000.00", -DAY, TransferStatus.PENDING),
+            Demo("IBFT to Kamran Shah (UBL)", "15000.00", -DAY, TransferStatus.PENDING, "app"),
+        ],
+    ),
+    (
+        "CUST-1006",
+        "Faraz Hussain",
+        "923001234506",
+        [
+            # Disputed as "never made", but everything says the customer made it: their own
+            # phone, OTP-verified, at a merchant they buy from every month (first-party fraud).
+            Demo("Daraz", "18500.00", -DAY + 3600),
+            Demo("Daraz", "2100.00", -9 * DAY),
+            Demo("Daraz", "3400.00", -16 * DAY),
+            Demo("Daraz", "1850.00", -24 * DAY),
+            Demo("Salary - Systems Ltd", "+110000.00", -6 * DAY, channel="ibft"),
         ],
     ),
 ]
@@ -230,10 +276,12 @@ async def seed_demo_data(session: AsyncSession, org_id: uuid.UUID) -> list[Accou
 
     CUST-1001  PKR 5,000 charged twice       -> refund above PKR 2,000: needs approval
     CUST-1002  PKR 1,200 charged twice       -> small refund: allowed automatically
-    CUST-1003  unknown PKR 85,000 debits     -> fraud: card frozen at once, a human investigates
+    CUST-1003  unknown PKR 85,000 debits     -> genuine fraud: card frozen, a human investigates
     CUST-1004  PKR 5,000 transfer rejected   -> network-confirmed failure: reversed at once
     CUST-1005  PKR 15,000 transfer stuck 27h -> partner-bank inquiry ticket
-    Phones 923001234501..05 log in to the customer app (OTP).
+    CUST-1006  "never made" PKR 18,500 Daraz -> looks customer-made: no freeze, reviewed
+    Phones 923001234501..06 log in to the customer app (OTP); emails
+    cust1001@example.com..cust1006@example.com write to the support inbox.
     """
     now = datetime.now(UTC)
     tag = uuid.uuid4().hex[:6].upper()
@@ -246,27 +294,44 @@ async def seed_demo_data(session: AsyncSession, org_id: uuid.UUID) -> list[Accou
             accounts.append(existing)
             continue
         account = Account(
-            org_id=org_id, customer_ref=ref, customer_name=name, phone=phone, currency="PKR"
+            org_id=org_id,
+            customer_ref=ref,
+            customer_name=name,
+            phone=phone,
+            email=f"{ref.lower().replace('-', '')}@example.com",
+            currency="PKR",
         )
         session.add(account)
         await session.flush()
-        for i, (merchant, amount, offset, transfer_status) in enumerate(txns):
+        for i, t in enumerate(txns):
             session.add(
                 Transaction(
                     org_id=org_id,
                     account_id=account.id,
                     reference=f"TXN-{ref[-4:]}-{tag}-{i + 1}",
-                    kind=TransactionKind.CREDIT if amount[0] == "+" else TransactionKind.DEBIT,
-                    amount=Decimal(amount.lstrip("+")),
+                    kind=TransactionKind.CREDIT if t.amount[0] == "+" else TransactionKind.DEBIT,
+                    amount=Decimal(t.amount.lstrip("+")),
                     currency="PKR",
-                    merchant=merchant,
-                    transfer_status=transfer_status,
-                    occurred_at=now - timedelta(hours=3) + timedelta(seconds=offset),
+                    merchant=t.merchant,
+                    transfer_status=t.transfer,
+                    channel=t.channel,
+                    device=t.device,
+                    device_known=t.device_known,
+                    verified=t.verified,
+                    occurred_at=now - timedelta(hours=3) + timedelta(seconds=t.offset),
                 )
             )
         accounts.append(account)
     await session.flush()
     return accounts
+
+
+async def get_account_by_email(
+    session: AsyncSession, org_id: uuid.UUID, email: str
+) -> Account | None:
+    return await session.scalar(
+        select(Account).where(Account.org_id == org_id, Account.email == email.lower())
+    )
 
 
 async def gather_evidence(

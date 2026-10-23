@@ -17,7 +17,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from agentflow.audit import service as audit
 from agentflow.db import set_tenant_context
 from agentflow.identity.models import Membership, Organization, Role, User, UserStatus
-from agentflow.identity.schemas import MemberOut, MembershipOut, SignupRequest
+from agentflow.identity.schemas import (
+    BusinessProfile,
+    MemberOut,
+    MembershipOut,
+    OrgProfileOut,
+    SignupRequest,
+)
 from agentflow.identity.security import hash_password, verify_password
 
 
@@ -71,14 +77,24 @@ async def _insert_org_with_unique_slug(session: AsyncSession, org: Organization)
 
 
 async def _create_org_with_owner(
-    session: AsyncSession, user_id: uuid.UUID, org_name: str, *, via: str
+    session: AsyncSession,
+    user_id: uuid.UUID,
+    org_name: str,
+    *,
+    via: str,
+    profile: BusinessProfile | None = None,
 ) -> Organization:
     """A new organization (tenant) with `user_id` as its OWNER, plus the audit event.
 
     Shared by signup and "Add company": both end in exactly the same state, so the rules for
     what a new tenant looks like live in one place.
     """
-    org = Organization(id=uuid.uuid4(), name=org_name, slug=slugify(org_name))
+    org = Organization(
+        id=uuid.uuid4(),
+        name=org_name,
+        slug=slugify(org_name),
+        profile=profile.model_dump(mode="json") if profile else None,
+    )
     # Act inside the tenant being created, so the RLS policies' WITH CHECK accepts its rows.
     await set_tenant_context(session, user_id=user_id, org_id=org.id)
     await _insert_org_with_unique_slug(session, org)
@@ -90,7 +106,7 @@ async def _create_org_with_owner(
         action="org.created",
         target_type="organization",
         target_id=org.id,
-        details={"via": via},
+        details={"via": via} | ({"industry": profile.industry} if profile else {}),
     )
     return org
 
@@ -107,7 +123,9 @@ async def signup(session: AsyncSession, data: SignupRequest) -> tuple[User, Orga
     )
     session.add(user)
     await session.flush()  # the user row must exist before the membership points at it
-    org = await _create_org_with_owner(session, user.id, data.org_name, via="signup")
+    org = await _create_org_with_owner(
+        session, user.id, data.org_name, via="signup", profile=data.profile
+    )
     # ponytail: two simultaneous signups with one email both pass the check above; the
     # UNIQUE constraint still blocks the second (500, nothing saved). Map to 409 if ever seen.
     return user, org
@@ -297,3 +315,36 @@ async def remove_member(
         target_id=user_id,
         details={"role": membership.role},
     )
+
+
+class OrgNotFoundError(Exception):
+    pass
+
+
+async def get_profile(session: AsyncSession, org_id: uuid.UUID) -> OrgProfileOut:
+    org = await session.get(Organization, org_id)
+    if org is None:
+        raise OrgNotFoundError
+    return OrgProfileOut(
+        org_id=org.id,
+        name=org.name,
+        profile=BusinessProfile.model_validate(org.profile) if org.profile else None,
+    )
+
+
+async def set_profile(
+    session: AsyncSession, org_id: uuid.UUID, user_id: uuid.UUID, profile: BusinessProfile
+) -> OrgProfileOut:
+    org = await session.get(Organization, org_id)
+    assert org is not None  # noqa: S101
+    org.profile = profile.model_dump(mode="json")
+    await audit.record(
+        session,
+        org_id=org_id,
+        actor_user_id=user_id,
+        action="org.profile_updated",
+        target_type="organization",
+        target_id=org_id,
+        details={"industry": profile.industry},
+    )
+    return await get_profile(session, org_id)

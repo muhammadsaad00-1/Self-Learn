@@ -6,8 +6,10 @@ owns hangs off `organizations.id` as `org_id`.
 
 import uuid
 from enum import StrEnum
+from typing import Any
 
 from sqlalchemy import CheckConstraint, ForeignKey, String
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from agentflow.db import Base, TimestampMixin, enum_check, str_enum
@@ -45,6 +47,8 @@ class Organization(TimestampMixin, Base):
     slug: Mapped[str] = mapped_column(String(63), unique=True)  # URL-safe handle
     plan: Mapped[str] = mapped_column(String(32), default="free")
     status: Mapped[OrgStatus] = mapped_column(str_enum(OrgStatus), default=OrgStatus.ACTIVE)
+    # BusinessProfile (identity.schemas) from signup; None for companies created before it.
+    profile: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
 
 
 class User(TimestampMixin, Base):

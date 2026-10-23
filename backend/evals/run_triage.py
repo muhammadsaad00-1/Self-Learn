@@ -44,6 +44,8 @@ def check(result: TriageResult, expect: dict[str, Any]) -> list[str]:
         problems.append(f"urgency {result.urgency} > {expect['max_urgency']}")
     if "needs_human_review" in expect and result.needs_human_review != expect["needs_human_review"]:
         problems.append(f"needs_human_review {result.needs_human_review}")
+    if "language" in expect and result.language != expect["language"]:
+        problems.append(f"language {result.language} != {expect['language']}")
     if "currency" in expect and result.details.currency != expect["currency"]:
         problems.append(f"currency {result.details.currency} != {expect['currency']}")
     return problems

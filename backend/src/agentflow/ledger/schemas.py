@@ -27,6 +27,10 @@ class TransactionOut(BaseModel):
     merchant: str
     status: TransactionStatus
     transfer_status: TransferStatus | None = None
+    channel: str | None = None
+    device: str | None = None
+    device_known: bool | None = None
+    verified: bool | None = None
     occurred_at: datetime
 
 

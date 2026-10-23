@@ -1,16 +1,19 @@
 import { DecimalPipe, KeyValuePipe, PercentPipe } from '@angular/common';
-import { httpResource } from '@angular/common/http';
-import { Component, inject } from '@angular/core';
+import { HttpClient, httpResource } from '@angular/common/http';
+import { Component, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { firstValueFrom } from 'rxjs';
 
 import type { Insights } from '../api/types';
 import { Auth } from '../core/auth';
+import { errorMessage } from '../core/errors';
 import { HumanPipe } from '../core/format';
 import { Icon } from '../layout/icon';
 
 /** Impact at a glance: what the agents resolved alone, money returned, speed, AI cost. */
 @Component({
   selector: 'app-insights-page',
-  imports: [DecimalPipe, KeyValuePipe, PercentPipe, Icon, HumanPipe],
+  imports: [DecimalPipe, KeyValuePipe, PercentPipe, Icon, HumanPipe, RouterLink],
   template: `
     <div class="page">
       <header class="page-header">
@@ -25,12 +28,99 @@ import { Icon } from '../layout/icon';
 
       @if (insights.value(); as i) {
         @if (i.requests === 0) {
-          <div class="card empty">
-            <span class="empty-icon"><app-icon name="sparkles" [size]="20" /></span>
-            <strong>No customer requests yet</strong>
-            <span>Load demo customers on Requests, then open the customer app from the Inbox.</span>
-          </div>
+          <section class="card">
+            <div class="card-head">
+              <span class="empty-icon" style="margin: 0"
+                ><app-icon name="sparkles" [size]="18"
+              /></span>
+              <div class="grow">
+                <h2>Get started</h2>
+                <small class="muted"
+                  >Four steps to see the agents work on your customers' requests.</small
+                >
+              </div>
+            </div>
+            <ol class="checklist">
+              <li>
+                <span class="num">1</span>
+                <div class="grow">
+                  <strong>Add your customers' accounts</strong>
+                  <div class="muted">
+                    Demo: six customers with real-looking histories, failed transfers and a disputed
+                    payment.
+                  </div>
+                </div>
+                @if (auth.isAdmin()) {
+                  <button class="secondary" (click)="setup('demo')" [disabled]="busy()">
+                    Load demo customers
+                  </button>
+                }
+              </li>
+              <li>
+                <span class="num">2</span>
+                <div class="grow">
+                  <strong>Upload your policies and FAQ</strong>
+                  <div class="muted">The agents answer only from your documents, with sources.</div>
+                </div>
+                <a class="button secondary" routerLink="/knowledge">Upload</a>
+              </li>
+              <li>
+                <span class="num">3</span>
+                <div class="grow">
+                  <strong>Forward your support email</strong>
+                  <div class="muted">
+                    Or load a sample inbox of 8 real-world emails, including a fraud claim and an
+                    injection attempt.
+                  </div>
+                </div>
+                @if (auth.isAdmin()) {
+                  <button class="secondary" (click)="setup('inbox')" [disabled]="busy()">
+                    Load sample inbox
+                  </button>
+                }
+              </li>
+              <li>
+                <span class="num">4</span>
+                <div class="grow">
+                  <strong>Open your customer app</strong>
+                  <div class="muted">
+                    Text or send a voice note as a customer, in English or Urdu.
+                  </div>
+                </div>
+                <a class="button secondary" routerLink="/chats">Open inbox</a>
+              </li>
+            </ol>
+            @if (setupError()) {
+              <div class="card-body">
+                <div class="callout" data-tone="danger">{{ setupError() }}</div>
+              </div>
+            }
+          </section>
         } @else {
+          <section class="card roi">
+            <div>
+              <small class="muted">Your team saved so far</small>
+              <span class="big">{{ i.team_hours_saved | number: '1.0-1' }} h</span>
+              <small class="muted"
+                >≈ {{ i.currency }} {{ +i.team_cost_saved | number: '1.0-0' }}</small
+              >
+            </div>
+            <div>
+              <small class="muted">At {{ i.monthly_queries | number }} queries a month</small>
+              <span class="big"
+                >{{ i.projected_monthly_hours_saved | number: '1.0-0' }} h / month</span
+              >
+              <small class="muted"
+                >≈ {{ i.currency }} {{ +i.projected_monthly_cost_saved | number: '1.0-0' }} a month
+                · {{ i.projected_monthly_hours_saved / 160 | number: '1.0-1' }} full-time
+                agents</small
+              >
+            </div>
+            <small class="faint" style="grid-column: 1 / -1"
+              >Assumes {{ i.assumptions }} (from your business profile, editable in
+              Settings).</small
+            >
+          </section>
           <div class="tiles">
             <div class="card tile hero">
               <span class="tile-head"
@@ -124,7 +214,27 @@ import { Icon } from '../layout/icon';
   `,
 })
 export class InsightsPage {
-  private readonly auth = inject(Auth);
+  protected readonly auth = inject(Auth);
+  private readonly http = inject(HttpClient);
+  protected readonly busy = signal(false);
+  protected readonly setupError = signal<string | null>(null);
+
+  /** One-click setup for a demo: customers (and the help guide), or the sample inbox. */
+  protected async setup(what: 'demo' | 'inbox'): Promise<void> {
+    this.busy.set(true);
+    this.setupError.set(null);
+    try {
+      if (what === 'inbox') await firstValueFrom(this.http.post('/v1/ledger/demo-data', {}));
+      await firstValueFrom(
+        this.http.post(what === 'demo' ? '/v1/ledger/demo-data' : '/v1/inbound/sample', {}),
+      );
+      this.insights.reload();
+    } catch (err) {
+      this.setupError.set(errorMessage(err));
+    } finally {
+      this.busy.set(false);
+    }
+  }
 
   protected readonly insights = httpResource<Insights>(() =>
     this.auth.orgId() ? '/v1/insights' : undefined,

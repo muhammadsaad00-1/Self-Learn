@@ -421,7 +421,7 @@ def test_demo_data_is_idempotent_and_admin_only(client_for: Any) -> None:
         owner = signup(client)
         first = client.post("/v1/ledger/demo-data", headers=owner.headers()).json()
         again = client.post("/v1/ledger/demo-data", headers=owner.headers()).json()
-        assert [a["customer_ref"] for a in first] == [f"CUST-100{i}" for i in range(1, 6)]
+        assert [a["customer_ref"] for a in first] == [f"CUST-100{i}" for i in range(1, 7)]
         assert first == again
         # The customer help guide (cheques, transfers, fraud) is queued once.
         [guide] = client.get("/v1/knowledge/documents", headers=owner.headers()).json()

@@ -21,10 +21,12 @@ from agentflow.identity.models import User
 from agentflow.identity.schemas import (
     AddCompanyRequest,
     AddMemberRequest,
+    BusinessProfile,
     ChangeRoleRequest,
     MemberOut,
     MembershipOut,
     MeResponse,
+    OrgProfileOut,
     SignupRequest,
     SignupResponse,
     TokenResponse,
@@ -181,3 +183,17 @@ async def add_company(
         # 403, not 401: the session is valid, only this confirmation failed. (A 401 would also
         # make the dashboard log the user out.)
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Password is incorrect") from None
+
+
+@orgs_router.get("/current/profile")
+async def get_business_profile(ctx: OrgContextDep, session: SessionDep) -> OrgProfileOut:
+    """The current company's business profile (from signup)."""
+    return await service.get_profile(session, ctx.org_id)
+
+
+@orgs_router.put("/current/profile")
+async def update_business_profile(
+    body: BusinessProfile, ctx: AdminContextDep, session: SessionDep
+) -> OrgProfileOut:
+    """Update the business profile (admins)."""
+    return await service.set_profile(session, ctx.org_id, ctx.user.id, body)

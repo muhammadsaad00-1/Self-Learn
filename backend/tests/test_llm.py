@@ -97,3 +97,35 @@ async def test_gives_up_when_every_model_fails() -> None:
     llm = router(primary=ScriptedModel(invalid(), invalid()), backup=ScriptedModel(rate_limited()))
     with pytest.raises(LLMError, match=r"primary: invalid output.*backup: RateLimitError"):
         await generate(llm)
+
+
+async def test_rate_limited_model_cools_down_then_is_tried_again() -> None:
+    """During a provider's quota outage, calls go straight to the backup instead of waiting
+    for the exhausted provider to refuse again every time."""
+    now = [0.0]
+    primary = ScriptedModel(rate_limited(), ok("primary-back"))
+    backup = ScriptedModel(ok("b1"), ok("b2"))
+    llm = RoutedLLM(
+        {TaskType.CLASSIFICATION: ["primary", "backup"]},
+        lambda name, _schema: {"primary": primary, "backup": backup}[name],
+        cooldown_seconds=60,
+        clock=lambda: now[0],
+    )
+    assert (await generate(llm)).model == "backup"
+    assert (await generate(llm)).model == "backup"  # primary skipped while cooling down
+    assert len(primary.received) == 1
+    now[0] = 61
+    assert (await generate(llm)).value.label == "primary-back"
+
+
+def test_cerebras_joins_the_routes_only_with_a_key() -> None:
+    from pydantic import SecretStr
+
+    from agentflow.config import Settings
+    from agentflow.llm import build_llm
+
+    without = build_llm(Settings(groq_api_key=SecretStr("g")))
+    assert all(not m.startswith("cerebras:") for m in without._routes[TaskType.GROUNDED_ANSWER])
+    with_key = build_llm(Settings(groq_api_key=SecretStr("g"), cerebras_api_key=SecretStr("c")))
+    strong = with_key._routes[TaskType.GROUNDED_ANSWER]
+    assert strong[:2] == ["openai/gpt-oss-120b", "cerebras:gpt-oss-120b"]

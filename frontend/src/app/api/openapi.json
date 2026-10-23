@@ -398,6 +398,116 @@
         ]
       }
     },
+    "/v1/orgs/current/profile": {
+      "get": {
+        "tags": [
+          "orgs"
+        ],
+        "summary": "Get Business Profile",
+        "description": "The current company's business profile (from signup).",
+        "operationId": "get_business_profile_v1_orgs_current_profile_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-org-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Organization this request acts in",
+              "title": "X-Org-Id"
+            },
+            "description": "Organization this request acts in"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgProfileOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "orgs"
+        ],
+        "summary": "Update Business Profile",
+        "description": "Update the business profile (admins).",
+        "operationId": "update_business_profile_v1_orgs_current_profile_put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-org-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Organization this request acts in",
+              "title": "X-Org-Id"
+            },
+            "description": "Organization this request acts in"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BusinessProfile"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrgProfileOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/audit/events": {
       "get": {
         "tags": [
@@ -2178,6 +2288,50 @@
         ]
       }
     },
+    "/v1/customer/bank/{bank_id}": {
+      "get": {
+        "tags": [
+          "customer"
+        ],
+        "summary": "Bank",
+        "description": "The bank's name for its customer-app login screen (the id comes from the bank's own\napp link; nothing else about the company is exposed).",
+        "operationId": "bank_v1_customer_bank__bank_id__get",
+        "parameters": [
+          {
+            "name": "bank_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Bank Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Bank"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/customer/login/start": {
       "post": {
         "tags": [
@@ -2313,6 +2467,174 @@
         }
       }
     },
+    "/v1/inbound/email/{org_id}/{token}": {
+      "post": {
+        "tags": [
+          "email"
+        ],
+        "summary": "Receive Email",
+        "description": "One inbound email (JSON). A wrong token answers 404, like an unknown address.",
+        "operationId": "receive_email_v1_inbound_email__org_id___token__post",
+        "parameters": [
+          {
+            "name": "org_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Org Id"
+            }
+          },
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InboundEmail"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/inbound/address": {
+      "get": {
+        "tags": [
+          "email"
+        ],
+        "summary": "Inbound Address",
+        "operationId": "inbound_address_v1_inbound_address_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-org-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Organization this request acts in",
+              "title": "X-Org-Id"
+            },
+            "description": "Organization this request acts in"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboundAddress"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/inbound/sample": {
+      "post": {
+        "tags": [
+          "email"
+        ],
+        "summary": "Load Sample Inbox",
+        "description": "Push a realistic sample inbox through the email channel (never in production). Needs\nthe demo customers for sender matching.",
+        "operationId": "load_sample_inbox_v1_inbound_sample_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-org-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Organization this request acts in",
+              "title": "X-Org-Id"
+            },
+            "description": "Organization this request acts in"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Accepted"
+                  },
+                  "title": "Response Load Sample Inbox V1 Inbound Sample Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -2362,6 +2684,32 @@
   },
   "components": {
     "schemas": {
+      "Accepted": {
+        "properties": {
+          "workflow_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Workflow Id"
+          },
+          "customer_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Customer Ref"
+          }
+        },
+        "type": "object",
+        "required": [
+          "workflow_id",
+          "customer_ref"
+        ],
+        "title": "Accepted"
+      },
       "AccountOut": {
         "properties": {
           "customer_ref": {
@@ -2721,6 +3069,19 @@
         ],
         "title": "AuditPage"
       },
+      "Bank": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "Bank"
+      },
       "Body_login_v1_auth_login_post": {
         "properties": {
           "grant_type": {
@@ -2821,6 +3182,98 @@
           "file"
         ],
         "title": "Body_upload_document_v1_knowledge_documents_post"
+      },
+      "BusinessProfile": {
+        "properties": {
+          "industry": {
+            "$ref": "#/components/schemas/Industry"
+          },
+          "country": {
+            "type": "string",
+            "maxLength": 2,
+            "minLength": 2,
+            "title": "Country",
+            "default": "PK"
+          },
+          "currency": {
+            "type": "string",
+            "maxLength": 3,
+            "minLength": 3,
+            "title": "Currency",
+            "default": "PKR"
+          },
+          "customers": {
+            "type": "string",
+            "enum": [
+              "under_10k",
+              "10k_100k",
+              "100k_1m",
+              "over_1m"
+            ],
+            "title": "Customers",
+            "default": "10k_100k"
+          },
+          "monthly_queries": {
+            "type": "integer",
+            "maximum": 10000000.0,
+            "minimum": 0.0,
+            "title": "Monthly Queries",
+            "default": 5000
+          },
+          "channels": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "app_chat",
+                "email",
+                "whatsapp",
+                "phone",
+                "branch"
+              ]
+            },
+            "type": "array",
+            "title": "Channels",
+            "default": [
+              "app_chat"
+            ]
+          },
+          "languages": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "en",
+                "ur",
+                "roman_ur"
+              ]
+            },
+            "type": "array",
+            "title": "Languages",
+            "default": [
+              "en",
+              "roman_ur"
+            ]
+          },
+          "minutes_per_query": {
+            "type": "integer",
+            "maximum": 240.0,
+            "minimum": 1.0,
+            "title": "Minutes Per Query",
+            "default": 8
+          },
+          "agent_cost_per_hour": {
+            "type": "integer",
+            "maximum": 1000000.0,
+            "minimum": 0.0,
+            "title": "Agent Cost Per Hour",
+            "default": 1500
+          }
+        },
+        "type": "object",
+        "required": [
+          "industry"
+        ],
+        "title": "BusinessProfile",
+        "description": "What the company told us at signup. Sizes the ROI numbers and tailors the setup."
       },
       "CardStatus": {
         "type": "string",
@@ -3166,6 +3619,10 @@
       },
       "CustomerMe": {
         "properties": {
+          "bank_name": {
+            "type": "string",
+            "title": "Bank Name"
+          },
           "customer_ref": {
             "type": "string",
             "title": "Customer Ref"
@@ -3191,6 +3648,7 @@
         },
         "type": "object",
         "required": [
+          "bank_name",
           "customer_ref",
           "customer_name",
           "phone",
@@ -3291,6 +3749,88 @@
         ],
         "title": "Details",
         "description": "Facts copied from the message. Null when the customer didn't state them."
+      },
+      "DisputeAssessment": {
+        "properties": {
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "likely_unauthorized",
+              "likely_customer_made",
+              "unclear"
+            ],
+            "title": "Verdict"
+          },
+          "disputed": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Disputed"
+          },
+          "unauthorized_score": {
+            "type": "integer",
+            "title": "Unauthorized Score"
+          },
+          "customer_score": {
+            "type": "integer",
+            "title": "Customer Score"
+          },
+          "signals": {
+            "items": {
+              "$ref": "#/components/schemas/DisputeSignal"
+            },
+            "type": "array",
+            "title": "Signals"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "verdict",
+          "disputed",
+          "unauthorized_score",
+          "customer_score",
+          "signals",
+          "summary"
+        ],
+        "title": "DisputeAssessment"
+      },
+      "DisputeSignal": {
+        "properties": {
+          "reference": {
+            "type": "string",
+            "title": "Reference"
+          },
+          "signal": {
+            "type": "string",
+            "title": "Signal"
+          },
+          "points_unauthorized": {
+            "type": "integer",
+            "title": "Points Unauthorized"
+          },
+          "points_customer": {
+            "type": "integer",
+            "title": "Points Customer"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reference",
+          "signal",
+          "points_unauthorized",
+          "points_customer",
+          "detail"
+        ],
+        "title": "DisputeSignal"
       },
       "DocumentOut": {
         "properties": {
@@ -3537,6 +4077,77 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "InboundAddress": {
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "sample_customer_emails": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Sample Customer Emails"
+          }
+        },
+        "type": "object",
+        "required": [
+          "url",
+          "sample_customer_emails"
+        ],
+        "title": "InboundAddress"
+      },
+      "InboundEmail": {
+        "properties": {
+          "from_address": {
+            "type": "string",
+            "format": "email",
+            "title": "From Address"
+          },
+          "subject": {
+            "type": "string",
+            "maxLength": 500,
+            "title": "Subject",
+            "default": ""
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 7000,
+            "minLength": 1,
+            "title": "Text"
+          },
+          "message_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "from_address",
+          "text"
+        ],
+        "title": "InboundEmail"
+      },
+      "Industry": {
+        "type": "string",
+        "enum": [
+          "commercial_bank",
+          "microfinance_bank",
+          "digital_wallet",
+          "digital_lender"
+        ],
+        "title": "Industry",
+        "description": "Who AgentFlow is for: companies that move customers' money. Its tools (ledger\nresearch, reversals, card freeze) and policies (maker-checker, reversal limits) are built\nfor regulated money movement; other businesses are out of scope by design."
+      },
       "Insights": {
         "properties": {
           "days": {
@@ -3610,6 +4221,36 @@
             },
             "type": "object",
             "title": "By Channel"
+          },
+          "team_hours_saved": {
+            "type": "number",
+            "title": "Team Hours Saved"
+          },
+          "team_cost_saved": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Team Cost Saved"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "monthly_queries": {
+            "type": "integer",
+            "title": "Monthly Queries"
+          },
+          "projected_monthly_hours_saved": {
+            "type": "number",
+            "title": "Projected Monthly Hours Saved"
+          },
+          "projected_monthly_cost_saved": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Projected Monthly Cost Saved"
+          },
+          "assumptions": {
+            "type": "string",
+            "title": "Assumptions"
           }
         },
         "type": "object",
@@ -3627,7 +4268,14 @@
           "ai_cost_usd",
           "ai_cost_per_request_usd",
           "by_category",
-          "by_channel"
+          "by_channel",
+          "team_hours_saved",
+          "team_cost_saved",
+          "currency",
+          "monthly_queries",
+          "projected_monthly_hours_saved",
+          "projected_monthly_cost_saved",
+          "assumptions"
         ],
         "title": "Insights"
       },
@@ -3936,6 +4584,36 @@
         ],
         "title": "OpenedChat"
       },
+      "OrgProfileOut": {
+        "properties": {
+          "org_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Org Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BusinessProfile"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "org_id",
+          "name",
+          "profile"
+        ],
+        "title": "OrgProfileOut"
+      },
       "Outcome": {
         "type": "string",
         "enum": [
@@ -4218,6 +4896,16 @@
             "maxLength": 200,
             "minLength": 1,
             "title": "Org Name"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BusinessProfile"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -4609,6 +5297,50 @@
               }
             ]
           },
+          "channel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Channel"
+          },
+          "device": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device"
+          },
+          "device_known": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Device Known"
+          },
+          "verified": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified"
+          },
           "occurred_at": {
             "type": "string",
             "format": "date-time",
@@ -4658,6 +5390,17 @@
             "type": "string",
             "title": "Summary",
             "description": "One neutral sentence for an operations agent"
+          },
+          "language": {
+            "type": "string",
+            "enum": [
+              "en",
+              "ur",
+              "roman_ur"
+            ],
+            "title": "Language",
+            "description": "Language of the customer's newest message: en (English), ur (Urdu script) or roman_ur (Urdu written in Latin letters, e.g. 'mere paise nahi mile')",
+            "default": "en"
           },
           "title": {
             "type": "string",
@@ -4931,6 +5674,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/RiskAssessment"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dispute": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DisputeAssessment"
               },
               {
                 "type": "null"

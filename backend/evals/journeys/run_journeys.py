@@ -57,6 +57,14 @@ class Bank:
                 "password": PASSWORD,
                 "full_name": "Ayesha (Ops lead)",
                 "org_name": "Mehran Microfinance Bank",
+                "profile": {
+                    "industry": "microfinance_bank",
+                    "monthly_queries": 20000,
+                    "channels": ["app_chat", "email"],
+                    "languages": ["en", "ur", "roman_ur"],
+                    "minutes_per_query": 8,
+                    "agent_cost_per_hour": 1500,
+                },
             },
         )
         resp.raise_for_status()

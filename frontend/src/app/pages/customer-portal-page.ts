@@ -55,7 +55,7 @@ const ISSUE_STATUS: Record<Conversation['status'], { label: string; badge: strin
           <div>
             <strong>{{ title() }}</strong>
             <small>
-              {{ me.value()?.customer_name ?? 'AgentFlow Bank' }} ·
+              {{ me.value()?.customer_name ?? '' }} ·
               @if (me.value()?.card_status === 'frozen') {
                 🔒 card frozen
               } @else {
@@ -215,7 +215,7 @@ export class CustomerPortalPage implements OnInit {
       const open = this.issues().find((i) => i.id === this.openIssue());
       return open ? (open.subject ?? 'Issue') : 'Your issues';
     }
-    return this.tab() === 'activity' ? 'Activity' : 'AgentFlow Bank';
+    return this.tab() === 'activity' ? 'Activity' : (this.me.value()?.bank_name ?? 'Your bank');
   });
 
   ngOnInit(): void {

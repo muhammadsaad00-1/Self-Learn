@@ -36,6 +36,7 @@ from agentflow.conversations.models import (
     MessageRole,
 )
 from agentflow.db import SessionDep, set_tenant_context
+from agentflow.identity import service as identity
 from agentflow.identity.deps import OrgContextDep, SettingsDep
 from agentflow.identity.security import create_customer_token, decode_customer_token
 from agentflow.ledger import service as ledger
@@ -295,6 +296,7 @@ async def send_voice_note(
 
 
 class CustomerMe(BaseModel):
+    bank_name: str
     customer_ref: str
     customer_name: str
     phone: str | None  # masked
@@ -305,6 +307,7 @@ class CustomerMe(BaseModel):
 async def customer_me(me: CustomerDep, session: SessionDep) -> CustomerMe:
     account = await ledger.get_account(session, me.org_id, me.customer_ref)
     return CustomerMe(
+        bank_name=(await identity.get_profile(session, me.org_id)).name,
         customer_ref=account.customer_ref,
         customer_name=account.customer_name,
         phone=f"+{account.phone[:2]} *** ***{account.phone[-4:]}" if account.phone else None,
@@ -317,6 +320,21 @@ async def customer_transactions(me: CustomerDep, session: SessionDep) -> list[Tr
     """The customer's last 30 days, newest first: the same data the agents read."""
     account = await ledger.get_account(session, me.org_id, me.customer_ref)
     return await ledger.recent_transactions(session, account)
+
+
+class Bank(BaseModel):
+    name: str
+
+
+@customer_router.get("/bank/{bank_id}")
+async def bank(bank_id: uuid.UUID, session: SessionDep) -> Bank:
+    """The bank's name for its customer-app login screen (the id comes from the bank's own
+    app link; nothing else about the company is exposed)."""
+    await set_tenant_context(session, org_id=bank_id)
+    try:
+        return Bank(name=(await identity.get_profile(session, bank_id)).name)
+    except identity.OrgNotFoundError:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown bank") from None
 
 
 # --- Customer login --------------------------------------------------------------------------

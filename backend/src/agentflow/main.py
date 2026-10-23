@@ -21,6 +21,7 @@ from agentflow.config import Settings, get_settings
 from agentflow.conversations import api as conversations_api
 from agentflow.db import create_engine
 from agentflow.identity import api as identity_api
+from agentflow.inbound import api as inbound_api
 from agentflow.knowledge import api as knowledge_api
 from agentflow.knowledge.runtime import KnowledgeRuntime
 from agentflow.ledger import api as ledger_api
@@ -78,6 +79,7 @@ def create_app(
     app.include_router(conversations_api.staff_router)
     app.include_router(conversations_api.customer_router)
     app.include_router(insights.router)
+    app.include_router(inbound_api.router)
 
     @app.get("/health", tags=["ops"])
     async def health() -> dict[str, str]:

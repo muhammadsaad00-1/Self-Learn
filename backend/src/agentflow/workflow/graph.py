@@ -48,6 +48,7 @@ from agentflow.knowledge.retrieval import RetrievedChunk
 from agentflow.knowledge.schemas import Citation, KnowledgeAnswer, Source
 from agentflow.ledger.schemas import Evidence
 from agentflow.llm import LLMResult, StructuredLLM
+from agentflow.policy import dispute as dispute_analysis
 from agentflow.policy import engine as policy
 from agentflow.policy import risk as risk_analysis
 from agentflow.tools.refund import ExecutionResult
@@ -77,6 +78,7 @@ class WorkflowState(TypedDict, total=False):
     proposal: dict[str, Any]  # validated ProposedAction (resolve)
     decision: dict[str, Any]  # PolicyDecision (policy_gate)
     risk: dict[str, Any]  # RiskAssessment (policy_gate): criticality, by code
+    dispute: dict[str, Any] | None  # DisputeAssessment for fraud claims (policy_gate)
     approval: dict[str, Any] | None  # {"id", "status"} once a human was asked
     execution: dict[str, Any]  # ExecutionResult (execute)
     ticket: dict[str, Any] | None  # TicketRef, when a human must own the case (raise_ticket)
@@ -334,9 +336,15 @@ def build_graph(llm: StructuredLLM) -> CompiledStateGraph[WorkflowState]:
             ),
             recent_requests=evidence.recent_requests_72h,
         )
+        dispute = (
+            dispute_analysis.assess(evidence, proposal.record_references)
+            if triage_result.get("category") == "unauthorized_transaction"
+            else None
+        )
         decision = policy.evaluate(
             proposal,
             evidence=evidence,
+            dispute_verdict=dispute.verdict if dispute else None,
             category=triage_result.get("category"),
             needs_human_review=bool(triage_result.get("needs_human_review")),
             knowledge_status=(state.get("knowledge") or {}).get("status"),
@@ -344,6 +352,7 @@ def build_graph(llm: StructuredLLM) -> CompiledStateGraph[WorkflowState]:
         return {
             "decision": decision.model_dump(mode="json"),
             "risk": risk.model_dump(mode="json"),
+            "dispute": dispute.model_dump(mode="json") if dispute else None,
             "node_meta": {},
         }
 
@@ -389,6 +398,7 @@ def build_execution_graph(llm: StructuredLLM) -> CompiledStateGraph[WorkflowStat
             execution_detail=execution.get("detail"),
             risk_critical=bool((state.get("risk") or {}).get("critical")),
             risk_signals=[s["detail"] for s in (state.get("risk") or {}).get("signals", [])],
+            dispute_summary=(state.get("dispute") or {}).get("summary"),
         )
         if not reasons:
             return {"ticket": None, "node_meta": {}}
@@ -407,9 +417,17 @@ def build_execution_graph(llm: StructuredLLM) -> CompiledStateGraph[WorkflowStat
             },
             "approval": (state.get("approval") or {}).get("status"),
             "decision": (state.get("decision") or {}).get("outcome"),
+            # Decided by triage, enforced here: the reply model once answered an English
+            # question in Roman Urdu when left to guess.
+            "reply_language": LANGUAGE_NAMES.get(
+                (state.get("triage") or {}).get("language", "en"), "English"
+            ),
             # The transactions the resolution cited (verified by code): the reply may state
             # them as facts.
             "records": records_of(state),
+            "dispute": {k: (state.get("dispute") or {}).get(k) for k in ("verdict", "summary")}
+            if state.get("dispute")
+            else None,
         }
         knowledge = state.get("knowledge") or {}
         policy_text = knowledge.get("answer") if knowledge.get("status") == "answered" else None
@@ -433,6 +451,12 @@ def build_execution_graph(llm: StructuredLLM) -> CompiledStateGraph[WorkflowStat
     graph.add_edge("communicate", END)
     return graph.compile()
 
+
+LANGUAGE_NAMES = {
+    "en": "English",
+    "ur": "Urdu (Urdu script)",
+    "roman_ur": "Roman Urdu (Urdu in Latin letters)",
+}
 
 RECORD_FIELDS = ("reference", "kind", "amount", "currency", "merchant", "status")
 

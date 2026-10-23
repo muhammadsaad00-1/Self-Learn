@@ -128,6 +128,39 @@ import { KnowledgeAnswerView } from './knowledge-answer';
         </li>
       }
 
+      @if (r.dispute; as d) {
+        <li>
+          <span class="node" [attr.data-tone]="disputeTone[d.verdict]"
+            ><app-icon name="search" [size]="14"
+          /></span>
+          <div class="body">
+            <div class="row">
+              <strong>Dispute check</strong>
+              <span class="badge" [attr.data-tone]="disputeTone[d.verdict]">{{
+                disputeLabel[d.verdict]
+              }}</span>
+              <small class="faint"
+                >fraud {{ d.unauthorized_score }} · customer {{ d.customer_score }}</small
+              >
+            </div>
+            <span class="muted">{{ d.summary }}</span>
+            @if (d.signals.length) {
+              <ul class="reasons">
+                @for (s of d.signals; track $index) {
+                  <li>
+                    <span
+                      [style.color]="s.points_unauthorized ? 'var(--danger)' : 'var(--success)'"
+                      >{{ s.signal | human }}</span
+                    >
+                    <span class="muted"> · {{ s.detail }}</span>
+                  </li>
+                }
+              </ul>
+            }
+          </div>
+        </li>
+      }
+
       @if (r.proposal; as p) {
         <li>
           <span class="node" data-tone="ai"><app-icon name="bot" [size]="14" /></span>
@@ -234,6 +267,16 @@ export class DecisionTrail {
   protected readonly duplicates = computed(
     () => new Set((this.result().evidence?.duplicate_pairs ?? []).flat()),
   );
+  protected readonly disputeTone: Record<string, string> = {
+    likely_unauthorized: 'danger',
+    likely_customer_made: 'warning',
+    unclear: 'neutral',
+  };
+  protected readonly disputeLabel: Record<string, string> = {
+    likely_unauthorized: 'Likely fraud',
+    likely_customer_made: 'Looks customer-made',
+    unclear: 'Unclear',
+  };
   protected readonly transfer: Record<string, string> = {
     credited: 'delivered',
     pending: 'in transit',

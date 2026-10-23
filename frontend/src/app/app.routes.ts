@@ -12,8 +12,7 @@ export const routes: Routes = [
   },
   {
     path: 'signup',
-    loadComponent: () => import('./pages/auth-page').then((m) => m.AuthPage),
-    data: { mode: 'signup' },
+    loadComponent: () => import('./pages/signup-wizard').then((m) => m.SignupWizard),
   },
   // The customer's app: its own login (phone + one-time code) and its own session; never
   // the staff dashboard. /chat#<token> is the staff-issued link into the same app.
@@ -66,6 +65,11 @@ export const routes: Routes = [
       {
         path: 'approvals',
         loadComponent: () => import('./pages/approvals-page').then((m) => m.ApprovalsPage),
+        canActivate: [adminGuard],
+      },
+      {
+        path: 'settings',
+        loadComponent: () => import('./pages/settings-page').then((m) => m.SettingsPage),
         canActivate: [adminGuard],
       },
       {

@@ -64,6 +64,9 @@ const COUNTS_POLL_MS = 15000;
           <a class="nav-link" routerLink="/audit" routerLinkActive="active">
             <app-icon name="scroll" /> Audit log
           </a>
+          <a class="nav-link" routerLink="/settings" routerLinkActive="active">
+            <app-icon name="building" /> Settings
+          </a>
         }
 
         <div class="sidebar-foot">

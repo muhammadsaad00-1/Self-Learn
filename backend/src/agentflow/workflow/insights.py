@@ -17,7 +17,9 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from agentflow.db import SessionDep
+from agentflow.identity import service as identity
 from agentflow.identity.deps import OrgContextDep
+from agentflow.identity.schemas import BusinessProfile, Industry
 from agentflow.tickets.models import Ticket, TicketStatus
 from agentflow.tools.models import ActionExecution
 from agentflow.workflow.models import Workflow, WorkflowStatus, WorkflowStep
@@ -46,6 +48,14 @@ class Insights(BaseModel):
     ai_cost_per_request_usd: Decimal
     by_category: dict[str, int]
     by_channel: dict[str, int]
+    # The business case, from the company's own numbers (business profile, or defaults).
+    team_hours_saved: float  # requests the AI resolved alone x minutes a person would spend
+    team_cost_saved: Decimal  # ... x the cost of an agent hour, in `currency`
+    currency: str
+    monthly_queries: int  # what the company told us it gets
+    projected_monthly_hours_saved: float  # at that volume and today's AI resolution rate
+    projected_monthly_cost_saved: Decimal
+    assumptions: str  # shown next to the numbers: no hidden maths
 
 
 async def compute(session: AsyncSession, org_id: uuid.UUID, days: int = 30) -> Insights:
@@ -101,12 +111,31 @@ async def compute(session: AsyncSession, org_id: uuid.UUID, days: int = 30) -> I
         .select_from(Ticket)
         .where(Ticket.org_id == org_id, Ticket.status != TicketStatus.RESOLVED)
     )
+    profile = (await identity.get_profile(session, org_id)).profile or BusinessProfile(
+        industry=Industry.COMMERCIAL_BANK
+    )
+    rate = len(by_ai) / len(completed) if completed else 0.0
+    per_query_hours = profile.minutes_per_query / 60
+    hours = len(by_ai) * per_query_hours
+    monthly_hours = profile.monthly_queries * rate * per_query_hours
+    hourly = Decimal(profile.agent_cost_per_hour)
     return Insights(
+        team_hours_saved=round(hours, 1),
+        team_cost_saved=(Decimal(str(hours)) * hourly).quantize(Decimal("1")),
+        currency=profile.currency,
+        monthly_queries=profile.monthly_queries,
+        projected_monthly_hours_saved=round(monthly_hours, 0),
+        projected_monthly_cost_saved=(Decimal(str(monthly_hours)) * hourly).quantize(Decimal("1")),
+        assumptions=(
+            f"{profile.minutes_per_query} min of a person's time per routine query at "
+            f"{profile.currency} {profile.agent_cost_per_hour:,}/hour; "
+            f"{profile.monthly_queries:,} queries a month"
+        ),
         days=days,
         requests=len(workflows),
         completed=len(completed),
         resolved_by_ai=len(by_ai),
-        ai_resolution_rate=round(len(by_ai) / len(completed), 3) if completed else 0.0,
+        ai_resolution_rate=round(rate, 3),
         waiting_approval=sum(w.status == WorkflowStatus.WAITING_APPROVAL for w in workflows),
         open_tickets=open_tickets or 0,
         money_returned=money,

@@ -19,7 +19,10 @@ import { Icon } from '../layout/icon';
       <div class="phone">
         <header class="phone-head">
           <div class="avatar"><app-icon name="zap" [size]="16" /></div>
-          <div><strong>AgentFlow Bank</strong><small>Sign in to your account</small></div>
+          <div>
+            <strong>{{ bankName() ?? 'Your bank' }}</strong
+            ><small>Sign in to your account</small>
+          </div>
         </header>
         <form
           class="customer-login"
@@ -92,12 +95,21 @@ export class CustomerLoginPage {
   private readonly router = inject(Router);
 
   protected readonly bankId = inject(ActivatedRoute).snapshot.queryParamMap.get('bank');
+  protected readonly bankName = signal<string | null>(null);
   protected readonly step = signal<'phone' | 'code'>('phone');
   protected readonly devCode = signal<string | null>(null);
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
   protected phone = '';
   protected code = '';
+
+  constructor() {
+    if (this.bankId) {
+      firstValueFrom(this.http.get<{ name: string }>(`/v1/customer/bank/${this.bankId}`))
+        .then((b) => this.bankName.set(b.name))
+        .catch(() => this.bankName.set(null));
+    }
+  }
 
   protected async sendCode(): Promise<void> {
     await this.run(async () => {

@@ -129,6 +129,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/orgs/current/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Business Profile
+         * @description The current company's business profile (from signup).
+         */
+        get: operations["get_business_profile_v1_orgs_current_profile_get"];
+        /**
+         * Update Business Profile
+         * @description Update the business profile (admins).
+         */
+        put: operations["update_business_profile_v1_orgs_current_profile_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/audit/events": {
         parameters: {
             query?: never;
@@ -648,6 +672,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/customer/bank/{bank_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Bank
+         * @description The bank's name for its customer-app login screen (the id comes from the bank's own
+         *     app link; nothing else about the company is exposed).
+         */
+        get: operations["bank_v1_customer_bank__bank_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/customer/login/start": {
         parameters: {
             query?: never;
@@ -708,6 +753,64 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/inbound/email/{org_id}/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Receive Email
+         * @description One inbound email (JSON). A wrong token answers 404, like an unknown address.
+         */
+        post: operations["receive_email_v1_inbound_email__org_id___token__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inbound/address": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Inbound Address */
+        get: operations["inbound_address_v1_inbound_address_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/inbound/sample": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Load Sample Inbox
+         * @description Push a realistic sample inbox through the email channel (never in production). Needs
+         *     the demo customers for sender matching.
+         */
+        post: operations["load_sample_inbox_v1_inbound_sample_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -754,6 +857,16 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** Accepted */
+        Accepted: {
+            /**
+             * Workflow Id
+             * Format: uuid
+             */
+            workflow_id: string;
+            /** Customer Ref */
+            customer_ref: string | null;
+        };
         /** AccountOut */
         AccountOut: {
             /** Customer Ref */
@@ -891,6 +1004,11 @@ export interface components {
             /** Next Before Id */
             next_before_id: number | null;
         };
+        /** Bank */
+        Bank: {
+            /** Name */
+            name: string;
+        };
         /** Body_login_v1_auth_login_post */
         Body_login_v1_auth_login_post: {
             /** Grant Type */
@@ -932,6 +1050,59 @@ export interface components {
             file: string;
             /** Title */
             title?: string | null;
+        };
+        /**
+         * BusinessProfile
+         * @description What the company told us at signup. Sizes the ROI numbers and tailors the setup.
+         */
+        BusinessProfile: {
+            industry: components["schemas"]["Industry"];
+            /**
+             * Country
+             * @default PK
+             */
+            country: string;
+            /**
+             * Currency
+             * @default PKR
+             */
+            currency: string;
+            /**
+             * Customers
+             * @default 10k_100k
+             * @enum {string}
+             */
+            customers: "under_10k" | "10k_100k" | "100k_1m" | "over_1m";
+            /**
+             * Monthly Queries
+             * @default 5000
+             */
+            monthly_queries: number;
+            /**
+             * Channels
+             * @default [
+             *       "app_chat"
+             *     ]
+             */
+            channels: ("app_chat" | "email" | "whatsapp" | "phone" | "branch")[];
+            /**
+             * Languages
+             * @default [
+             *       "en",
+             *       "roman_ur"
+             *     ]
+             */
+            languages: ("en" | "ur" | "roman_ur")[];
+            /**
+             * Minutes Per Query
+             * @default 8
+             */
+            minutes_per_query: number;
+            /**
+             * Agent Cost Per Hour
+             * @default 1500
+             */
+            agent_cost_per_hour: number;
         };
         /**
          * CardStatus
@@ -1062,6 +1233,8 @@ export interface components {
         };
         /** CustomerMe */
         CustomerMe: {
+            /** Bank Name */
+            bank_name: string;
             /** Customer Ref */
             customer_ref: string;
             /** Customer Name */
@@ -1105,6 +1278,37 @@ export interface components {
              * @description Date of the transaction if given
              */
             transaction_date: string | null;
+        };
+        /** DisputeAssessment */
+        DisputeAssessment: {
+            /**
+             * Verdict
+             * @enum {string}
+             */
+            verdict: "likely_unauthorized" | "likely_customer_made" | "unclear";
+            /** Disputed */
+            disputed: string[];
+            /** Unauthorized Score */
+            unauthorized_score: number;
+            /** Customer Score */
+            customer_score: number;
+            /** Signals */
+            signals: components["schemas"]["DisputeSignal"][];
+            /** Summary */
+            summary: string;
+        };
+        /** DisputeSignal */
+        DisputeSignal: {
+            /** Reference */
+            reference: string;
+            /** Signal */
+            signal: string;
+            /** Points Unauthorized */
+            points_unauthorized: number;
+            /** Points Customer */
+            points_customer: number;
+            /** Detail */
+            detail: string;
         };
         /** DocumentOut */
         DocumentOut: {
@@ -1202,6 +1406,38 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** InboundAddress */
+        InboundAddress: {
+            /** Url */
+            url: string;
+            /** Sample Customer Emails */
+            sample_customer_emails: string[];
+        };
+        /** InboundEmail */
+        InboundEmail: {
+            /**
+             * From Address
+             * Format: email
+             */
+            from_address: string;
+            /**
+             * Subject
+             * @default
+             */
+            subject: string;
+            /** Text */
+            text: string;
+            /** Message Id */
+            message_id?: string | null;
+        };
+        /**
+         * Industry
+         * @description Who AgentFlow is for: companies that move customers' money. Its tools (ledger
+         *     research, reversals, card freeze) and policies (maker-checker, reversal limits) are built
+         *     for regulated money movement; other businesses are out of scope by design.
+         * @enum {string}
+         */
+        Industry: "commercial_bank" | "microfinance_bank" | "digital_wallet" | "digital_lender";
         /** Insights */
         Insights: {
             /** Days */
@@ -1236,6 +1472,20 @@ export interface components {
             by_channel: {
                 [key: string]: number;
             };
+            /** Team Hours Saved */
+            team_hours_saved: number;
+            /** Team Cost Saved */
+            team_cost_saved: string;
+            /** Currency */
+            currency: string;
+            /** Monthly Queries */
+            monthly_queries: number;
+            /** Projected Monthly Hours Saved */
+            projected_monthly_hours_saved: number;
+            /** Projected Monthly Cost Saved */
+            projected_monthly_cost_saved: string;
+            /** Assumptions */
+            assumptions: string;
         };
         /**
          * IssueStatus
@@ -1367,6 +1617,17 @@ export interface components {
             /** Customer Token */
             customer_token: string;
         };
+        /** OrgProfileOut */
+        OrgProfileOut: {
+            /**
+             * Org Id
+             * Format: uuid
+             */
+            org_id: string;
+            /** Name */
+            name: string;
+            profile: components["schemas"]["BusinessProfile"] | null;
+        };
         /**
          * Outcome
          * @enum {string}
@@ -1478,6 +1739,7 @@ export interface components {
             full_name: string;
             /** Org Name */
             org_name: string;
+            profile?: components["schemas"]["BusinessProfile"] | null;
         };
         /** SignupResponse */
         SignupResponse: {
@@ -1620,6 +1882,14 @@ export interface components {
             merchant: string;
             status: components["schemas"]["TransactionStatus"];
             transfer_status?: components["schemas"]["TransferStatus"] | null;
+            /** Channel */
+            channel?: string | null;
+            /** Device */
+            device?: string | null;
+            /** Device Known */
+            device_known?: boolean | null;
+            /** Verified */
+            verified?: boolean | null;
             /**
              * Occurred At
              * Format: date-time
@@ -1646,6 +1916,13 @@ export interface components {
              * @description One neutral sentence for an operations agent
              */
             summary: string;
+            /**
+             * Language
+             * @description Language of the customer's newest message: en (English), ur (Urdu script) or roman_ur (Urdu written in Latin letters, e.g. 'mere paise nahi mile')
+             * @default en
+             * @enum {string}
+             */
+            language: "en" | "ur" | "roman_ur";
             /**
              * Title
              * @description 3-7 word title of the request in English, as the customer would name it, e.g. 'Transfer to Ali not received'
@@ -1741,6 +2018,7 @@ export interface components {
             proposal?: components["schemas"]["ProposedAction"] | null;
             decision?: components["schemas"]["PolicyDecision"] | null;
             risk?: components["schemas"]["RiskAssessment"] | null;
+            dispute?: components["schemas"]["DisputeAssessment"] | null;
             approval?: components["schemas"]["ApprovalRef"] | null;
             execution?: components["schemas"]["ExecutionResult"] | null;
             ticket?: components["schemas"]["TicketRef"] | null;
@@ -2059,6 +2337,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MembershipOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_business_profile_v1_orgs_current_profile_get: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgProfileOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_business_profile_v1_orgs_current_profile_put: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BusinessProfile"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrgProfileOut"];
                 };
             };
             /** @description Validation Error */
@@ -3067,6 +3413,37 @@ export interface operations {
             };
         };
     };
+    bank_v1_customer_bank__bank_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bank_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Bank"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     login_start_v1_customer_login_start_post: {
         parameters: {
             query?: never;
@@ -3152,6 +3529,106 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Insights"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    receive_email_v1_inbound_email__org_id___token__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                org_id: string;
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InboundEmail"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Accepted"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    inbound_address_v1_inbound_address_get: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboundAddress"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    load_sample_inbox_v1_inbound_sample_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Accepted"][];
                 };
             };
             /** @description Validation Error */

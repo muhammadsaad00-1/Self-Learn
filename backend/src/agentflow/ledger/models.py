@@ -39,6 +39,7 @@ class Account(Base):
     __table_args__ = (
         UniqueConstraint("org_id", "customer_ref"),
         UniqueConstraint("org_id", "phone"),
+        UniqueConstraint("org_id", "email"),
         enum_check("card_status", CardStatus),
     )
 
@@ -48,6 +49,8 @@ class Account(Base):
     customer_name: Mapped[str] = mapped_column(String(200))
     # Mobile number the customer logs in with (E.164 digits, e.g. 923001234501).
     phone: Mapped[str | None] = mapped_column(String(20))
+    # Email the customer writes from (the email channel matches senders to customers).
+    email: Mapped[str | None] = mapped_column(String(320))
     currency: Mapped[str] = mapped_column(String(3))
     card_status: Mapped[CardStatus] = mapped_column(
         str_enum(CardStatus), default=CardStatus.ACTIVE, server_default=CardStatus.ACTIVE
@@ -77,6 +80,12 @@ class Transaction(Base):
     status: Mapped[TransactionStatus] = mapped_column(
         str_enum(TransactionStatus), default=TransactionStatus.POSTED
     )
+    # How the payment was made, as card/payment systems record it: the evidence that settles
+    # "I never made this payment" (dispute intelligence, policy/dispute.py).
+    channel: Mapped[str | None] = mapped_column(String(32))  # card_online, pos, atm, app, ...
+    device: Mapped[str | None] = mapped_column(String(200))  # "Registered phone (Samsung A54)"
+    device_known: Mapped[bool | None]  # the customer's registered device
+    verified: Mapped[bool | None]  # passed OTP / 3-D Secure
     # Set for transfers only (None for card/merchant payments).
     transfer_status: Mapped[TransferStatus | None] = mapped_column(str_enum(TransferStatus))
     # For a refund credit: the debit it reverses.

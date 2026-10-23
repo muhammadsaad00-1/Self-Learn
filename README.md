@@ -22,19 +22,12 @@ make web         # Angular dashboard                      →  http://localhost:
 
 Sign up at http://localhost:4200/signup.
 
-**Demo (≈5 min):**
-1. Workflows → "Load demo customers" (also queues the customer help guide; wait until Knowledge shows it `ready`).
-2. **Customer app** (separate from this dashboard): Chats shows the link `http://localhost:4200/customer/login?bank=<your org id>`. Sign in with a demo customer's mobile number, `0300 1234501` to `0300 1234505` (CUST-1001..1005). Outside production the one-time code is shown on screen. Tabs: Chat, Activity, Cases. Try *"I sent 3000 to Sara yesterday, she didn't get it"* (CUST-1004: the records show it was delivered), *"did my salary come?"* (CUST-1002), *"Daraz charged me twice"* (CUST-1001: only one charge), *"a bank officer called and I gave him my OTP"* (critical case + card frozen).
-   Or, from the dashboard: Chats → "Open the customer app as…" → a customer → **Open customer app ↗** (a phone-style chat opens in a new tab). Try:
-   - CUST-1004: *"Maine Ali ko 5000 bheje, kat gaye lekin usko nahi mile"* → the network says the transfer failed → reversed at once, transfer trace card, reply in Roman Urdu.
-   - CUST-1002: *"How do I issue a cheque?"* (or 🎤 a voice note) → answered from the help guide with its source.
-   - CUST-1003: *"I see payments I never made!"* → card frozen instantly + critical case TCK-… (Tickets page).
-   - CUST-1005: *"I sent 15000 to Kamran yesterday, still not received"* → stuck in transit → partner-bank inquiry case.
-   - CUST-1002: *"Careem charged me twice"* → refunded automatically. CUST-1001: *"My 5,000 bill was deducted twice"* → "with an officer"; a second admin approves in Approvals and the refund lands in the same chat.
-3. Tickets: hand a case to a teammate with a note ("Hand off"), filter "mine", resolve with a message to the customer (it appears in their chat and their Cases tab).
-4. Back in Chats: watch every conversation; type a reply to take over from the AI, then "Hand back to AI".
-5. Insights: AI resolution rate, money returned, time to resolve, AI cost per request.
-6. Workflows → any request → the decision trail (criticality signals, evidence → policy → approval → ledger-verified action → reply); Audit log for the compliance record.
+**Demo (≈5 min):** the script, the pitch and the competitor comparison are in [`docs/PITCH.md`](docs/PITCH.md) §7. In short:
+1. Sign up at /signup (3-step wizard) → Overview → **Load demo customers**.
+2. Inbox → **Open** the customer app as a customer (phones 0300 1234501–06). Try a failed transfer (CUST-1004), *"my 3000 to Sara never arrived"* (CUST-1004), genuine fraud (CUST-1003) and a **false fraud claim** (CUST-1006: no freeze, the facts shown, a case for review).
+3. Settings → **Load a sample inbox**: 8 emails through the same agents, including an injection attempt.
+4. Tickets (hand off, resolve with a message), Approvals (maker-checker), Requests (the decision trail), Overview (ROI).
+
 `make help` lists every command. `make down` stops the stack.
 
 ## How a customer message flows

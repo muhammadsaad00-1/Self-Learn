@@ -12,6 +12,7 @@ dependencies = [
     "fastembed>=0.9.0",
     "langchain-core>=1.6.10",
     "langchain-groq>=1.1.3",
+    "langchain-openai>=1.0",
     "langgraph>=1.2.15",
     "pgvector>=0.5.1",
     "pwdlib[argon2]>=0.3.1",

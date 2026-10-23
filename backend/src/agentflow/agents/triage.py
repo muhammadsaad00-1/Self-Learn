@@ -8,6 +8,7 @@ and human review ("the model proposes, the system decides").
 from datetime import date
 from decimal import Decimal
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -49,6 +50,11 @@ class TriageResult(BaseModel):
     category: Category
     urgency: Urgency
     summary: str = Field(description="One neutral sentence for an operations agent")
+    language: Literal["en", "ur", "roman_ur"] = Field(
+        default="en",
+        description="Language of the customer's newest message: en (English), ur (Urdu "
+        "script) or roman_ur (Urdu written in Latin letters, e.g. 'mere paise nahi mile')",
+    )
     title: str = Field(
         default="",
         description="3-7 word title of the request in English, as the customer would name "
