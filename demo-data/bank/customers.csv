@@ -1,0 +1,12 @@
+Customer ID,Account Title,Mobile No,CNIC,Username,Email,Currency
+CUST-2001,Ayesha Khan,0300 2001001,42101-2001001-2,ayesha.k,ayesha@example.pk,PKR
+CUST-2002,Bilal Ahmed,0301 2002002,35202-2002002-1,bilal.a,bilal@example.pk,PKR
+CUST-2003,Hira Malik,0302 2003003,61101-2003003-4,hira.m,hira@example.pk,PKR
+CUST-2004,Usman Tariq,0303 2004004,42201-2004004-5,usman.t,usman@example.pk,PKR
+CUST-2005,Zara Hussain,0304 2005005,37405-2005005-6,zara.h,zara@example.pk,PKR
+CUST-2006,Hamza Sheikh,0305 2006006,42101-2006006-7,hamza.s,hamza@example.pk,PKR
+CUST-2007,Mehwish Raza,0306 2007007,35201-2007007-8,mehwish.r,,PKR
+CUST-2008,Fahad Iqbal,0307 2008008,42301-2008008-9,fahad.i,fahad@example.pk,PKR
+CUST-2009,Sana Javed,0308 2009009,61101-2009009-1,sana.j,sana@example.pk,PKR
+CUST-2010,Omar Farooq,0309 2010010,42101-2010010-3,omar.f,omar@example.pk,PKR
+CUST-2011,,12345,4210-1,,not-an-email,PKR

@@ -2,7 +2,7 @@
 
 **Customers text. AI resolves. Your team only handles what truly needs a human.**
 
-AgentFlow is an AI support desk for companies that move money: banks, microfinance banks, wallets and digital lenders. Customers write in the bank's app or by email, in English, Urdu or Roman Urdu, typed or as a voice note. Agents read the bank's documents **and the customer's own ledger**, then actually fix the problem: reverse a failed transfer, refund a duplicate, freeze a card. They only act inside policy written in code, with maker-checker approval above limits, exactly-once execution and a full audit trail. Everything else becomes a ticket for a human, with the evidence already gathered.
+AgentFlow is an AI support-desk prototype for companies that move money: banks, microfinance banks, wallets and digital lenders. Customers write in the app or by email, in English, Urdu or Roman Urdu, typed or as a voice note. Agents read company documents and a **simulated customer ledger**, investigate a request, and can demonstrate a governed refund or card freeze against that sample data. Deterministic rules, maker-checker approvals, and an auditable workflow surround each proposed action. A live core-banking/payment connection is not implemented yet.
 
 ---
 
@@ -18,12 +18,12 @@ AgentFlow is an AI support desk for companies that move money: banks, microfinan
 |---|---|---|---|
 | Answers from documents with sources | ✓ | ✓ | ✓ verified, abstains when the documents don't cover it |
 | Reads **this customer's** transactions | ✗ | needs custom integration work | ✓ built in: the agents settle doubts from records |
-| **Takes the action** (reversal, refund, freeze) | ✗ | via generic workflows | ✓ typed tools, policy-checked, exactly once, ledger-verified |
-| Policy in code + maker-checker approvals | ✗ | ✗ | ✓ above limits, a second officer approves |
+| **Demonstrates a governed action** | ✗ | via generic workflows | ✓ typed tools against sample ledger, verified in that simulator |
+| Configurable policy limits + maker-checker approvals | ✗ | ✗ | ✓ per-tenant limits and second-officer approvals |
 | Fraud claims weighed against device/OTP evidence | ✗ | ✗ | ✓ **dispute intelligence** |
 | Critical cases always reach a human | partial | partial | ✓ code-scored risk that the message can't argue down |
 | Roman Urdu, Urdu script, voice notes | rarely | limited | ✓ |
-| Regulator-grade audit trail | ✗ | partial | ✓ append-only, every decision and action |
+| Auditable workflow | ✗ | partial | ✓ append-only application records with a verifiable hash chain |
 | Pricing | per seat | **$0.99 per resolution** ([source](https://www.gleap.io/blog/intercom-fin-ai-pricing-2026)) | our measured AI cost is **≈ $0.001 per request** |
 
 In Pakistan, easypaisa launched the in-app assistant *ello* for product knowledge and guided self-service ([Aaj](https://english.aaj.tv/news/330452473/easypaisa-rolls-out-ai-chatbot-ello-to-boost-in-app-customer-support)). Allied Bank launched a Kore.ai virtual assistant ([ABL](https://www.abl.com/allied-bank-partners-with-kore-ai-to-launch-pakistans-first-ai-powered-intelligent-virtual-assistant/)). The public descriptions of these assistants are about answering, guiding and routing. We found no public evidence of one that autonomously reverses money under maker-checker policy, or weighs a fraud claim against device and OTP evidence. **That gap is AgentFlow.**
@@ -35,7 +35,7 @@ RAG is one of eleven steps. For every message:
 ```
 triage (AI) ─► documents (RAG, verified) ─► ledger research (code) ─► risk check (code)
    ─► dispute check (code, fraud claims) ─► proposal (AI, typed) ─► validation (code)
-   ─► policy (code: allow / approve / block) ─► [second officer] ─► action (exactly once)
+   ─► policy (code: allow / approve / block) ─► [second officer] ─► simulator action (internal idempotency)
    ─► ticket if a human must own it ─► reply in the customer's language (AI, facts only)
 ```
 
@@ -48,9 +48,9 @@ triage (AI) ─► documents (RAG, verified) ─► ledger research (code) ─�
    - Voice notes, plus English, Urdu and Roman Urdu.
    - Fact cards in replies: a transfer trace, refund reference, frozen card, case number.
 2. **Resolves, not just answers.**
-   - Network-confirmed failed transfers are reversed at once.
-   - Small duplicates are refunded automatically; large ones wait for a second officer.
-   - Every action is checked against the ledger afterwards.
+   - Sample network-confirmed failed transfers are reversed in the demo ledger.
+   - Small sample duplicates are refunded automatically; larger ones wait for a second officer.
+   - Each simulated action is checked against the ledger afterwards.
 3. **Settles doubts from records.** *"My 3000 to Sara never arrived"* gets the answer: it was delivered at 15:30, reference …, ask Sara to check. No ticket, no human.
 4. **Dispute intelligence.**
    - *"I never made this payment"* is weighed against device, OTP/3-D Secure, merchant history and amount pattern.
@@ -77,7 +77,8 @@ triage (AI) ─► documents (RAG, verified) ─► ledger research (code) ─�
 
 ## 6. Honest limits, and what's next
 
-- **Simulated ledger.** Integrating a real core banking system is an adapter behind the same tool contract. The exactly-once design already plans for the provider's idempotency key.
+- **Simulated ledger.** A `MoneyActions` adapter boundary now isolates writes, but its implementation still mutates only AgentFlow's database. A live adapter needs a selected provider, provider-side idempotency keys, and reconciliation after ambiguous timeouts. Exactly-once currently describes the internal simulator only.
+- **Audit scope.** App-role writes are append-only; a per-tenant hash chain can detect an isolated edit or deletion. A database superuser could rewrite the full chain. Independently stored signed checkpoints or immutable external retention are needed for privileged tamper evidence; this is not a regulator-grade deployment claim.
 - **No real sends yet.** Replies to email are drafted, not sent, and one-time codes are shown on screen instead of sent by SMS.
 - **Latency and rate limits:**
   - **Latency:** a reply takes 15–45 s. Streaming the reply and caching frequent questions are next.

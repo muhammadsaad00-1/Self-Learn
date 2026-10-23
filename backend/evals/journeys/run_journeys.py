@@ -10,7 +10,9 @@ What it does, as a bank would:
    and a key fact in the reply.
 3. The team works the queue: approves the large refund (the issue then resolves itself),
    hands the fraud case to a colleague, who resolves it with a message to the customer.
-4. Prints a report and the company's insights. Exit code 1 if any check failed.
+4. Journeys with "company": "transport" run against a bus company instead (passengers +
+   the sample schedule): seats, delays and "tomorrow" answered from live trips.
+5. Prints a report and the company's insights. Exit code 1 if any check failed.
 
 Unlike pytest (fake models), this measures the real thing; add a journey for every
 behaviour a demo depends on.
@@ -55,8 +57,13 @@ class Result:
 class Bank:
     """Staff session of one company, plus customer sessions on demand."""
 
-    def __init__(self, client: httpx.Client) -> None:
-        self.http = client
+    def __init__(
+        self,
+        client: httpx.Client,
+        industry: str = "microfinance_bank",
+        name: str = "Mehran Microfinance Bank",
+    ) -> None:
+        self.http, self.name = client, name
         email = f"ops-{uuid.uuid4().hex[:6]}@example.com"
         resp = client.post(
             "/v1/auth/signup",
@@ -64,9 +71,9 @@ class Bank:
                 "email": email,
                 "password": PASSWORD,
                 "full_name": "Ayesha (Ops lead)",
-                "org_name": "Mehran Microfinance Bank",
+                "org_name": name,
                 "profile": {
-                    "industry": "microfinance_bank",
+                    "industry": industry,
                     "monthly_queries": 20000,
                     "channels": ["app_chat", "email"],
                     "languages": ["en", "ur", "roman_ur"],
@@ -148,6 +155,21 @@ def setup(bank: Bank) -> None:
             raise TimeoutError("documents not ingested")
         time.sleep(2)
     print(f"Knowledge: {', '.join(d['title'] for d in docs)} (ready)\n")
+
+
+def setup_transport(company: Bank) -> None:
+    """Passengers, the help guide and the sample schedule (tomorrow's 08:00 Lahore-Islamabad
+    is delayed; the 17:00 Karachi-Lahore has 3 seats)."""
+    print(f"Company: {company.name} ({company.email})")
+    company.post("/v1/ledger/demo-data")
+    batch = company.post("/v1/imports/sample", {"record_type": "trips"})
+    for row in batch["rows"]:
+        if row["errors"]:  # the sample's deliberately bad row
+            company.http.delete(
+                f"/v1/imports/{batch['id']}/rows/{row['id']}", headers=company.headers
+            ).raise_for_status()
+    company.post(f"/v1/imports/{batch['id']}/commit")
+    print("Trips: sample schedule committed\n")
 
 
 def conversations(bank: Bank, customer: dict[str, str]) -> list[dict[str, Any]]:
@@ -275,9 +297,16 @@ def main() -> int:
         wait_until_ready(client)
         bank = Bank(client)
         setup(bank)
+        transport: Bank | None = None
         results = []
         for journey in journeys:
-            r = run_journey(bank, journey)
+            company = bank
+            if journey.get("company") == "transport":
+                if transport is None:
+                    transport = Bank(client, "transport", "Shaheen Express")
+                    setup_transport(transport)
+                company = transport
+            r = run_journey(company, journey)
             results.append(r)
             mark = "PASS" if not r.failures else "FAIL"
             where = r.route + (f" ({r.status})" if r.status else "")
