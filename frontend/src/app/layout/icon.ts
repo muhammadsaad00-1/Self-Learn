@@ -27,6 +27,7 @@ const PATHS: Record<string, string> = {
   sparkles:
     'm12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z',
   search: 'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z M21 21l-4.35-4.35',
+  menu: 'M3 6h18 M3 12h18 M3 18h18',
   'chevron-down': 'm6 9 6 6 6-6',
   'chevron-left': 'm15 18-6-6 6-6',
   x: 'M18 6 6 18 M6 6l12 12',

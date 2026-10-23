@@ -10,6 +10,12 @@ import { errorMessage } from '../core/errors';
 import { FORMAT } from '../core/format';
 import { Icon } from '../layout/icon';
 
+type AuditVerification = {
+  valid: boolean;
+  verified_events: number;
+  first_invalid_event_id: number | null;
+};
+
 /** Every change in the company, append-only: what compliance reads. */
 @Component({
   selector: 'app-audit-page',
@@ -20,10 +26,27 @@ import { Icon } from '../layout/icon';
         <div>
           <h1>Audit log</h1>
           <p class="subtitle">
-            Every change and every action the agents executed. Entries can't be edited or deleted.
+            Append-only for the application role. Hash links make edits detectable; a database
+            superuser could still rewrite the full chain.
           </p>
         </div>
+        <div class="actions">
+          <button type="button" class="secondary" (click)="verify()" [disabled]="verifying()">
+            <app-icon name="shield" /> {{ verifying() ? 'Verifying…' : 'Verify integrity' }}
+          </button>
+        </div>
       </header>
+
+      @if (verification(); as check) {
+        <div class="callout" [attr.data-tone]="check.valid ? 'success' : 'danger'">
+          @if (check.valid) {
+            Hash chain valid · {{ check.verified_events }} events checked.
+          } @else {
+            Integrity check failed at event {{ check.first_invalid_event_id }} after
+            {{ check.verified_events }} valid events. Escalate for investigation.
+          }
+        </div>
+      }
 
       <form class="toolbar" (ngSubmit)="load(true)">
         <input
@@ -124,6 +147,8 @@ export class AuditPage {
   protected readonly events = signal<AuditEvent[]>([]);
   protected readonly nextBeforeId = signal<number | null>(null);
   protected readonly error = signal<string | null>(null);
+  protected readonly verifying = signal(false);
+  protected readonly verification = signal<AuditVerification | null>(null);
 
   constructor() {
     // Start over whenever the selected org changes (and once on first render). No org means
@@ -146,6 +171,20 @@ export class AuditPage {
       this.nextBeforeId.set(page.next_before_id ?? null);
     } catch (err) {
       this.error.set(errorMessage(err));
+    }
+  }
+
+  protected async verify(): Promise<void> {
+    this.verifying.set(true);
+    this.error.set(null);
+    try {
+      this.verification.set(
+        await firstValueFrom(this.http.get<AuditVerification>('/v1/audit/verify')),
+      );
+    } catch (err) {
+      this.error.set(errorMessage(err));
+    } finally {
+      this.verifying.set(false);
     }
   }
 }

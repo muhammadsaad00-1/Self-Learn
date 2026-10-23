@@ -16,7 +16,7 @@ from agentflow.db import set_tenant_context
 from agentflow.knowledge.runtime import KnowledgeRuntime
 from agentflow.tools.models import ActionExecution
 from agentflow.tools.refund import authorize_and_execute
-from agentflow.worker import process_next, process_next_document
+from agentflow.worker import process_next, process_next_document, sweep_expired_approvals
 from agentflow.workflow.graph import build_workflow_graphs
 from tests.fakes import (
     FakeLLM,
@@ -262,8 +262,7 @@ async def test_expired_approval_is_not_executed(
         wf_id = submit(client, owner, "CUST-1001")
         await run(sessions, settings, runtime, llm)
         await exec_sql("UPDATE approvals SET expires_at = now() - interval '1 minute'", {})
-        async with sessions() as s, s.begin():  # the worker's sweep, as the app role
-            assert await s.scalar(text("SELECT expire_approvals()")) == 1
+        assert await sweep_expired_approvals(sessions) == 1  # the worker's sweep, app role
         await run(sessions, settings, runtime, llm)
 
         r = workflow(client, owner, wf_id)["result"]
@@ -272,6 +271,8 @@ async def test_expired_approval_is_not_executed(
             "Approval expired",
         )
         assert await credits(sessions, owner.org_id) == 0
+        events = client.get("/v1/audit/events", headers=owner.headers()).json()["events"]
+        assert "approval.expired" in [e["action"] for e in events]
 
 
 async def test_limits_are_rechecked_at_execution_time(
@@ -430,3 +431,35 @@ def test_demo_data_is_idempotent_and_admin_only(client_for: Any) -> None:
         client.post("/v1/members", headers=owner.headers(), json={"email": member.email})
         resp = client.post("/v1/ledger/demo-data", headers=member.headers(org_id=owner.org_id))
         assert resp.status_code == 403
+
+
+def test_only_trips_for_the_cities_asked_about_reach_the_model() -> None:
+    from types import SimpleNamespace
+
+    from agentflow.agents.resolution import MAX_TRIPS_SHOWN, relevant_trips
+
+    def trip(origin: str, destination: str) -> SimpleNamespace:
+        return SimpleNamespace(origin=origin, destination=destination)
+
+    schedule = [trip("Karachi", "Lahore"), trip("Lahore", "Islamabad"), trip("Multan", "Lahore")]
+    schedule += [trip("Karachi", "Hyderabad")] * 40
+    lahore = relevant_trips(schedule, "kal shaam 5 baje Lahore wali bus mein 2 seats hain?")
+    assert lahore == schedule[:3]
+    assert relevant_trips(schedule, "karachi to lahore tomorrow?") == [schedule[0]]
+    assert len(relevant_trips(schedule, "any buses tonight?")) == MAX_TRIPS_SHOWN
+
+
+def test_trip_days_are_labelled_by_code() -> None:
+    from datetime import date, datetime
+    from zoneinfo import ZoneInfo
+
+    from agentflow.agents.resolution import day_label
+    from agentflow.workflow.graph import _when
+
+    pkt = ZoneInfo("Asia/Karachi")
+    today = date(2026, 10, 24)
+    assert day_label(datetime(2026, 10, 24, 23, 0, tzinfo=pkt), today) == "today"
+    assert day_label(datetime(2026, 10, 25, 10, 0, tzinfo=pkt), today) == "tomorrow"
+    assert day_label(datetime(2026, 10, 27, 10, 0, tzinfo=pkt), today) == "Tuesday"
+    assert day_label(datetime(2026, 10, 27, 10, 0, tzinfo=pkt), None) == ""
+    assert _when("2026-10-25T10:00:00+05:00", "2026-10-24") == "tomorrow, Sun 25 Oct, 10:00 AM"

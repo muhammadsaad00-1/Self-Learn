@@ -11,7 +11,28 @@ import { errorMessage } from '../core/errors';
 import { Icon } from '../layout/icon';
 import { CustomerChat } from '../layout/customer-chat';
 
-type Tab = 'help' | 'issues' | 'activity';
+type Tab = 'help' | 'issues' | 'activity' | 'bookings';
+interface BookingTrip {
+  id: string;
+  trip_ref: string;
+  origin: string;
+  destination: string;
+  departs_at: string;
+  fare: string;
+  currency: string;
+  seats_available: number;
+}
+interface SeatBooking {
+  id: string;
+  trip_ref: string | null;
+  booking_ref: string;
+  seats: number;
+  unit_fare: string;
+  currency: string;
+  status: string;
+  expires_at: string | null;
+  created_at: string;
+}
 
 const TRANSFER_LABEL: Record<string, string> = {
   credited: 'Delivered',
@@ -155,6 +176,78 @@ const ISSUE_STATUS: Record<Conversation['status'], { label: string; badge: strin
                 }
               </ul>
             }
+            @case ('bookings') {
+              <form class="report stack-sm" (submit)="$event.preventDefault(); bookSeat()">
+                <label
+                  >Trip<select [(ngModel)]="tripId" name="trip" required>
+                    <option value="">Choose a departure</option>
+                    @for (t of trips.value() ?? []; track t.id) {
+                      <option [value]="t.id">
+                        {{ t.origin }} → {{ t.destination }} ·
+                        {{ t.departs_at | date: 'MMM d, h:mm a' }} · {{ t.seats_available }} seats ·
+                        {{ t.currency }} {{ +t.fare | number: '1.0-0' }}
+                      </option>
+                    }
+                  </select></label
+                >
+                <label
+                  >Phone number<input
+                    [(ngModel)]="bookingPhone"
+                    name="bookingPhone"
+                    inputmode="tel"
+                    autocomplete="tel"
+                    required
+                /></label>
+                <label
+                  >CNIC (13 digits)<input
+                    [(ngModel)]="bookingCnic"
+                    name="bookingCnic"
+                    inputmode="numeric"
+                    maxlength="20"
+                    autocomplete="off"
+                    required
+                /></label>
+                <label
+                  >Seats<input
+                    [(ngModel)]="bookingSeats"
+                    name="bookingSeats"
+                    type="number"
+                    min="1"
+                    max="6"
+                    required
+                /></label>
+                <button type="submit" [disabled]="busy() || !tripId">
+                  {{ busy() ? 'Checking…' : 'Verify and hold seats' }}
+                </button>
+                <small class="muted"
+                  >We compare these details with your customer record. A seat hold expires after 20
+                  minutes until payment is confirmed through the operator.</small
+                >
+                @if (error()) {
+                  <small class="error" role="alert">{{ error() }}</small>
+                }
+              </form>
+              <ul class="activity">
+                @for (b of bookings.value() ?? []; track b.id) {
+                  <li>
+                    <span
+                      ><strong>{{ b.booking_ref }} · {{ b.trip_ref ?? 'Trip' }}</strong
+                      ><small class="muted"
+                        >{{ b.seats }} seat(s) · {{ b.status }}
+                        @if (b.expires_at) {
+                          · expires {{ b.expires_at | date: 'shortTime' }}
+                        }
+                      </small></span
+                    >
+                    @if (b.status === 'held' || b.status === 'confirmed') {
+                      <button type="button" class="ghost" (click)="cancelBooking(b)">Cancel</button>
+                    }
+                  </li>
+                } @empty {
+                  <li class="muted">Your seat bookings will appear here.</li>
+                }
+              </ul>
+            }
           }
         }
 
@@ -182,6 +275,7 @@ export class CustomerPortalPage implements OnInit {
     { id: 'help', label: 'Help', icon: 'message' },
     { id: 'issues', label: 'Issues', icon: 'ticket' },
     { id: 'activity', label: 'Activity', icon: 'activity' },
+    { id: 'bookings', label: 'Seats', icon: 'ticket' },
   ];
   protected readonly tab = signal<Tab>('help');
   protected readonly openIssue = signal<string | null>(null);
@@ -190,6 +284,10 @@ export class CustomerPortalPage implements OnInit {
   protected readonly transferLabel = TRANSFER_LABEL;
   protected readonly issueStatus = ISSUE_STATUS;
   protected problem = '';
+  protected tripId = '';
+  protected bookingPhone = '';
+  protected bookingCnic = '';
+  protected bookingSeats = 1;
 
   private resource<T>(url: string) {
     return httpResource<T>(() =>
@@ -200,6 +298,8 @@ export class CustomerPortalPage implements OnInit {
   protected readonly me = this.resource<CustomerMe>('/v1/customer/me');
   protected readonly transactions = this.resource<LedgerTransaction[]>('/v1/customer/transactions');
   protected readonly conversations = this.resource<Conversation[]>('/v1/customer/conversations');
+  protected readonly trips = this.resource<BookingTrip[]>('/v1/customer/bookings/trips');
+  protected readonly bookings = this.resource<SeatBooking[]>('/v1/customer/bookings');
 
   protected readonly helpId = computed(
     () => this.conversations.value()?.find((c) => c.kind === 'help')?.id ?? null,
@@ -215,9 +315,9 @@ export class CustomerPortalPage implements OnInit {
       const open = this.issues().find((i) => i.id === this.openIssue());
       return open ? (open.subject ?? 'Issue') : 'Your issues';
     }
-    return this.tab() === 'activity'
-      ? 'Activity'
-      : (this.me.value()?.bank_name ?? this.session.bankName() ?? 'Your bank');
+    if (this.tab() === 'activity') return 'Activity';
+    if (this.tab() === 'bookings') return 'Seat bookings';
+    return this.me.value()?.bank_name ?? this.session.bankName() ?? 'Your bank';
   });
 
   ngOnInit(): void {
@@ -233,6 +333,10 @@ export class CustomerPortalPage implements OnInit {
   protected selectTab(tab: Tab): void {
     this.tab.set(tab);
     if (tab === 'issues') this.openIssue.set(null);
+    if (tab === 'bookings') {
+      this.trips.reload();
+      this.bookings.reload();
+    }
   }
 
   protected showIssue(id: string): void {
@@ -265,6 +369,52 @@ export class CustomerPortalPage implements OnInit {
       this.error.set(errorMessage(err));
     } finally {
       this.busy.set(false);
+    }
+  }
+
+  protected async bookSeat(): Promise<void> {
+    this.busy.set(true);
+    this.error.set(null);
+    try {
+      await firstValueFrom(
+        this.http.post(
+          '/v1/customer/bookings',
+          {
+            trip_id: this.tripId,
+            phone: this.bookingPhone,
+            cnic: this.bookingCnic,
+            seats: Number(this.bookingSeats),
+            idempotency_key: crypto.randomUUID(),
+          },
+          { headers: this.session.headers() },
+        ),
+      );
+      this.bookingPhone = '';
+      this.bookingCnic = '';
+      this.tripId = '';
+      this.bookings.reload();
+      this.trips.reload();
+    } catch (err) {
+      this.error.set(errorMessage(err));
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  protected async cancelBooking(booking: SeatBooking): Promise<void> {
+    this.error.set(null);
+    try {
+      await firstValueFrom(
+        this.http.post(
+          `/v1/customer/bookings/${booking.id}/cancel`,
+          {},
+          { headers: this.session.headers() },
+        ),
+      );
+      this.bookings.reload();
+      this.trips.reload();
+    } catch (err) {
+      this.error.set(errorMessage(err));
     }
   }
 

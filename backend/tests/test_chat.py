@@ -1,3 +1,4 @@
+# ruff: noqa: RUF001 -- Urdu replies end sentences with the Urdu full stop, not a hyphen.
 """Customer chat end to end (real database, fake models): a customer message runs the agents;
 a problem moves to its own issue thread and the outcome lands there with a card; failed
 transfers are reversed at once, fraud freezes the card; staff can take over; insights add it
@@ -170,7 +171,7 @@ async def test_failed_transfer_is_reversed_in_the_chat(
         assert help_chat["customer_name"] == "Usman Tariq"
         mine, routed = help_chat["messages"]
         assert (mine["role"], routed["role"]) == ("customer", "assistant")
-        assert "separate issue" in routed["body"]
+        assert "alag issue khol diya" in routed["body"]  # in the customer's Roman Urdu
         # ...and the outcome landed there, with the issue resolved.
         thread = issue(client, customer)
         assert routed["card"]["issue"]["id"] == thread["id"]
@@ -183,6 +184,19 @@ async def test_failed_transfer_is_reversed_in_the_chat(
         assert card["transfer"]["network_status"] == "failed"
         assert card["transfer"]["reversed"] is True
         assert "case" not in card
+
+
+def test_code_written_replies_follow_the_customers_language() -> None:
+    from agentflow.conversations.service import _failed_text, _language, _review_text
+
+    assert _language("refund kab milega? paise kat gaye", {"language": "en"}) == "roman_ur"
+    assert _language("میرے پیسے واپس کریں", None) == "ur"
+    assert _language("Where is my refund?", {"language": "roman_ur"}) == "roman_ur"  # triage
+    assert _language("Where is my refund?", {"language": "fr"}) == "en"
+    state = {"proposal": {"amount": "15000"}, "ticket": {"code": "TCK-7"}}
+    assert _review_text(state, "roman_ur").startswith("Maine aapka account check")
+    assert "PKR 15,000 ka refund" in _review_text(state, "roman_ur")
+    assert _failed_text(state, "ur").endswith("آپ کا کیس نمبر TCK-7 ہے۔")
 
 
 async def test_fraud_freezes_the_card_and_opens_a_case(
@@ -207,6 +221,10 @@ async def test_fraud_freezes_the_card_and_opens_a_case(
             if a["customer_ref"] == "CUST-1003"
         ]
         assert account["card_status"] == "frozen"
+        # The models see the bank's local time, not UTC (a 2 am fraud once read "21:41").
+        resolve_call = next(c for c in llm.calls if '"transactions"' in c["user"])
+        assert "+05:00" in resolve_call["user"]
+        assert "+00:00" not in resolve_call["user"].split('"transactions"')[1]
 
 
 async def test_large_refund_tells_the_customer_it_is_under_review(

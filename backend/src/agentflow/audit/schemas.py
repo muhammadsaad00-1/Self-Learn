@@ -13,9 +13,17 @@ class AuditEventOut(BaseModel):
     target_type: str
     target_id: str
     details: dict[str, Any]
+    previous_hash: str | None
+    event_hash: str
     occurred_at: datetime
 
 
 class AuditPage(BaseModel):
     events: list[AuditEventOut]
     next_before_id: int | None  # None: this is the last page
+
+
+class AuditVerification(BaseModel):
+    valid: bool
+    verified_events: int
+    first_invalid_event_id: int | None

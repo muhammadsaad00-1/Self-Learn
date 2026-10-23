@@ -383,7 +383,7 @@ class LoginStartOut(BaseModel):
     sent: bool
     bank: BankOption | None = None  # the bank the code is for
     banks: list[BankOption] = []
-    dev_code: str | None = None  # outside production only (no SMS provider yet)
+    dev_code: str | None = None  # local/test only (no SMS provider yet)
 
 
 class LoginVerifyIn(BaseModel):
@@ -436,7 +436,9 @@ async def login_start(
     redis = request.app.state.redis
     await redis.set(f"otp:{bank.id}:{phone}", _otp_hash(code), ex=OTP_TTL_SECONDS)
     await redis.delete(f"otp-tries:{bank.id}:{phone}")
-    return LoginStartOut(sent=True, bank=bank, dev_code=code if settings.env != "prod" else None)
+    return LoginStartOut(
+        sent=True, bank=bank, dev_code=code if settings.env in ("local", "test") else None
+    )
 
 
 @customer_router.post("/login/verify")

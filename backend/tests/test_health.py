@@ -13,7 +13,12 @@ def test_health_ok() -> None:
 
 
 def test_docs_disabled_in_prod() -> None:
-    prod = Settings(env="prod", jwt_secret=SecretStr("a-real-secret-from-secrets-manager"))
+    prod = Settings(
+        env="prod",
+        jwt_secret=SecretStr("a-real-secret-from-secrets-manager"),
+        cnic_hash_secret=SecretStr("another-real-secret"),
+        audit_chain_secret=SecretStr("a-third-real-secret"),
+    )
     client = TestClient(create_app(prod))
     assert client.get("/docs").status_code == 404
 

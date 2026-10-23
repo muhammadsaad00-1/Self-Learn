@@ -127,3 +127,54 @@ async def test_even_the_owner_cannot_rewrite_history(db_session: AsyncSession, s
     await insert_event(db_session)
     with pytest.raises(DBAPIError, match="append-only"):
         await db_session.execute(text(sql))
+
+
+async def test_superuser_rewrite_with_recomputed_hashes_is_detected(
+    db_session: AsyncSession, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    org_id = await insert_event(db_session)
+    for action in ("refund.executed", "approval.decided"):
+        await audit.record(
+            db_session,
+            org_id=org_id,
+            actor_user_id=None,
+            action=action,
+            target_type="t",
+            target_id="1",
+        )
+    await db_session.flush()
+    assert await audit.verify_chain(db_session, org_id) == (True, 3, None)
+
+    # The attacker is a DB superuser: skips the append-only trigger, rewrites "refund.executed"
+    # and recomputes a perfectly consistent chain, but with a key of their own.
+    rows = (
+        await db_session.execute(
+            text("SELECT * FROM audit_events WHERE org_id = :o ORDER BY id"), {"o": org_id}
+        )
+    ).all()
+    await db_session.execute(text("SET LOCAL session_replication_role = replica"))
+    with monkeypatch.context() as m:
+        m.setattr(audit, "get_settings", lambda: Settings(audit_chain_secret="attacker-guess"))
+        previous = rows[0].event_hash
+        for row in rows[1:]:
+            action = "nothing.happened" if row.action == "refund.executed" else row.action
+            forged = audit._event_hash(
+                org_id=org_id,
+                actor_user_id=None,
+                action=action,
+                target_type=row.target_type,
+                target_id=row.target_id,
+                details=row.details,
+                occurred_at=row.occurred_at,
+                previous_hash=previous,
+            )
+            await db_session.execute(
+                text(
+                    "UPDATE audit_events SET action=:a, previous_hash=:p, event_hash=:h "
+                    "WHERE id=:id"
+                ),
+                {"a": action, "p": previous, "h": forged, "id": row.id},
+            )
+            previous = forged
+    db_session.expire_all()
+    assert await audit.verify_chain(db_session, org_id) == (False, 1, rows[1].id)

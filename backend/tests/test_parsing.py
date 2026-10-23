@@ -1,7 +1,11 @@
 """File type detection (by content, not by the client's claims) and text extraction."""
 
+import shutil
+import subprocess
+
 import pytest
 
+from agentflow.knowledge import parsing
 from agentflow.knowledge.parsing import UnsupportedFileError, detect_kind, extract_text
 
 
@@ -76,11 +80,42 @@ def test_extracts_utf8_text() -> None:
 @pytest.mark.parametrize(
     ("data", "content_type", "message"),
     [
-        (b"%PDF-1.4 garbage", "application/pdf", "Unreadable PDF|No extractable text"),
-        (make_pdf(""), "application/pdf", "No extractable text"),  # e.g. a scanned PDF
-        (b"   \n\n ", "text/plain", "No extractable text"),
+        (b"%PDF-1.4 garbage", "application/pdf", "Unreadable PDF|No text could be recognized"),
+        (make_pdf(""), "application/pdf", "No text could be recognized"),  # blank scan
+        (b"   \n\n ", "text/plain", "No text could be recognized"),
     ],
 )
-def test_documents_without_text_rejected(data: bytes, content_type: str, message: str) -> None:
+def test_documents_without_text_rejected(
+    data: bytes, content_type: str, message: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # OCR finds nothing on a blank page; stubbed so the test doesn't depend on Tesseract.
+    monkeypatch.setattr(parsing, "_ocr_pages", lambda _data, pages: dict.fromkeys(pages, ""))
     with pytest.raises(UnsupportedFileError, match=message):
         extract_text(data, content_type)
+
+
+def test_scanned_pages_are_ocred_and_text_pages_kept(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: list[int] = []
+
+    def fake_ocr(_data: bytes, pages: list[int]) -> dict[int, str]:
+        seen.extend(pages)
+        return dict.fromkeys(pages, "Statement for CUST-1001")
+
+    monkeypatch.setattr(parsing, "_ocr_pages", fake_ocr)
+    assert extract_text(make_pdf(""), "application/pdf") == "Statement for CUST-1001"
+    assert seen == [0]
+    seen.clear()
+    assert "Duplicate" in extract_text(make_pdf("Duplicate"), "application/pdf")
+    assert seen == []  # pages with a text layer are never sent to OCR
+
+
+def test_ocr_errors_do_not_leak_command_details(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(shutil, "which", lambda name: f"/usr/bin/{name}")
+
+    def boom(*_args: object, **_kwargs: object) -> None:
+        raise subprocess.CalledProcessError(1, ["/usr/bin/pdftoppm", "/srv/upload-123.pdf"])
+
+    monkeypatch.setattr(subprocess, "run", boom)
+    with pytest.raises(UnsupportedFileError) as e:
+        extract_text(make_pdf(""), "application/pdf")
+    assert str(e.value) == "Could not read scanned page 1"

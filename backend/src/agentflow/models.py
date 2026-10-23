@@ -12,6 +12,7 @@ from agentflow.db import Base
 from agentflow.identity import models as identity
 from agentflow.knowledge import models as knowledge
 from agentflow.ledger import models as ledger
+from agentflow.policy import models as policy
 from agentflow.tickets import models as tickets
 from agentflow.tools import models as tools
 from agentflow.transport import models as transport
@@ -26,6 +27,7 @@ __all__ = [
     "identity",
     "knowledge",
     "ledger",
+    "policy",
     "tickets",
     "tools",
     "transport",

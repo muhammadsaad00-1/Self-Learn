@@ -17,6 +17,7 @@ import logging
 import signal
 import uuid
 from collections.abc import Sequence
+from datetime import datetime
 from typing import Any, cast
 from zoneinfo import ZoneInfo
 
@@ -28,15 +29,18 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from agentflow.agents import extraction
 from agentflow.agents.resolution import ActionType, ProposedAction
 from agentflow.approvals import service as approvals
+from agentflow.audit import service as audit_service
 from agentflow.config import Settings, get_settings
 from agentflow.conversations import service as conversations
 from agentflow.datasets import service as datasets
+from agentflow.datasets.service import MAX_TEXT_CHARS
 from agentflow.datasets.templates import RECORD_TYPES
 from agentflow.db import create_engine, set_tenant_context
 from agentflow.identity import service as identity
 from agentflow.jobs import Claim
 from agentflow.knowledge import ingestion, retrieval
 from agentflow.knowledge import service as knowledge_service
+from agentflow.knowledge.parsing import UnsupportedFileError, extract_text
 from agentflow.knowledge.retrieval import RetrievedChunk
 from agentflow.knowledge.runtime import KnowledgeRuntime, build_runtime
 from agentflow.knowledge.storage import S3ObjectStore
@@ -44,6 +48,7 @@ from agentflow.ledger import service as ledger
 from agentflow.ledger.schemas import Evidence
 from agentflow.llm import ProviderUnavailableError, StructuredLLM, build_llm
 from agentflow.observability import configure_logging, org_id_var, request_id_var, workflow_id_var
+from agentflow.policy import service as policy_service
 from agentflow.policy.engine import Outcome
 from agentflow.tools import card as card_tool
 from agentflow.tools import refund as refund_tool
@@ -95,10 +100,16 @@ def tenant_research(sessions: Sessions, claim: Claim) -> ResearchFn:
             await set_tenant_context(session, org_id=claim.org_id)
             evidence = await ledger.gather_evidence(session, claim.org_id, customer_ref)
             company = await identity.get_profile(session, claim.org_id)
+            # Every time the models see is in the company's local time: "the 5 pm bus" is
+            # 17:00+05:00 and a 2:41 am payment is 02:41, so no model does time-zone
+            # arithmetic (QA: replies said "17:00 UTC", and "21:41" for a 2:41 am fraud).
+            zone = ZoneInfo(company.profile.timezone if company.profile else "Asia/Karachi")
+            evidence.local_today = datetime.now(zone).date()
+            evidence.transactions = [
+                t.model_copy(update={"occurred_at": t.occurred_at.astimezone(zone)})
+                for t in evidence.transactions
+            ]
             if company.capabilities.trips:
-                # In the company's local time: "the 5 pm bus" is 17:00+05:00, so neither
-                # model does time-zone arithmetic (QA: replies said "17:00 UTC").
-                zone = ZoneInfo(company.profile.timezone if company.profile else "Asia/Karachi")
                 evidence.trips = [
                     t.model_copy(
                         update={
@@ -253,6 +264,7 @@ async def process_next(
         message, customer_ref = service.agent_message(wf.input), wf.input.get("customer_ref")
         customer_message = wf.input["message"]  # what they actually wrote (tickets show it)
         approval = await approvals.get_for_workflow(session, wf.id)
+        policy_config, _ = await policy_service.get_config(session, claim.org_id)
     request_id_var.set(request_id)  # logs of this run correlate with the API request
     log.info("workflow.started", extra={"attempt": claim.attempt, "stage": stage})
 
@@ -262,6 +274,7 @@ async def process_next(
         "research": tenant_research(sessions, claim),
         "execute": tenant_execute(sessions, claim),
         "open_ticket": tenant_open_ticket(sessions, claim),
+        "policy_config": policy_config,
     }
     try:
         async with asyncio.timeout(settings.workflow_timeout_seconds):
@@ -360,7 +373,11 @@ async def process_next_document(
                     locked,
                     claim,
                     f"{type(e).__name__}: {e}"[:2000],
-                    max_attempts=settings.document_max_attempts,
+                    max_attempts=(
+                        claim.attempt
+                        if isinstance(e, UnsupportedFileError)
+                        else settings.document_max_attempts
+                    ),
                 )
         return True
 
@@ -387,9 +404,15 @@ async def process_next_import(sessions: Sessions, llm: StructuredLLM, settings: 
     async with sessions() as session, session.begin():
         await set_tenant_context(session, org_id=claim.org_id)
         batch = await datasets.get_batch(session, claim.org_id, claim.job_id)
-        record_type, report = batch.record_type, batch.source_text or ""
+        record_type = batch.record_type
+        report = batch.source_text or ""
+        source_data = batch.source_data
+        source_content_type = batch.source_content_type
     try:
-        rows, _calls = await extraction.extract(llm, RECORD_TYPES[record_type], report)
+        if source_data is not None and source_content_type is not None:
+            report = await asyncio.to_thread(extract_text, source_data, source_content_type)
+        report = report[:MAX_TEXT_CHARS]
+        rows, _calls, notes = await extraction.extract(llm, RECORD_TYPES[record_type], report)
     except Exception as e:
         log.exception("import.extraction_failed", extra={"attempt": claim.attempt})
         async with sessions() as session, session.begin():
@@ -400,15 +423,38 @@ async def process_next_import(sessions: Sessions, llm: StructuredLLM, settings: 
                     locked,
                     claim,
                     f"{type(e).__name__}: {e}"[:2000],
-                    max_attempts=settings.document_max_attempts,
+                    max_attempts=(
+                        claim.attempt
+                        if isinstance(e, UnsupportedFileError)
+                        else settings.document_max_attempts
+                    ),
                 )
         return True
     async with sessions() as session, session.begin():
         await set_tenant_context(session, org_id=claim.org_id)
         if locked := await datasets.lock_if_still_ours(session, claim):
-            await datasets.complete_extraction(session, locked, rows)
+            await datasets.complete_extraction(session, locked, rows, notes)
             log.info("import.extracted", extra={"rows": len(rows)})
     return True
+
+
+async def sweep_expired_approvals(sessions: Sessions) -> int:
+    """Expire approvals nobody decided in time (their workflows resume and report "not
+    executed"), and audit each expiry in the same transaction. Returns how many expired."""
+    async with sessions() as session, session.begin():
+        expired = (await session.execute(text("SELECT * FROM expire_approvals()"))).all()
+        for item in expired:
+            await set_tenant_context(session, org_id=item.org_id)
+            await audit_service.record(
+                session,
+                org_id=item.org_id,
+                actor_user_id=None,
+                action="approval.expired",
+                target_type="approval",
+                target_id=item.approval_id,
+                details={"workflow_id": str(item.workflow_id)},
+            )
+    return len(expired)
 
 
 async def run(settings: Settings, stop: asyncio.Event, poll_seconds: float = 1.0) -> None:
@@ -429,9 +475,24 @@ async def run(settings: Settings, stop: asyncio.Event, poll_seconds: float = 1.0
             # Ingestion first: an answer can only be as good as the indexed documents.
             busy = await process_next_document(sessions, settings, runtime)
             busy = await process_next_import(sessions, llm, settings) or busy
-            # Approvals nobody decided in time expire (and their workflows resume).
             async with sessions() as session, session.begin():
-                await session.execute(text("SELECT expire_approvals()"))
+                expired_holds = (
+                    await session.execute(text("SELECT * FROM expire_seat_holds()"))
+                ).all()
+                for hold in expired_holds:
+                    org_id = hold.org_id
+                    await set_tenant_context(session, org_id=org_id)
+                    await audit_service.record(
+                        session,
+                        org_id=org_id,
+                        actor_user_id=None,
+                        action="booking.hold_expired",
+                        target_type="seat_booking",
+                        target_id=hold.booking_id,
+                    )
+                busy = bool(expired_holds) or busy
+            # Approvals nobody decided in time expire (and their workflows resume).
+            await sweep_expired_approvals(sessions)
             busy = await process_next(sessions, graphs, settings, runtime) or busy
             if not busy:
                 # Idle: wait before polling again, but wake at once on shutdown.

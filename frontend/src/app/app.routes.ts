@@ -63,6 +63,11 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/tickets-page').then((m) => m.TicketsPage),
       },
       {
+        path: 'bookings',
+        loadComponent: () => import('./pages/bookings-page').then((m) => m.BookingsPage),
+        canActivate: [adminGuard],
+      },
+      {
         path: 'approvals',
         loadComponent: () => import('./pages/approvals-page').then((m) => m.ApprovalsPage),
         canActivate: [adminGuard],

@@ -7,7 +7,15 @@ on AWS they come from the ECS task definition and Secrets Manager.
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import AliasChoices, Field, PostgresDsn, RedisDsn, SecretStr, model_validator
+from pydantic import (
+    AliasChoices,
+    Field,
+    PostgresDsn,
+    RedisDsn,
+    SecretStr,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Only valid for local/test; Settings refuses to start elsewhere while it's still in use.
@@ -34,6 +42,11 @@ class Settings(BaseSettings):
     # Key that signs login tokens. Anyone holding it can mint a token for any user, so on AWS
     # it comes from Secrets Manager. SecretStr keeps it out of logs and reprs.
     jwt_secret: SecretStr = SecretStr(_DEV_JWT_SECRET)
+    # Independent pepper for keyed customer identifiers; JWT rotation must not orphan IDs.
+    cnic_hash_secret: SecretStr = SecretStr(_DEV_JWT_SECRET)
+    # Keys the audit hash chain (HMAC). Kept outside the database, so a DB superuser who edits
+    # an event cannot recompute a chain that still verifies.
+    audit_chain_secret: SecretStr = SecretStr(_DEV_JWT_SECRET)
     access_token_ttl_minutes: int = 30
     customer_token_ttl_hours: int = 24  # customer chat links
     login_max_attempts: int = 10  # per email, per window
@@ -44,6 +57,12 @@ class Settings(BaseSettings):
     groq_api_key: SecretStr | None = Field(
         default=None, validation_alias=AliasChoices("AGENTFLOW_GROQ_API_KEY", "GROQ_API_KEY")
     )
+    # More Groq keys, comma-separated: each joins the routes so a key's rate limit falls
+    # through to the same model on the next key before a smaller model is used.
+    groq_api_keys: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices("AGENTFLOW_GROQ_API_KEYS", "GROQ_API_KEYS"),
+    )
     # Optional second provider serving the same open models (gpt-oss): when set, its models
     # join every route after Groq's first choice, so a Groq rate limit falls through to it.
     cerebras_api_key: SecretStr | None = Field(
@@ -51,6 +70,14 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("AGENTFLOW_CEREBRAS_API_KEY", "CEREBRAS_API_KEY"),
     )
     cerebras_base_url: str = "https://api.cerebras.ai/v1"
+
+    @field_validator("groq_api_key", "groq_api_keys", "cerebras_api_key", mode="before")
+    @classmethod
+    def _blank_key_is_no_key(cls, value: object) -> object:
+        # Compose passes unset keys as "" (`${CEREBRAS_API_KEY:-}`): that means "not configured",
+        # not "a key that is empty" (which put a provider without credentials on every route).
+        return None if isinstance(value, str) and not value.strip() else value
+
     llm_cooldown_seconds: float = 60  # skip a rate-limited model this long
     # Model routes, tried in order: the next model is used when the previous is rate-limited
     # or down. All enforce our JSON schema strictly on Groq (others only try to) and have
@@ -105,8 +132,13 @@ class Settings(BaseSettings):
     def _no_dev_secrets_outside_local(self) -> "Settings":
         if self.env not in ("local", "test") and (
             self.jwt_secret.get_secret_value() == _DEV_JWT_SECRET
+            or self.cnic_hash_secret.get_secret_value() == _DEV_JWT_SECRET
+            or self.audit_chain_secret.get_secret_value() == _DEV_JWT_SECRET
         ):
-            raise ValueError("AGENTFLOW_JWT_SECRET must be set outside local/test")
+            raise ValueError(
+                "AGENTFLOW_JWT_SECRET, AGENTFLOW_CNIC_HASH_SECRET and AGENTFLOW_AUDIT_CHAIN_SECRET "
+                "must be set outside local/test"
+            )
         return self
 
 

@@ -30,6 +30,8 @@ class AuditEvent(Base):
     target_id: Mapped[str] = mapped_column(String(64))
     # Ids and enum values only: no secrets, no free-text personal data (data minimization).
     details: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    previous_hash: Mapped[str | None] = mapped_column(String(64))
+    event_hash: Mapped[str] = mapped_column(String(64))
     occurred_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

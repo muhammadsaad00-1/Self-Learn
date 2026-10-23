@@ -173,6 +173,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/audit/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Verify Audit Chain
+         * @description Verify this tenant's append-only hash chain for accidental or unauthorized edits.
+         */
+        get: operations["verify_audit_chain_v1_audit_verify_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/policy/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Policy */
+        get: operations["get_policy_v1_policy_current_get"];
+        /** Update Policy */
+        put: operations["update_policy_v1_policy_current_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/workflows": {
         parameters: {
             query?: never;
@@ -457,6 +495,127 @@ export interface paths {
          *     note · resolve: close with a note (and optionally message the customer) · reopen.
          */
         patch: operations["update_ticket_v1_tickets__ticket_id__patch"];
+        trace?: never;
+    };
+    "/v1/bookings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Bookings */
+        get: operations["list_bookings_v1_bookings_get"];
+        put?: never;
+        /** Admin Book */
+        post: operations["admin_book_v1_bookings_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/bookings/trips": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Admin Trips */
+        get: operations["admin_trips_v1_bookings_trips_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/bookings/{booking_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Admin Cancel */
+        post: operations["admin_cancel_v1_bookings__booking_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/bookings/{booking_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Admin Confirm */
+        post: operations["admin_confirm_v1_bookings__booking_id__confirm_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/customer/bookings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Customer Bookings */
+        get: operations["customer_bookings_v1_customer_bookings_get"];
+        put?: never;
+        /** Customer Book */
+        post: operations["customer_book_v1_customer_bookings_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/customer/bookings/trips": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Customer Trips */
+        get: operations["customer_trips_v1_customer_bookings_trips_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/customer/bookings/{booking_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Customer Cancel */
+        post: operations["customer_cancel_v1_customer_bookings__booking_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/v1/conversations": {
@@ -857,8 +1016,8 @@ export interface paths {
         put?: never;
         /**
          * Upload
-         * @description CSV is parsed at once. A PDF or text report is read by the extraction agent in the
-         *     background: poll until the status is `review`.
+         * @description CSV/XLSX is parsed into the review grid. PDFs are extracted (including OCR) in the
+         *     worker; poll until an import reaches `review`.
          */
         post: operations["upload_v1_imports_file_post"];
         delete?: never;
@@ -1090,6 +1249,27 @@ export interface components {
             /** @default member */
             role: components["schemas"]["Role"];
         };
+        /** AdminBookingIn */
+        AdminBookingIn: {
+            /**
+             * Trip Id
+             * Format: uuid
+             */
+            trip_id: string;
+            /** Phone */
+            phone: string;
+            /** Cnic */
+            cnic: string;
+            /** Seats */
+            seats: number;
+            /**
+             * Idempotency Key
+             * Format: uuid
+             */
+            idempotency_key: string;
+            /** Customer Ref */
+            customer_ref: string;
+        };
         /** ApprovalOut */
         ApprovalOut: {
             /**
@@ -1174,6 +1354,10 @@ export interface components {
             details: {
                 [key: string]: unknown;
             };
+            /** Previous Hash */
+            previous_hash: string | null;
+            /** Event Hash */
+            event_hash: string;
             /**
              * Occurred At
              * Format: date-time
@@ -1186,6 +1370,15 @@ export interface components {
             events: components["schemas"]["AuditEventOut"][];
             /** Next Before Id */
             next_before_id: number | null;
+        };
+        /** AuditVerification */
+        AuditVerification: {
+            /** Valid */
+            valid: boolean;
+            /** Verified Events */
+            verified_events: number;
+            /** First Invalid Event Id */
+            first_invalid_event_id: number | null;
         };
         /** Bank */
         Bank: {
@@ -1270,7 +1463,7 @@ export interface components {
          * BatchSource
          * @enum {string}
          */
-        BatchSource: "manual" | "csv" | "document" | "sample";
+        BatchSource: "manual" | "csv" | "xlsx" | "document" | "sample";
         /**
          * BatchStatus
          * @enum {string}
@@ -1324,10 +1517,67 @@ export interface components {
             record_type: string;
             /**
              * File
-             * @description CSV, or a PDF / text report (10 MB)
+             * @description CSV/XLSX spreadsheet or a PDF/text report (10 MB)
              */
             file: string;
         };
+        /** BookingIn */
+        BookingIn: {
+            /**
+             * Trip Id
+             * Format: uuid
+             */
+            trip_id: string;
+            /** Phone */
+            phone: string;
+            /** Cnic */
+            cnic: string;
+            /** Seats */
+            seats: number;
+            /**
+             * Idempotency Key
+             * Format: uuid
+             */
+            idempotency_key: string;
+        };
+        /** BookingOut */
+        BookingOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Trip Id
+             * Format: uuid
+             */
+            trip_id: string;
+            /** Trip Ref */
+            trip_ref?: string | null;
+            /** Customer Ref */
+            customer_ref: string;
+            /** Booking Ref */
+            booking_ref: string;
+            /** Seats */
+            seats: number;
+            /** Unit Fare */
+            unit_fare: string;
+            /** Currency */
+            currency: string;
+            status: components["schemas"]["BookingStatus"];
+            /** Expires At */
+            expires_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * BookingStatus
+         * @enum {string}
+         */
+        BookingStatus: "held" | "confirmed" | "cancelled" | "expired";
         /**
          * BusinessProfile
          * @description What the company told us at signup. Sizes the ROI numbers and tailors the setup.
@@ -1998,6 +2248,31 @@ export interface components {
             reasons: string[];
             /** Rules */
             rules: string[];
+        };
+        /** PolicyLimits */
+        PolicyLimits: {
+            /** Auto Approve Limit */
+            auto_approve_limit: number | string;
+            /** Max Refund */
+            max_refund: number | string;
+            /** Max Reversals Per Day */
+            max_reversals_per_day: number;
+        };
+        /** PolicyLimitsOut */
+        PolicyLimitsOut: {
+            /** Auto Approve Limit */
+            auto_approve_limit: string;
+            /** Max Refund */
+            max_refund: string;
+            /** Max Reversals Per Day */
+            max_reversals_per_day: number;
+            /**
+             * Org Id
+             * Format: uuid
+             */
+            org_id: string;
+            /** Version */
+            version: number;
         };
         /** ProposedAction */
         ProposedAction: {
@@ -2892,6 +3167,106 @@ export interface operations {
             };
         };
     };
+    verify_audit_chain_v1_audit_verify_get: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditVerification"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_policy_v1_policy_current_get: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PolicyLimitsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_policy_v1_policy_current_put: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PolicyLimits"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PolicyLimitsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_workflows_v1_workflows_get: {
         parameters: {
             query?: never;
@@ -3470,6 +3845,286 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TicketOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_bookings_v1_bookings_get: {
+        parameters: {
+            query?: {
+                customer_ref?: string | null;
+            };
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_book_v1_bookings_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminBookingIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_trips_v1_bookings_trips_get: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TripOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_cancel_v1_bookings__booking_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path: {
+                booking_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    admin_confirm_v1_bookings__booking_id__confirm_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path: {
+                booking_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    customer_bookings_v1_customer_bookings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingOut"][];
+                };
+            };
+        };
+    };
+    customer_book_v1_customer_bookings_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookingIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookingOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    customer_trips_v1_customer_bookings_trips_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TripOut"][];
+                };
+            };
+        };
+    };
+    customer_cancel_v1_customer_bookings__booking_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                booking_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
                 };
             };
             /** @description Validation Error */

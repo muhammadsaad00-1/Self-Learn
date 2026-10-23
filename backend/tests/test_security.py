@@ -52,7 +52,14 @@ def test_password_hash_verifies_only_the_right_password() -> None:
 def test_default_jwt_secret_refused_outside_local() -> None:
     with pytest.raises(ValidationError, match="AGENTFLOW_JWT_SECRET"):
         Settings(env="prod")
-    Settings(env="prod", jwt_secret=SecretStr("a-real-secret-from-secrets-manager"))  # ok
+    with pytest.raises(ValidationError, match="CNIC_HASH_SECRET"):  # each key must be set
+        Settings(env="prod", jwt_secret=SecretStr("a-real-secret-from-secrets-manager"))
+    Settings(
+        env="prod",
+        jwt_secret=SecretStr("a-real-secret-from-secrets-manager"),
+        cnic_hash_secret=SecretStr("another-real-secret"),
+        audit_chain_secret=SecretStr("a-third-real-secret"),
+    )  # ok
 
 
 @pytest.mark.parametrize(

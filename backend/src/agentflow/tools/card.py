@@ -11,7 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from agentflow.agents.resolution import ProposedAction
 from agentflow.audit import service as audit
 from agentflow.ledger import service as ledger
+from agentflow.ledger.providers import money_actions
 from agentflow.policy import dispute
+from agentflow.policy import service as policy_service
 from agentflow.policy.engine import Outcome, evaluate
 from agentflow.tools.models import ActionExecution
 from agentflow.tools.refund import ExecutionResult
@@ -38,6 +40,7 @@ async def freeze(
         return ExecutionResult.model_validate(previous.result | {"replayed": True})
 
     evidence = await ledger.gather_evidence(session, org_id, customer_ref)
+    policy_config, _ = await policy_service.get_config(session, org_id)
     decision = evaluate(
         proposal,
         evidence=evidence,
@@ -46,14 +49,19 @@ async def freeze(
         knowledge_status=None,
         # Re-assessed on fresh ledger data, like every other check at execution time.
         dispute_verdict=dispute.assess(evidence, proposal.record_references).verdict,
+        config=policy_config,
     )
     if decision.outcome != Outcome.ALLOW or not evidence.account_found:
         return ExecutionResult(
             status="not_executed", detail="; ".join(decision.reasons) or "Not authorized"
         )
 
-    account = await ledger.get_account(session, org_id, customer_ref or "")
-    was_active = await ledger.freeze_card(session, account)
+    was_active = await money_actions.freeze_card(
+        session,
+        org_id=org_id,
+        customer_ref=customer_ref or "",
+        idempotency_key=key,
+    )
     result = ExecutionResult(
         status="executed",
         detail="Card frozen" if was_active else "Card was already frozen",

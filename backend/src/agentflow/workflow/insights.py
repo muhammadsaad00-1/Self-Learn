@@ -103,7 +103,9 @@ async def compute(session: AsyncSession, org_id: uuid.UUID, days: int = 30) -> I
         .group_by(WorkflowStep.model)
     )
     for model, tokens_in, tokens_out in usage:
-        price_in, price_out = PRICES.get(model or "", (Decimal("0"), Decimal("0")))
+        # "groq@2:openai/gpt-oss-120b" is the same model, priced the same.
+        base = (model or "").split(":", 1)[-1] if (model or "").startswith("groq@") else model
+        price_in, price_out = PRICES.get(base or "", (Decimal("0"), Decimal("0")))
         cost += (Decimal(tokens_in or 0) * price_in + Decimal(tokens_out or 0) * price_out) / 10**6
 
     open_tickets = await session.scalar(

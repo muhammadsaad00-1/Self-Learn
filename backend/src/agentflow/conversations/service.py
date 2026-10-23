@@ -1,3 +1,4 @@
+# ruff: noqa: RUF001 -- Urdu replies end sentences with the Urdu full stop, not a hyphen.
 """Customer conversations and the orchestration between them.
 
     help chat  --customer message-->  workflow (agents, policy, tools)
@@ -21,6 +22,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agentflow.agents import language
 from agentflow.conversations.models import (
     ChatMessage,
     Conversation,
@@ -326,8 +328,7 @@ async def after_triage(
                 org_id=conversation.org_id,
                 conversation_id=conversation.id,
                 role=MessageRole.ASSISTANT,
-                body="That sounds like a problem to fix, so I've opened a separate issue for "
-                "it and I'm on it now. You'll see every update there.",
+                body=TEXTS[_language(source.body, triage)]["issue_opened"],
                 card={"issue": {"id": str(issue.id), "subject": summary}},
                 workflow_id=workflow_id,
             ),
@@ -383,25 +384,66 @@ def outcome_card(state: dict[str, Any]) -> dict[str, Any]:
     return card
 
 
-def _review_text(state: dict[str, Any]) -> str:
-    amount = (state.get("proposal") or {}).get("amount")
-    what = f"a refund of PKR {Decimal(str(amount)):,.0f}" if amount else "this action"
-    return (
-        f"I've checked your account and {what} looks right. Amounts like this need a "
+# The few replies code writes itself, in the customer's language (QA: a Roman Urdu message
+# got "That sounds like a problem..." in English). Model-written replies follow triage.
+TEXTS: dict[str, dict[str, str]] = {
+    "en": {
+        "issue_opened": "That sounds like a problem to fix, so I've opened a separate issue "
+        "for it and I'm on it now. You'll see every update there.",
+        "review": "I've checked your account and {what} looks right. Amounts like this need a "
         "second officer's sign-off, so it's with our team now. You'll get an update right "
-        "here, no need to call."
+        "here, no need to call.",
+        "refund": "a refund of PKR {amount}",
+        "action": "this action",
+        "failed": "Sorry, something went wrong on our side while handling this. Your message is "
+        "saved and a specialist will reply here.",
+        "case": " Your case number is {code}.",
+    },
+    "roman_ur": {
+        "issue_opened": "Yeh masla hal karna hai, is liye maine iske liye alag issue khol diya "
+        "hai aur abhi is par kaam ho raha hai. Har update aapko wahin milegi.",
+        "review": "Maine aapka account check kar liya hai aur {what} theek lagta hai. Is raqam "
+        "ke liye doosre officer ki manzoori zaroori hai, is liye yeh hamari team ke paas hai. "
+        "Update yahin milegi, call karne ki zaroorat nahi.",
+        "refund": "PKR {amount} ka refund",
+        "action": "yeh action",
+        "failed": "Maazrat, hamari taraf se kuch masla aa gaya. Aapka message mehfooz hai aur "
+        "ek specialist yahin jawab dega.",
+        "case": " Aapka case number {code} hai.",
+    },
+    "ur": {
+        "issue_opened": "یہ مسئلہ حل کرنا ہے، اس لیے میں نے اس کے لیے الگ issue کھول دیا ہے "
+        "اور ابھی اس پر کام ہو رہا ہے۔ ہر اپڈیٹ آپ کو وہیں ملے گی۔",
+        "review": "میں نے آپ کا اکاؤنٹ چیک کر لیا ہے اور {what} درست لگتی ہے۔ اس رقم کے لیے "
+        "دوسرے افسر کی منظوری ضروری ہے، اس لیے یہ ہماری ٹیم کے پاس ہے۔ اپڈیٹ یہیں ملے گی، "
+        "کال کرنے کی ضرورت نہیں۔",
+        "refund": "PKR {amount} کی واپسی",
+        "action": "یہ کارروائی",
+        "failed": "معذرت، ہماری طرف سے کچھ مسئلہ آ گیا۔ آپ کا پیغام محفوظ ہے اور ایک ماہر یہیں "
+        "جواب دے گا۔",
+        "case": " آپ کا کیس نمبر {code} ہے۔",
+    },
+}
+
+
+def _language(body: str, triage: dict[str, Any] | None) -> str:
+    """Script and Roman Urdu words decide in code; triage's guess only when code can't tell."""
+    guess = (triage or {}).get("language")
+    return language.detect(body) or (guess if guess in TEXTS else "en")
+
+
+def _review_text(state: dict[str, Any], lang: str) -> str:
+    text = TEXTS[lang]
+    amount = (state.get("proposal") or {}).get("amount")
+    what = (
+        text["refund"].format(amount=f"{Decimal(str(amount)):,.0f}") if amount else text["action"]
     )
+    return text["review"].format(what=what)
 
 
-FAILED_TEXT = (
-    "Sorry, something went wrong on our side while handling this. Your message is saved and "
-    "a specialist will reply here."
-)
-
-
-def _failed_text(state: dict[str, Any]) -> str:
+def _failed_text(state: dict[str, Any], lang: str) -> str:
     code = (state.get("ticket") or {}).get("code")
-    return FAILED_TEXT + (f" Your case number is {code}." if code else "")
+    return TEXTS[lang]["failed"] + (TEXTS[lang]["case"].format(code=code) if code else "")
 
 
 def _issue_status(state: dict[str, Any], kind: str) -> IssueStatus:
@@ -425,10 +467,11 @@ async def post_outcome(
         Conversation, source.conversation_id
     )
     assert target is not None  # noqa: S101 (FK)
+    lang = _language(source.body, state.get("triage"))
     body = {
-        "review": _review_text(state),
-        "reply": state.get("reply") or FAILED_TEXT,
-        "failed": _failed_text(state),
+        "review": _review_text(state, lang),
+        "reply": state.get("reply") or TEXTS[lang]["failed"],
+        "failed": _failed_text(state, lang),
     }[kind]
     session.add(
         ChatMessage(

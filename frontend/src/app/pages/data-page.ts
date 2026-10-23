@@ -20,7 +20,7 @@ const POLL_MS = 2000;
 
 /**
  * Bring the company's records in: customers, transactions or trips, depending on the
- * industry. Typed, CSV, or a PDF/text report read by the extraction agent. Every row is
+ * industry. Typed, CSV/Excel, or a PDF/text report read by the extraction agent. Every row is
  * checked and reviewed by a person; only "Commit" writes to the tables the agents read.
  */
 @Component({
@@ -32,8 +32,8 @@ const POLL_MS = 2000;
         <div>
           <h1>Data</h1>
           <p class="subtitle">
-            Bring your records in by hand, from a CSV, or from a PDF report. Nothing reaches the
-            agents until a person has reviewed it and committed it.
+            Bring your records in by hand, from CSV or Excel, or from a PDF report. Nothing reaches
+            the agents until a person has reviewed it and committed it.
           </p>
         </div>
         @if (open()) {
@@ -210,11 +210,11 @@ const POLL_MS = 2000;
               <small class="faint"> Fields: {{ requiredOf(t) }} </small>
               <div class="row">
                 <label class="button secondary" style="cursor: pointer">
-                  <app-icon name="upload" /> CSV or PDF report
+                  <app-icon name="upload" /> CSV, Excel or report
                   <input
                     class="sr-only"
                     type="file"
-                    accept=".csv,.tsv,.pdf,.txt,.md"
+                    accept=".csv,.tsv,.xlsx,.pdf,.txt,.md"
                     (change)="upload(t, $any($event.target))"
                   />
                 </label>

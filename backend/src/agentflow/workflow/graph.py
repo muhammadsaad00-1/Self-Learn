@@ -33,7 +33,7 @@ import re
 import time
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Literal, TypedDict
 
@@ -326,7 +326,7 @@ def build_graph(llm: StructuredLLM) -> CompiledStateGraph[WorkflowState]:
             )
         return {"proposal": proposal.model_dump(mode="json"), "node_meta": meta}
 
-    async def policy_gate(state: WorkflowState) -> WorkflowState:
+    async def policy_gate(state: WorkflowState, config: RunnableConfig) -> WorkflowState:
         triage_result = state.get("triage", {})
         proposal = ProposedAction.model_validate(state["proposal"])
         evidence = Evidence.model_validate(state["evidence"])
@@ -353,6 +353,7 @@ def build_graph(llm: StructuredLLM) -> CompiledStateGraph[WorkflowState]:
             category=triage_result.get("category"),
             needs_human_review=bool(triage_result.get("needs_human_review")),
             knowledge_status=(state.get("knowledge") or {}).get("status"),
+            config=_configurable(config).get("policy_config", policy.DEFAULT_CONFIG),
         )
         return {
             "decision": decision.model_dump(mode="json"),
@@ -491,16 +492,20 @@ def records_of(state: Mapping[str, Any]) -> list[dict[str, Any]]:
         for t in evidence.get("transactions") or []
         if t["reference"] in refs
     ] + [
-        {"kind": "trip", "when": _when(t["departs_at"])} | {k: t.get(k) for k in TRIP_FIELDS}
+        {"kind": "trip", "when": _when(t["departs_at"], evidence.get("local_today"))}
+        | {k: t.get(k) for k in TRIP_FIELDS}
         for t in evidence.get("trips") or []
         if t["trip_ref"] in refs
     ]
 
 
-def _when(iso: str) -> str:
-    """Day and local time written by code: a model once called Saturday 24 Oct "Thursday"."""
+def _when(iso: str, today: str | None = None) -> str:
+    """Day and local time written by code: a model once called Saturday 24 Oct "Thursday".
+    "tomorrow, Sat 25 Oct, 10:00 AM" when the local date is known."""
     t = datetime.fromisoformat(iso)
-    return t.strftime("%a %d %b, %I:%M %p").replace(" 0", " ")
+    label = resolution.day_label(t, date.fromisoformat(today) if today else None)
+    written = t.strftime("%a %d %b, %I:%M %p").replace(" 0", " ")
+    return f"{label}, {written}" if label in ("today", "tomorrow") else written
 
 
 @dataclass(frozen=True)

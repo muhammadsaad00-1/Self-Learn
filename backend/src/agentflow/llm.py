@@ -10,6 +10,7 @@ or model, so models can be swapped in configuration (ADR 0002). Per call this mo
 4. records model, tokens and latency for every call (FR-016: cost and performance tracking).
 """
 
+import json
 import logging
 import time
 from collections.abc import Callable
@@ -22,7 +23,7 @@ import openai
 from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
 from langchain_openai import ChatOpenAI
-from pydantic import BaseModel
+from pydantic import BaseModel, SecretStr
 
 from agentflow.config import Settings
 
@@ -84,6 +85,18 @@ _TRANSIENT = (
 _RATE_LIMITED = (groq.RateLimitError, openai.RateLimitError)
 
 
+def _unwrap_schema_echo[T: BaseModel](raw: Any, schema: type[T]) -> T | None:
+    """gpt-oss sometimes answers in the schema's own shape, {"description": "", "properties":
+    {<the answer>}, "required": [...]}, on every key and model size (seen live on the answer
+    step). The answer inside is valid; it is accepted only if it passes the schema."""
+    try:
+        data = json.loads(raw.content)
+        inner = data.get("properties") if isinstance(data, dict) else None
+        return schema.model_validate(inner) if isinstance(inner, dict) else None
+    except (ValueError, TypeError, AttributeError):  # incl. JSON and validation errors
+        return None
+
+
 class RoutedLLM:
     def __init__(
         self,
@@ -132,10 +145,18 @@ class RoutedLLM:
                     break  # next model
                 except (groq.BadRequestError, openai.BadRequestError) as e:  # invalid JSON
                     out = {"raw": None, "parsed": None, "parsing_error": e}
+                except (groq.APIStatusError, openai.APIStatusError) as e:
+                    if e.status_code != 413:  # 413: too large for this model's per-minute limit
+                        raise
+                    failures.append(f"{model_name}: request too large")
+                    log.warning("llm.too_large", extra={"model": model_name})
+                    break  # next model (a smaller one may have its own budget)
                 usage = getattr(out["raw"], "usage_metadata", None) or {}
                 tokens_in += usage.get("input_tokens", 0)
                 tokens_out += usage.get("output_tokens", 0)
                 parsed = out["parsed"]
+                if parsed is None and out["raw"] is not None:
+                    parsed = _unwrap_schema_echo(out["raw"], schema)
                 log.info(
                     "llm.call",
                     extra={
@@ -145,6 +166,7 @@ class RoutedLLM:
                         "valid": parsed is not None,
                         "input_tokens": usage.get("input_tokens", 0),
                         "output_tokens": usage.get("output_tokens", 0),
+                        **({} if parsed else {"error": str(out["parsing_error"])[:300]}),
                     },
                 )
                 if isinstance(parsed, schema):
@@ -179,10 +201,15 @@ def build_llm(settings: Settings) -> RoutedLLM:
     """
     if settings.groq_api_key is None:
         raise LLMError("GROQ_API_KEY is not set")
-    groq_key, cerebras_key = settings.groq_api_key, settings.cerebras_api_key
+    extra = (settings.groq_api_keys.get_secret_value() if settings.groq_api_keys else "").split(",")
+    # Key 1 is GROQ_API_KEY; "groq@2:model" uses the second key, and so on. The index, never
+    # the key, appears in model names, logs and step records.
+    groq_keys = [settings.groq_api_key, *(SecretStr(k.strip()) for k in extra if k.strip())]
+    cerebras_key = settings.cerebras_api_key
 
     def make_model(name: str, schema: type[BaseModel]) -> _Invokable:
         provider, _, model = name.partition(":") if ":" in name else ("groq", "", name)
+        key_index = int(provider.split("@")[1]) - 1 if "@" in provider else 0
         # gpt-oss "thinks" before answering; our tasks need little of that, and thinking
         # tokens count against rate limits and latency.
         effort = "low" if "gpt-oss" in model else None
@@ -200,7 +227,7 @@ def build_llm(settings: Settings) -> RoutedLLM:
         else:
             chat = ChatGroq(
                 model_name=model,
-                api_key=groq_key,
+                api_key=groq_keys[key_index],
                 temperature=0,  # same input, same answer: agent output should be repeatable
                 reasoning_effort=effort,
                 timeout=settings.llm_timeout_seconds,
@@ -212,9 +239,14 @@ def build_llm(settings: Settings) -> RoutedLLM:
         return runnable
 
     def route(models: list[str]) -> list[str]:
+        """Each model on every Groq key (same model first, then the next model), with
+        Cerebras after the first choice when configured."""
+        on_keys = [
+            m if i == 1 else f"groq@{i}:{m}" for m in models for i in range(1, len(groq_keys) + 1)
+        ]
         if cerebras_key is None:
-            return models
-        return [models[0], "cerebras:gpt-oss-120b", *models[1:]]
+            return on_keys
+        return [on_keys[0], "cerebras:gpt-oss-120b", *on_keys[1:]]
 
     fast, strong = route(settings.llm_fast_models), route(settings.llm_strong_models)
     routes = {

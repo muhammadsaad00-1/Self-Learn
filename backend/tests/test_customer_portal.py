@@ -302,7 +302,7 @@ async def test_model_sees_short_refs_and_code_maps_them_back() -> None:
 
     assert result.value.record_references == ["TXN-1"]  # the real reference
     [call] = llm.calls
-    assert '"ref": "T1"' in call["user"]
+    assert '"ref":"T1"' in call["user"]
     assert "TXN-1" not in call["user"]  # the model never sees the long id
 
 

@@ -53,6 +53,8 @@ services:
       AGENTFLOW_S3_ENDPOINT_URL: http://minio:9000
       AGENTFLOW_MODEL_CACHE_DIR: /models
       GROQ_API_KEY: ${GROQ_API_KEY:-}   # for /v1/knowledge/ask
+      GROQ_API_KEYS: ${GROQ_API_KEYS:-}
+      CEREBRAS_API_KEY: ${CEREBRAS_API_KEY:-}
     ports: ["127.0.0.1:8000:8000"]
     volumes: [models:/models]   # embedding/reranker models, downloaded once
     depends_on:
@@ -72,6 +74,8 @@ services:
       AGENTFLOW_MODEL_CACHE_DIR: /models
       # Read from your .env by docker compose; never baked into the image.
       GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_API_KEYS: ${GROQ_API_KEYS:-}
+      CEREBRAS_API_KEY: ${CEREBRAS_API_KEY:-}
     volumes: [models:/models]
     healthcheck:
       disable: true  # no HTTP server in the worker; the image's /health check doesn't apply

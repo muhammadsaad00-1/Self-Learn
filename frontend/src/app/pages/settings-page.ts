@@ -76,6 +76,65 @@ const INDUSTRIES: BusinessProfile['industry'][] = [
         </div>
       </section>
 
+      <section class="card" style="margin-bottom: 16px">
+        <div class="card-head">
+          <span class="avatar square"><app-icon name="shield" /></span>
+          <div class="grow">
+            <h2>Action policy limits</h2>
+            <small class="muted">
+              Deterministic guardrails applied before proposed refunds. Changes are versioned and
+              recorded in the audit log. Defaults: {{ draft.currency }} 2,000 auto-approval,
+              {{ draft.currency }} 100,000 maximum, 3 reversals per day.
+            </small>
+          </div>
+        </div>
+        <form class="card-body stack" (ngSubmit)="savePolicy()">
+          <div class="row">
+            <label class="grow"
+              >Auto-approval limit ({{ draft.currency }})
+              <input
+                [(ngModel)]="policyDraft.auto_approve_limit"
+                name="autoApproveLimit"
+                type="number"
+                min="0"
+                step="0.01"
+              />
+            </label>
+            <label class="grow"
+              >Maximum automated refund ({{ draft.currency }})
+              <input
+                [(ngModel)]="policyDraft.max_refund"
+                name="maxRefund"
+                type="number"
+                min="0.01"
+                step="0.01"
+              />
+            </label>
+            <label class="grow"
+              >Reversals allowed per 24 hours
+              <input
+                [(ngModel)]="policyDraft.max_reversals_per_day"
+                name="maxReversals"
+                type="number"
+                min="1"
+                max="100"
+                step="1"
+              />
+            </label>
+          </div>
+          @if (policyError()) {
+            <div class="callout" data-tone="danger" role="alert">{{ policyError() }}</div>
+          }
+          <div class="row">
+            <small class="muted">Policy version {{ policy.value()?.version ?? 0 }}</small>
+            <span class="spacer"></span>
+            <button type="submit" [disabled]="policyBusy()">
+              {{ policyBusy() ? 'Saving…' : 'Save action policy' }}
+            </button>
+          </div>
+        </form>
+      </section>
+
       <section class="card">
         <div class="card-head">
           <span class="avatar square"><app-icon name="building" /></span>
@@ -143,6 +202,13 @@ export class SettingsPage {
   protected readonly saved = signal(false);
   protected readonly copied = signal(false);
   protected readonly inboxLoaded = signal(0);
+  protected readonly policyBusy = signal(false);
+  protected readonly policyError = signal<string | null>(null);
+  protected policyDraft = {
+    auto_approve_limit: 2000,
+    max_refund: 100000,
+    max_reversals_per_day: 3,
+  };
   protected draft: BusinessProfile = {
     industry: 'commercial_bank',
     country: 'PK',
@@ -162,11 +228,25 @@ export class SettingsPage {
   protected readonly address = httpResource<InboundAddress>(() =>
     this.auth.orgId() ? '/v1/inbound/address' : undefined,
   );
+  protected readonly policy = httpResource<{
+    auto_approve_limit: number;
+    max_refund: number;
+    max_reversals_per_day: number;
+    version: number;
+  }>(() => (this.auth.orgId() ? '/v1/policy/current' : undefined));
 
   constructor() {
     effect(() => {
       const p = this.profile.value()?.profile;
       if (p) this.draft = { ...p };
+      const policy = this.policy.value();
+      if (policy) {
+        this.policyDraft = {
+          auto_approve_limit: policy.auto_approve_limit,
+          max_refund: policy.max_refund,
+          max_reversals_per_day: policy.max_reversals_per_day,
+        };
+      }
     });
   }
 
@@ -190,6 +270,19 @@ export class SettingsPage {
       this.saved.set(true);
       setTimeout(() => this.saved.set(false), 2500);
     });
+  }
+
+  protected async savePolicy(): Promise<void> {
+    this.policyBusy.set(true);
+    this.policyError.set(null);
+    try {
+      await firstValueFrom(this.http.put('/v1/policy/current', this.policyDraft));
+      this.policy.reload();
+    } catch (err) {
+      this.policyError.set(errorMessage(err));
+    } finally {
+      this.policyBusy.set(false);
+    }
   }
 
   private async run(action: () => Promise<void>): Promise<void> {

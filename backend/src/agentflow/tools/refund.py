@@ -23,6 +23,8 @@ from agentflow.agents.resolution import ActionType, ProposedAction
 from agentflow.audit import service as audit
 from agentflow.ledger import service as ledger
 from agentflow.ledger.models import Transaction, TransactionStatus
+from agentflow.ledger.providers import money_actions
+from agentflow.policy import service as policy_service
 from agentflow.policy.engine import Outcome, evaluate
 from agentflow.tools.models import ActionExecution
 
@@ -71,6 +73,7 @@ async def authorize_and_execute(
         return ExecutionResult.model_validate(previous.result | {"replayed": True})
 
     # Re-authorize with fresh ledger data: limits may have changed since the proposal.
+    policy_config, _ = await policy_service.get_config(session, org_id)
     evidence = await ledger.gather_evidence(session, org_id, customer_ref)
     decision = evaluate(
         proposal,
@@ -78,6 +81,7 @@ async def authorize_and_execute(
         category=category,
         needs_human_review=needs_human_review,
         knowledge_status=knowledge_status,
+        config=policy_config,
     )
     if decision.outcome == Outcome.BLOCK:
         return ExecutionResult(status="not_executed", detail="; ".join(decision.reasons))
@@ -86,9 +90,15 @@ async def authorize_and_execute(
             status="not_executed", detail=f"Approval {approval_status or 'missing'}"
         )
 
-    account = await ledger.get_account(session, org_id, customer_ref or "")
     try:
-        posted = await ledger.post_refund(session, account, reference, amount)
+        posted = await money_actions.refund(
+            session,
+            org_id=org_id,
+            customer_ref=customer_ref or "",
+            transaction_reference=reference,
+            amount=amount,
+            idempotency_key=key,
+        )
     except ledger.RefundNotPossibleError as e:
         return ExecutionResult(status="not_executed", detail=str(e))
 

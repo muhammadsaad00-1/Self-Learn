@@ -386,7 +386,13 @@ async def get_account_by_phone(
     )
 
 
-async def upsert_customer(session: AsyncSession, org_id: uuid.UUID, data: dict[str, Any]) -> bool:
+async def upsert_customer(
+    session: AsyncSession,
+    org_id: uuid.UUID,
+    data: dict[str, Any],
+    *,
+    cnic_digest: str | None = None,
+) -> bool:
     """Insert, or update the customer with the same `customer_ref`. True if it was new.
     Fields absent from `data` are left as they are (an import can add phones later)."""
     account = await session.scalar(
@@ -407,6 +413,8 @@ async def upsert_customer(session: AsyncSession, org_id: uuid.UUID, data: dict[s
     for field in ("phone", "username", "email"):
         if data.get(field):
             setattr(account, field, data[field])
+    if cnic_digest:
+        account.cnic_digest = cnic_digest
     await session.flush()
     return created
 

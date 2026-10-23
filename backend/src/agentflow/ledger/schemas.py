@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict
@@ -50,3 +50,6 @@ class Evidence(BaseModel):
     recent_requests_72h: int = 0
     # Transport companies: upcoming departures the agents answer schedule questions from.
     trips: list[TripOut] = []
+    # The company's local date when the evidence was gathered: code (not a model) turns
+    # "tomorrow" into a date (a model without it said the 10 am bus "doesn't exist").
+    local_today: date | None = None

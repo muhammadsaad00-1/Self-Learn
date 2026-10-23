@@ -177,10 +177,12 @@ async def upload(
     ctx: AdminContextDep,
     session: SessionDep,
     record_type: Annotated[str, Form()],
-    file: Annotated[UploadFile, File(description="CSV, or a PDF / text report (10 MB)")],
+    file: Annotated[
+        UploadFile, File(description="CSV/XLSX spreadsheet or a PDF/text report (10 MB)")
+    ],
 ) -> BatchDetail:
-    """CSV is parsed at once. A PDF or text report is read by the extraction agent in the
-    background: poll until the status is `review`."""
+    """CSV/XLSX is parsed into the review grid. PDFs are extracted (including OCR) in the
+    worker; poll until an import reaches `review`."""
     await _allowed(session, ctx.org_id, record_type)
     data = await file.read(MAX_FILE_BYTES + 1)
     if len(data) > MAX_FILE_BYTES:
@@ -201,10 +203,35 @@ async def upload(
                 rows=rows,
                 notes=notes,
             )
+        elif name.lower().endswith(".xlsx"):
+            if not data.startswith(b"PK\x03\x04"):
+                raise service.ImportFileError("The file is not a valid XLSX workbook")
+            rows, notes = service.parse_xlsx(RECORD_TYPES[record_type], data)
+            batch = await service.create_batch(
+                session,
+                org_id=ctx.org_id,
+                user_id=ctx.user.id,
+                record_type=record_type,
+                source=BatchSource.XLSX,
+                filename=name,
+                rows=rows,
+                notes=notes,
+            )
         else:
-            report = extract_text(data, detect_kind(name, data).content_type)
-            if not report.strip():
-                raise service.ImportFileError("No text found in the file (a scanned image?)")
+            kind = detect_kind(name, data)
+            if kind.content_type == "application/pdf":
+                batch = await service.create_batch(
+                    session,
+                    org_id=ctx.org_id,
+                    user_id=ctx.user.id,
+                    record_type=record_type,
+                    source=BatchSource.DOCUMENT,
+                    filename=name,
+                    source_data=data,
+                    source_content_type=kind.content_type,
+                )
+                return await _detail(session, batch)
+            report = extract_text(data, kind.content_type)
             batch = await service.create_batch(
                 session,
                 org_id=ctx.org_id,
@@ -291,12 +318,21 @@ async def delete_row(
 
 
 @router.post("/{batch_id}/commit")
-async def commit(batch_id: uuid.UUID, ctx: AdminContextDep, session: SessionDep) -> CommitOut:
+async def commit(
+    batch_id: uuid.UUID, ctx: AdminContextDep, session: SessionDep, settings: SettingsDep
+) -> CommitOut:
     """Write the reviewed rows to the real tables, once. Refused (committed=false) while rows
     have problems; nothing is half-imported."""
     batch = await _batch(session, ctx, batch_id)
     try:
-        return CommitOut(**await service.commit(session, batch, ctx.user.id))
+        return CommitOut(
+            **await service.commit(
+                session,
+                batch,
+                ctx.user.id,
+                cnic_secret=settings.cnic_hash_secret.get_secret_value(),
+            )
+        )
     except service.BatchLockedError as e:
         raise _locked(e) from None
 

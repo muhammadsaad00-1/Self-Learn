@@ -15,7 +15,9 @@ from typing import Any, Literal
 
 from pydantic import BaseModel
 
-Kind = Literal["text", "money", "integer", "datetime", "boolean", "phone", "email", "choice"]
+Kind = Literal[
+    "text", "money", "integer", "datetime", "boolean", "phone", "email", "choice", "cnic"
+]
 
 
 @dataclass(frozen=True)
@@ -59,6 +61,9 @@ CUSTOMERS = RecordType(
                 "customer number",
                 "cif",
                 "account id",
+                "passenger id",  # transport companies: their customers are passengers
+                "passenger no",
+                "member id",
                 "id",
             ),
         ),
@@ -73,6 +78,14 @@ CUSTOMERS = RecordType(
             "Mobile",
             "phone",
             synonyms=("mobile", "mobile no", "phone number", "cell", "contact"),
+        ),
+        Field(
+            "cnic",
+            "CNIC",
+            "cnic",
+            max_length=32,
+            hint="Optional 13-digit ID used to verify seat bookings; stored as a keyed digest.",
+            synonyms=("national id", "national identity number", "identity card", "id card"),
         ),
         Field(
             "username",
@@ -331,7 +344,10 @@ def clean_value(f: Field, raw: Any, zone: tzinfo = UTC) -> Any:
             case "money":
                 return str(_money(text).quantize(Decimal("0.01")))
             case "integer":
-                return int(Decimal(text.replace(",", "")))
+                number = int(Decimal(text.replace(",", "")))
+                if f.name in ("seats_available", "seats_total") and number < 0:
+                    raise ValueError("must be zero or more")
+                return number
             case "datetime":
                 return _datetime(text, zone).isoformat()
             case "boolean":
@@ -343,6 +359,11 @@ def clean_value(f: Field, raw: Any, zone: tzinfo = UTC) -> Any:
                 raise ValueError("expected yes or no")
             case "phone":
                 return _phone(text)
+            case "cnic":
+                digits = re.sub(r"\D", "", text)
+                if len(digits) != 13:
+                    raise ValueError("enter the 13 digits from the identity card")
+                return digits
             case "email":
                 if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", text):
                     raise ValueError("not an email address")

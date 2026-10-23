@@ -6,7 +6,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Index, String, Text, func, text
+from sqlalchemy import DateTime, ForeignKey, Index, LargeBinary, String, Text, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -24,6 +24,7 @@ class BatchStatus(StrEnum):
 class BatchSource(StrEnum):
     MANUAL = "manual"
     CSV = "csv"
+    XLSX = "xlsx"
     DOCUMENT = "document"  # PDF / text report, read by the extraction agent
     SAMPLE = "sample"
 
@@ -47,6 +48,8 @@ class ImportBatch(TimestampMixin, Base):
     filename: Mapped[str | None] = mapped_column(String(300))
     status: Mapped[BatchStatus] = mapped_column(str_enum(BatchStatus))
     source_text: Mapped[str | None] = mapped_column(Text)  # what the extraction agent reads
+    source_data: Mapped[bytes | None] = mapped_column(LargeBinary)
+    source_content_type: Mapped[str | None] = mapped_column(String(100))
     notes: Mapped[list[str]] = mapped_column(JSONB, default=list)  # e.g. ignored columns
     error: Mapped[str | None] = mapped_column(Text)
     created_by: Mapped[uuid.UUID | None]

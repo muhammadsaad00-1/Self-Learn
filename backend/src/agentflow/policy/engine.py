@@ -24,13 +24,14 @@ class Outcome(StrEnum):
 
 @dataclass(frozen=True)
 class PolicyConfig:
-    """Defaults mirror the EasyPay refund policy in the eval corpus (maker-checker section).
-    ponytail: one config for all orgs; per-org policies table when a second customer needs
-    different limits."""
+    """Safe defaults used until a tenant saves its own versioned policy limits."""
 
     auto_approve_limit: Decimal = Decimal("2000")  # refunds above need a second officer
     max_refund: Decimal = Decimal("100000")  # above: never automated, even with approval
     max_reversals_per_day: int = 3
+
+
+DEFAULT_CONFIG = PolicyConfig()
 
 
 class PolicyDecision(BaseModel):

@@ -28,7 +28,9 @@ from agentflow.knowledge.runtime import KnowledgeRuntime
 from agentflow.ledger import api as ledger_api
 from agentflow.llm import StructuredLLM
 from agentflow.observability import configure_logging, request_context_middleware
+from agentflow.policy import api as policy_api
 from agentflow.tickets import api as tickets_api
+from agentflow.transport import api as transport_api
 from agentflow.workflow import api as workflow_api
 from agentflow.workflow import insights
 
@@ -72,11 +74,14 @@ def create_app(
     app.include_router(identity_api.members_router)
     app.include_router(identity_api.orgs_router)
     app.include_router(audit_api.router)
+    app.include_router(policy_api.router)
     app.include_router(workflow_api.router)
     app.include_router(knowledge_api.router)
     app.include_router(ledger_api.router)
     app.include_router(approvals_api.router)
     app.include_router(tickets_api.router)
+    app.include_router(transport_api.admin_router)
+    app.include_router(transport_api.customer_router)
     app.include_router(conversations_api.staff_router)
     app.include_router(conversations_api.customer_router)
     app.include_router(insights.router)

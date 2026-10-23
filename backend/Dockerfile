@@ -11,7 +11,10 @@ RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked --no-dev --no-edi
 
 # Stage 2: minimal runtime — just Python + the venv, running as non-root.
 FROM python:3.12-slim-bookworm
-RUN useradd --create-home --uid 10001 app \
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y poppler-utils tesseract-ocr tesseract-ocr-eng tesseract-ocr-urd \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home --uid 10001 app \
     # Model cache mount point, owned by the app user: a named volume mounted here copies
     # this ownership, so the non-root process can download models into it.
     && mkdir /models && chown app:app /models

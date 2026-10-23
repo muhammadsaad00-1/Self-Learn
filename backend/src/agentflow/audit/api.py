@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 
 from agentflow.audit import service
-from agentflow.audit.schemas import AuditPage
+from agentflow.audit.schemas import AuditPage, AuditVerification
 from agentflow.db import SessionDep
 from agentflow.identity.deps import AdminContextDep
 
@@ -21,4 +21,15 @@ async def list_audit_events(
     """The organization's audit trail, newest first. Admins and owners only."""
     return await service.list_events(
         session, ctx.org_id, action=action, before_id=before_id, limit=limit
+    )
+
+
+@router.get("/verify", response_model=AuditVerification)
+async def verify_audit_chain(ctx: AdminContextDep, session: SessionDep) -> AuditVerification:
+    """Verify this tenant's append-only hash chain for accidental or unauthorized edits."""
+    valid, verified, first_invalid = await service.verify_chain(session, ctx.org_id)
+    return AuditVerification(
+        valid=valid,
+        verified_events=verified,
+        first_invalid_event_id=first_invalid,
     )

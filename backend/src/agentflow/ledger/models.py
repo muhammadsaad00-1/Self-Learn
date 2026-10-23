@@ -41,6 +41,7 @@ class Account(Base):
         UniqueConstraint("org_id", "phone"),
         UniqueConstraint("org_id", "email"),
         UniqueConstraint("org_id", "username"),
+        # National identifiers are stored only as keyed digests.
         enum_check("card_status", CardStatus),
     )
 
@@ -55,6 +56,7 @@ class Account(Base):
     username: Mapped[str | None] = mapped_column(String(64))
     # Email the customer writes from (the email channel matches senders to customers).
     email: Mapped[str | None] = mapped_column(String(320))
+    cnic_digest: Mapped[str | None] = mapped_column(String(64))
     currency: Mapped[str] = mapped_column(String(3))
     card_status: Mapped[CardStatus] = mapped_column(
         str_enum(CardStatus), default=CardStatus.ACTIVE, server_default=CardStatus.ACTIVE

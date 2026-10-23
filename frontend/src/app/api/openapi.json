@@ -608,6 +608,165 @@
         }
       }
     },
+    "/v1/audit/verify": {
+      "get": {
+        "tags": [
+          "audit"
+        ],
+        "summary": "Verify Audit Chain",
+        "description": "Verify this tenant's append-only hash chain for accidental or unauthorized edits.",
+        "operationId": "verify_audit_chain_v1_audit_verify_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-org-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Organization this request acts in",
+              "title": "X-Org-Id"
+            },
+            "description": "Organization this request acts in"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditVerification"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/policy/current": {
+      "get": {
+        "tags": [
+          "policy"
+        ],
+        "summary": "Get Policy",
+        "operationId": "get_policy_v1_policy_current_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-org-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Organization this request acts in",
+              "title": "X-Org-Id"
+            },
+            "description": "Organization this request acts in"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyLimitsOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "policy"
+        ],
+        "summary": "Update Policy",
+        "operationId": "update_policy_v1_policy_current_put",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-org-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Organization this request acts in",
+              "title": "X-Org-Id"
+            },
+            "description": "Organization this request acts in"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyLimits"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyLimitsOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/workflows": {
       "post": {
         "tags": [
@@ -1665,6 +1824,473 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/TicketOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/bookings": {
+      "get": {
+        "tags": [
+          "bookings"
+        ],
+        "summary": "List Bookings",
+        "operationId": "list_bookings_v1_bookings_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "customer_ref",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "maxLength": 100
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Customer Ref"
+            }
+          },
+          {
+            "name": "x-org-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Organization this request acts in",
+              "title": "X-Org-Id"
+            },
+            "description": "Organization this request acts in"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BookingOut"
+                  },
+                  "title": "Response List Bookings V1 Bookings Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "bookings"
+        ],
+        "summary": "Admin Book",
+        "operationId": "admin_book_v1_bookings_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-org-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Organization this request acts in",
+              "title": "X-Org-Id"
+            },
+            "description": "Organization this request acts in"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminBookingIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/bookings/trips": {
+      "get": {
+        "tags": [
+          "bookings"
+        ],
+        "summary": "Admin Trips",
+        "operationId": "admin_trips_v1_bookings_trips_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-org-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Organization this request acts in",
+              "title": "X-Org-Id"
+            },
+            "description": "Organization this request acts in"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TripOut"
+                  },
+                  "title": "Response Admin Trips V1 Bookings Trips Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/bookings/{booking_id}/cancel": {
+      "post": {
+        "tags": [
+          "bookings"
+        ],
+        "summary": "Admin Cancel",
+        "operationId": "admin_cancel_v1_bookings__booking_id__cancel_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "booking_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Booking Id"
+            }
+          },
+          {
+            "name": "x-org-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Organization this request acts in",
+              "title": "X-Org-Id"
+            },
+            "description": "Organization this request acts in"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Admin Cancel V1 Bookings  Booking Id  Cancel Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/bookings/{booking_id}/confirm": {
+      "post": {
+        "tags": [
+          "bookings"
+        ],
+        "summary": "Admin Confirm",
+        "operationId": "admin_confirm_v1_bookings__booking_id__confirm_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "booking_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Booking Id"
+            }
+          },
+          {
+            "name": "x-org-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Organization this request acts in",
+              "title": "X-Org-Id"
+            },
+            "description": "Organization this request acts in"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Admin Confirm V1 Bookings  Booking Id  Confirm Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/customer/bookings": {
+      "get": {
+        "tags": [
+          "bookings"
+        ],
+        "summary": "Customer Bookings",
+        "operationId": "customer_bookings_v1_customer_bookings_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/BookingOut"
+                  },
+                  "type": "array",
+                  "title": "Response Customer Bookings V1 Customer Bookings Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "bookings"
+        ],
+        "summary": "Customer Book",
+        "operationId": "customer_book_v1_customer_bookings_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BookingIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookingOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/customer/bookings/trips": {
+      "get": {
+        "tags": [
+          "bookings"
+        ],
+        "summary": "Customer Trips",
+        "operationId": "customer_trips_v1_customer_bookings_trips_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TripOut"
+                  },
+                  "type": "array",
+                  "title": "Response Customer Trips V1 Customer Bookings Trips Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/v1/customer/bookings/{booking_id}/cancel": {
+      "post": {
+        "tags": [
+          "bookings"
+        ],
+        "summary": "Customer Cancel",
+        "operationId": "customer_cancel_v1_customer_bookings__booking_id__cancel_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "booking_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Booking Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Customer Cancel V1 Customer Bookings  Booking Id  Cancel Post"
                 }
               }
             }
@@ -2755,7 +3381,7 @@
           "imports"
         ],
         "summary": "Upload",
-        "description": "CSV is parsed at once. A PDF or text report is read by the extraction agent in the\nbackground: poll until the status is `review`.",
+        "description": "CSV/XLSX is parsed into the review grid. PDFs are extracted (including OCR) in the\nworker; poll until an import reaches `review`.",
         "operationId": "upload_v1_imports_file_post",
         "security": [
           {
@@ -3472,6 +4098,54 @@
         "title": "AddMemberRequest",
         "description": "Add an existing account to the org. Email invitations for people without an account\narrive with the email tool (Phase 5)."
       },
+      "AdminBookingIn": {
+        "properties": {
+          "trip_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Trip Id"
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 20,
+            "minLength": 11,
+            "title": "Phone"
+          },
+          "cnic": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 13,
+            "title": "Cnic"
+          },
+          "seats": {
+            "type": "integer",
+            "maximum": 6.0,
+            "minimum": 1.0,
+            "title": "Seats"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Idempotency Key"
+          },
+          "customer_ref": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Customer Ref"
+          }
+        },
+        "type": "object",
+        "required": [
+          "trip_id",
+          "phone",
+          "cnic",
+          "seats",
+          "idempotency_key",
+          "customer_ref"
+        ],
+        "title": "AdminBookingIn"
+      },
       "ApprovalOut": {
         "properties": {
           "id": {
@@ -3704,6 +4378,21 @@
             "type": "object",
             "title": "Details"
           },
+          "previous_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Hash"
+          },
+          "event_hash": {
+            "type": "string",
+            "title": "Event Hash"
+          },
           "occurred_at": {
             "type": "string",
             "format": "date-time",
@@ -3719,6 +4408,8 @@
           "target_type",
           "target_id",
           "details",
+          "previous_hash",
+          "event_hash",
           "occurred_at"
         ],
         "title": "AuditEventOut"
@@ -3750,6 +4441,36 @@
           "next_before_id"
         ],
         "title": "AuditPage"
+      },
+      "AuditVerification": {
+        "properties": {
+          "valid": {
+            "type": "boolean",
+            "title": "Valid"
+          },
+          "verified_events": {
+            "type": "integer",
+            "title": "Verified Events"
+          },
+          "first_invalid_event_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Invalid Event Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "valid",
+          "verified_events",
+          "first_invalid_event_id"
+        ],
+        "title": "AuditVerification"
       },
       "Bank": {
         "properties": {
@@ -3988,6 +4709,7 @@
         "enum": [
           "manual",
           "csv",
+          "xlsx",
           "document",
           "sample"
         ],
@@ -4115,7 +4837,7 @@
             "type": "string",
             "contentMediaType": "application/octet-stream",
             "title": "File",
-            "description": "CSV, or a PDF / text report (10 MB)"
+            "description": "CSV/XLSX spreadsheet or a PDF/text report (10 MB)"
           }
         },
         "type": "object",
@@ -4124,6 +4846,137 @@
           "file"
         ],
         "title": "Body_upload_v1_imports_file_post"
+      },
+      "BookingIn": {
+        "properties": {
+          "trip_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Trip Id"
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 20,
+            "minLength": 11,
+            "title": "Phone"
+          },
+          "cnic": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 13,
+            "title": "Cnic"
+          },
+          "seats": {
+            "type": "integer",
+            "maximum": 6.0,
+            "minimum": 1.0,
+            "title": "Seats"
+          },
+          "idempotency_key": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Idempotency Key"
+          }
+        },
+        "type": "object",
+        "required": [
+          "trip_id",
+          "phone",
+          "cnic",
+          "seats",
+          "idempotency_key"
+        ],
+        "title": "BookingIn"
+      },
+      "BookingOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "trip_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Trip Id"
+          },
+          "trip_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trip Ref"
+          },
+          "customer_ref": {
+            "type": "string",
+            "title": "Customer Ref"
+          },
+          "booking_ref": {
+            "type": "string",
+            "title": "Booking Ref"
+          },
+          "seats": {
+            "type": "integer",
+            "title": "Seats"
+          },
+          "unit_fare": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Unit Fare"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BookingStatus"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "trip_id",
+          "customer_ref",
+          "booking_ref",
+          "seats",
+          "unit_fare",
+          "currency",
+          "status",
+          "expires_at",
+          "created_at"
+        ],
+        "title": "BookingOut"
+      },
+      "BookingStatus": {
+        "type": "string",
+        "enum": [
+          "held",
+          "confirmed",
+          "cancelled",
+          "expired"
+        ],
+        "title": "BookingStatus"
       },
       "BusinessProfile": {
         "properties": {
@@ -5765,6 +6618,87 @@
           "rules"
         ],
         "title": "PolicyDecision"
+      },
+      "PolicyLimits": {
+        "properties": {
+          "auto_approve_limit": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,10}|(?=[\\d.]{1,13}0*$)\\d{0,10}\\.\\d{0,2}0*$)"
+              }
+            ],
+            "title": "Auto Approve Limit"
+          },
+          "max_refund": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,10}|(?=[\\d.]{1,13}0*$)\\d{0,10}\\.\\d{0,2}0*$)"
+              }
+            ],
+            "title": "Max Refund"
+          },
+          "max_reversals_per_day": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Max Reversals Per Day"
+          }
+        },
+        "type": "object",
+        "required": [
+          "auto_approve_limit",
+          "max_refund",
+          "max_reversals_per_day"
+        ],
+        "title": "PolicyLimits"
+      },
+      "PolicyLimitsOut": {
+        "properties": {
+          "auto_approve_limit": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,10}|(?=[\\d.]{1,13}0*$)\\d{0,10}\\.\\d{0,2}0*$)",
+            "title": "Auto Approve Limit"
+          },
+          "max_refund": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,10}|(?=[\\d.]{1,13}0*$)\\d{0,10}\\.\\d{0,2}0*$)",
+            "title": "Max Refund"
+          },
+          "max_reversals_per_day": {
+            "type": "integer",
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Max Reversals Per Day"
+          },
+          "org_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Org Id"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          }
+        },
+        "type": "object",
+        "required": [
+          "auto_approve_limit",
+          "max_refund",
+          "max_reversals_per_day",
+          "org_id",
+          "version"
+        ],
+        "title": "PolicyLimitsOut"
       },
       "ProposedAction": {
         "properties": {
