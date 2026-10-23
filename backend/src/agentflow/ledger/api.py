@@ -5,6 +5,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Request, status
 
 from agentflow.db import SessionDep
+from agentflow.identity import service as identity
 from agentflow.identity.deps import AdminContextDep, OrgContextDep
 from agentflow.knowledge import service as knowledge
 from agentflow.knowledge.api import get_runtime
@@ -36,12 +37,16 @@ async def list_transactions(
 async def seed_demo_data(
     request: Request, ctx: AdminContextDep, session: SessionDep
 ) -> list[AccountOut]:
-    """Demo customers covering every policy path, plus the customer help guide (cheques,
-    transfers, fraud, ...) queued for ingestion (admins; never in production)."""
+    """Demo customers (for banks: with histories covering every policy path), plus a help
+    guide for the industry queued for ingestion (admins; never in production)."""
     if request.app.state.settings.env == "prod":
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Not found")
-    accounts = await service.seed_demo_data(session, ctx.org_id)
-    for path in sorted(DEMO_DOCS.glob("*.md")):
+    caps = (await identity.get_profile(session, ctx.org_id)).capabilities
+    # A transport company gets customers (to sign in) but no bank transactions, and its own
+    # passenger guide; its trips come in through Data imports.
+    accounts = await service.seed_demo_data(session, ctx.org_id, with_transactions=caps.money_tools)
+    docs = DEMO_DOCS / ("financial" if caps.money_tools else "transport")
+    for path in sorted(docs.glob("*.md")):
         await knowledge.create_document(  # idempotent by checksum
             session,
             org_id=ctx.org_id,

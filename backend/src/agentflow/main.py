@@ -19,6 +19,7 @@ from agentflow.approvals import api as approvals_api
 from agentflow.audit import api as audit_api
 from agentflow.config import Settings, get_settings
 from agentflow.conversations import api as conversations_api
+from agentflow.datasets import api as datasets_api
 from agentflow.db import create_engine
 from agentflow.identity import api as identity_api
 from agentflow.inbound import api as inbound_api
@@ -80,6 +81,7 @@ def create_app(
     app.include_router(conversations_api.customer_router)
     app.include_router(insights.router)
     app.include_router(inbound_api.router)
+    app.include_router(datasets_api.router)
 
     @app.get("/health", tags=["ops"])
     async def health() -> dict[str, str]:

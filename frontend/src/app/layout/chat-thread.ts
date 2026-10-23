@@ -25,7 +25,15 @@ interface Card {
   /** The customer's own transactions the answer is based on (answer_from_records). */
   records?: {
     reference: string;
-    kind: 'debit' | 'credit';
+    kind: 'debit' | 'credit' | 'trip';
+    trip_ref?: string;
+    origin?: string;
+    destination?: string;
+    departs_at?: string;
+    seats_available?: number;
+    fare?: string;
+    status?: string;
+    notes?: string | null;
     amount: string;
     currency: string;
     merchant: string;
@@ -88,24 +96,40 @@ interface Card {
               }
               @if (c.records; as rs) {
                 <div class="fact records">
-                  @for (r of rs; track r.reference) {
-                    <div class="record">
-                      <span>
-                        {{ r.merchant }}
-                        <small class="muted"
-                          >{{ r.occurred_at | date: 'MMM d, h:mm a' }} · {{ r.reference }}</small
-                        >
-                      </span>
-                      <span>
-                        <strong
-                          >{{ r.kind === 'credit' ? '+' : '−'
-                          }}{{ +r.amount | number: '1.0-0' }}</strong
-                        >
-                        @if (r.transfer_status === 'credited') {
-                          <small class="ok">delivered</small>
-                        }
-                      </span>
-                    </div>
+                  @for (r of rs; track $index) {
+                    @if (r.kind === 'trip') {
+                      <div class="record">
+                        <span>
+                          {{ r.origin }} → {{ r.destination }}
+                          <small class="muted"
+                            >{{ r.departs_at | date: 'EEE MMM d, h:mm a' }} · {{ r.status
+                            }}{{ r.notes ? ' · ' + r.notes : '' }}</small
+                          >
+                        </span>
+                        <span>
+                          <strong>{{ r.seats_available }} seats</strong>
+                          <small class="muted">PKR {{ +(r.fare ?? 0) | number: '1.0-0' }}</small>
+                        </span>
+                      </div>
+                    } @else {
+                      <div class="record">
+                        <span>
+                          {{ r.merchant }}
+                          <small class="muted"
+                            >{{ r.occurred_at | date: 'MMM d, h:mm a' }} · {{ r.reference }}</small
+                          >
+                        </span>
+                        <span>
+                          <strong
+                            >{{ r.kind === 'credit' ? '+' : '−'
+                            }}{{ +r.amount | number: '1.0-0' }}</strong
+                          >
+                          @if (r.transfer_status === 'credited') {
+                            <small class="ok">delivered</small>
+                          }
+                        </span>
+                      </div>
+                    }
                   }
                 </div>
               }

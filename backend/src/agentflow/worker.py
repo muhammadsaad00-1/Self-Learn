@@ -18,17 +18,22 @@ import signal
 import uuid
 from collections.abc import Sequence
 from typing import Any, cast
+from zoneinfo import ZoneInfo
 
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph.state import CompiledStateGraph
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from agentflow.agents import extraction
 from agentflow.agents.resolution import ActionType, ProposedAction
 from agentflow.approvals import service as approvals
 from agentflow.config import Settings, get_settings
 from agentflow.conversations import service as conversations
+from agentflow.datasets import service as datasets
+from agentflow.datasets.templates import RECORD_TYPES
 from agentflow.db import create_engine, set_tenant_context
+from agentflow.identity import service as identity
 from agentflow.jobs import Claim
 from agentflow.knowledge import ingestion, retrieval
 from agentflow.knowledge import service as knowledge_service
@@ -37,7 +42,7 @@ from agentflow.knowledge.runtime import KnowledgeRuntime, build_runtime
 from agentflow.knowledge.storage import S3ObjectStore
 from agentflow.ledger import service as ledger
 from agentflow.ledger.schemas import Evidence
-from agentflow.llm import ProviderUnavailableError, build_llm
+from agentflow.llm import ProviderUnavailableError, StructuredLLM, build_llm
 from agentflow.observability import configure_logging, org_id_var, request_id_var, workflow_id_var
 from agentflow.policy.engine import Outcome
 from agentflow.tools import card as card_tool
@@ -45,6 +50,7 @@ from agentflow.tools import refund as refund_tool
 from agentflow.tools import tickets as ticket_tool
 from agentflow.tools.refund import ExecutionResult
 from agentflow.tools.tickets import TicketRef
+from agentflow.transport import service as transport
 from agentflow.workflow import service
 from agentflow.workflow.graph import (
     RECURSION_LIMIT,
@@ -88,6 +94,20 @@ def tenant_research(sessions: Sessions, claim: Claim) -> ResearchFn:
         async with sessions() as session, session.begin():
             await set_tenant_context(session, org_id=claim.org_id)
             evidence = await ledger.gather_evidence(session, claim.org_id, customer_ref)
+            company = await identity.get_profile(session, claim.org_id)
+            if company.capabilities.trips:
+                # In the company's local time: "the 5 pm bus" is 17:00+05:00, so neither
+                # model does time-zone arithmetic (QA: replies said "17:00 UTC").
+                zone = ZoneInfo(company.profile.timezone if company.profile else "Asia/Karachi")
+                evidence.trips = [
+                    t.model_copy(
+                        update={
+                            "departs_at": t.departs_at.astimezone(zone),
+                            "arrives_at": t.arrives_at.astimezone(zone) if t.arrives_at else None,
+                        }
+                    )
+                    for t in await transport.upcoming(session, claim.org_id)
+                ]
             if customer_ref:
                 evidence.recent_requests_72h = await service.count_recent_for_customer(
                     session, claim.org_id, customer_ref, hours=72, excluding=claim.workflow_id
@@ -352,13 +372,53 @@ async def process_next_document(
     return True
 
 
+async def process_next_import(sessions: Sessions, llm: StructuredLLM, settings: Settings) -> bool:
+    """Claim one report (PDF/text import) and let the extraction agent list its rows. The
+    rows go to REVIEW: people check them before anything is committed."""
+    async with sessions() as session, session.begin():
+        claim = await datasets.claim_next_extraction(
+            session,
+            max_attempts=settings.document_max_attempts,
+            lease_seconds=settings.document_lease_seconds,
+        )
+    if claim is None:
+        return False
+    org_id_var.set(str(claim.org_id))
+    async with sessions() as session, session.begin():
+        await set_tenant_context(session, org_id=claim.org_id)
+        batch = await datasets.get_batch(session, claim.org_id, claim.job_id)
+        record_type, report = batch.record_type, batch.source_text or ""
+    try:
+        rows, _calls = await extraction.extract(llm, RECORD_TYPES[record_type], report)
+    except Exception as e:
+        log.exception("import.extraction_failed", extra={"attempt": claim.attempt})
+        async with sessions() as session, session.begin():
+            await set_tenant_context(session, org_id=claim.org_id)
+            if locked := await datasets.lock_if_still_ours(session, claim):
+                await datasets.fail_extraction(
+                    session,
+                    locked,
+                    claim,
+                    f"{type(e).__name__}: {e}"[:2000],
+                    max_attempts=settings.document_max_attempts,
+                )
+        return True
+    async with sessions() as session, session.begin():
+        await set_tenant_context(session, org_id=claim.org_id)
+        if locked := await datasets.lock_if_still_ours(session, claim):
+            await datasets.complete_extraction(session, locked, rows)
+            log.info("import.extracted", extra={"rows": len(rows)})
+    return True
+
+
 async def run(settings: Settings, stop: asyncio.Event, poll_seconds: float = 1.0) -> None:
     engine = create_engine(str(settings.database_url))
     sessions = async_sessionmaker(engine, expire_on_commit=False)
     runtime = build_runtime(settings)
     if settings.env == "local" and isinstance(runtime.store, S3ObjectStore):
         await runtime.store.ensure_bucket()
-    graphs = build_workflow_graphs(build_llm(settings))
+    llm = build_llm(settings)
+    graphs = build_workflow_graphs(llm)
     # Load the embedding and reranker models now (seconds; a download on first run), not
     # inside the first customer's request where it ate the workflow's time budget.
     await runtime.embedder.embed_query("warm up")
@@ -368,6 +428,7 @@ async def run(settings: Settings, stop: asyncio.Event, poll_seconds: float = 1.0
         while not stop.is_set():
             # Ingestion first: an answer can only be as good as the indexed documents.
             busy = await process_next_document(sessions, settings, runtime)
+            busy = await process_next_import(sessions, llm, settings) or busy
             # Approvals nobody decided in time expire (and their workflows resume).
             async with sessions() as session, session.begin():
                 await session.execute(text("SELECT expire_approvals()"))

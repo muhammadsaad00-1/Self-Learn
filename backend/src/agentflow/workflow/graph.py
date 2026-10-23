@@ -33,6 +33,7 @@ import re
 import time
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
 from typing import Any, Literal, TypedDict
 
@@ -40,7 +41,7 @@ from langchain_core.runnables import RunnableConfig
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.state import CompiledStateGraph
 
-from agentflow.agents import communication, query_planner, resolution
+from agentflow.agents import communication, language, query_planner, resolution
 from agentflow.agents import knowledge as knowledge_agents
 from agentflow.agents import triage as triage_agent
 from agentflow.agents.resolution import ActionType, ProposedAction
@@ -282,7 +283,9 @@ def build_graph(llm: StructuredLLM) -> CompiledStateGraph[WorkflowState]:
         category = triage_result.get("category")
         meta: dict[str, Any] = {}
         answered = (state.get("knowledge") or {}).get("status") == "answered"
-        if category not in ACTIONABLE and answered:
+        # A transport company's live trips can answer what a policy document can't ("any
+        # seat at 5pm?"): those questions always reach the agent.
+        if category not in ACTIONABLE and answered and not evidence.trips:
             # The company's documents answered it (a question, or a topic with no tool such
             # as "what documents do I need?"): no ledger reasoning, no escalation. Saves a
             # model call on the most common path; critical risk still opens a ticket.
@@ -292,7 +295,9 @@ def build_graph(llm: StructuredLLM) -> CompiledStateGraph[WorkflowState]:
                 amount=None,
                 rationale="Answered from the company's documents",
             )
-        elif evidence.account_found and (category in ACTIONABLE or category in INFORMATIONAL):
+        elif (evidence.account_found and category in ACTIONABLE) or (
+            (evidence.account_found or evidence.trips) and category in INFORMATIONAL
+        ):
             # Account questions the documents can't answer ("did my salary arrive?") are
             # answered from the customer's ledger by the resolution agent.
             result = await resolution.propose(
@@ -419,9 +424,10 @@ def build_execution_graph(llm: StructuredLLM) -> CompiledStateGraph[WorkflowStat
             "decision": (state.get("decision") or {}).get("outcome"),
             # Decided by triage, enforced here: the reply model once answered an English
             # question in Roman Urdu when left to guess.
-            "reply_language": LANGUAGE_NAMES.get(
-                (state.get("triage") or {}).get("language", "en"), "English"
-            ),
+            "reply_language": LANGUAGE_NAMES[
+                language.detect(state.get("customer_message") or state["message"])
+                or (state.get("triage") or {}).get("language", "en")
+            ],
             # The transactions the resolution cited (verified by code): the reply may state
             # them as facts.
             "records": records_of(state),
@@ -461,14 +467,40 @@ LANGUAGE_NAMES = {
 RECORD_FIELDS = ("reference", "kind", "amount", "currency", "merchant", "status")
 
 
+TRIP_FIELDS = (
+    "trip_ref",
+    "origin",
+    "destination",
+    "departs_at",
+    "arrives_at",
+    "seats_available",
+    "fare",
+    "currency",
+    "status",
+    "vehicle",
+    "notes",
+)
+
+
 def records_of(state: Mapping[str, Any]) -> list[dict[str, Any]]:
-    """The ledger rows an answer_from_records proposal cites, as plain facts."""
+    """The ledger rows (or trips) an answer_from_records proposal cites, as plain facts."""
     refs = set((state.get("proposal") or {}).get("record_references") or [])
+    evidence = state.get("evidence") or {}
     return [
         {k: t.get(k) for k in (*RECORD_FIELDS, "transfer_status", "occurred_at")}
-        for t in (state.get("evidence") or {}).get("transactions") or []
+        for t in evidence.get("transactions") or []
         if t["reference"] in refs
+    ] + [
+        {"kind": "trip", "when": _when(t["departs_at"])} | {k: t.get(k) for k in TRIP_FIELDS}
+        for t in evidence.get("trips") or []
+        if t["trip_ref"] in refs
     ]
+
+
+def _when(iso: str) -> str:
+    """Day and local time written by code: a model once called Saturday 24 Oct "Thursday"."""
+    t = datetime.fromisoformat(iso)
+    return t.strftime("%a %d %b, %I:%M %p").replace(" 0", " ")
 
 
 @dataclass(frozen=True)

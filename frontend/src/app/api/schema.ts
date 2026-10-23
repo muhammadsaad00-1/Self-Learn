@@ -347,8 +347,8 @@ export interface paths {
         put?: never;
         /**
          * Seed Demo Data
-         * @description Demo customers covering every policy path, plus the customer help guide (cheques,
-         *     transfers, fraud, ...) queued for ingestion (admins; never in production).
+         * @description Demo customers (for banks: with histories covering every policy path), plus a help
+         *     guide for the industry queued for ingestion (admins; never in production).
          */
         post: operations["seed_demo_data_v1_ledger_demo_data_post"];
         delete?: never;
@@ -812,6 +812,188 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/imports/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Templates */
+        get: operations["templates_v1_imports_templates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/imports/manual": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Manual */
+        post: operations["manual_v1_imports_manual_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/imports/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload
+         * @description CSV is parsed at once. A PDF or text report is read by the extraction agent in the
+         *     background: poll until the status is `review`.
+         */
+        post: operations["upload_v1_imports_file_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/imports/sample": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sample
+         * @description A realistic sample file through the CSV path (never in production).
+         */
+        post: operations["sample_v1_imports_sample_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/imports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Imports */
+        get: operations["list_imports_v1_imports_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/imports/{batch_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Import */
+        get: operations["get_import_v1_imports__batch_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/imports/{batch_id}/rows": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Row */
+        post: operations["add_row_v1_imports__batch_id__rows_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/imports/{batch_id}/rows/{row_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Row */
+        delete: operations["delete_row_v1_imports__batch_id__rows__row_id__delete"];
+        options?: never;
+        head?: never;
+        /** Edit Row */
+        patch: operations["edit_row_v1_imports__batch_id__rows__row_id__patch"];
+        trace?: never;
+    };
+    "/v1/imports/{batch_id}/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Commit
+         * @description Write the reviewed rows to the real tables, once. Refused (committed=false) while rows
+         *     have problems; nothing is half-imported.
+         */
+        post: operations["commit_v1_imports__batch_id__commit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/imports/{batch_id}/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Discard */
+        post: operations["discard_v1_imports__batch_id__discard_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -1020,6 +1202,80 @@ export interface components {
             /** Name */
             name: string;
         };
+        /** BatchDetail */
+        BatchDetail: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Record Type */
+            record_type: string;
+            source: components["schemas"]["BatchSource"];
+            /** Filename */
+            filename: string | null;
+            status: components["schemas"]["BatchStatus"];
+            /** Notes */
+            notes: string[];
+            /** Error */
+            error: string | null;
+            /** Summary */
+            summary: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Committed At */
+            committed_at: string | null;
+            /** Rows */
+            rows: components["schemas"]["RowOut"][];
+            /** Row Count */
+            row_count: number;
+            /** Error Count */
+            error_count: number;
+        };
+        /** BatchOut */
+        BatchOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Record Type */
+            record_type: string;
+            source: components["schemas"]["BatchSource"];
+            /** Filename */
+            filename: string | null;
+            status: components["schemas"]["BatchStatus"];
+            /** Notes */
+            notes: string[];
+            /** Error */
+            error: string | null;
+            /** Summary */
+            summary: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Committed At */
+            committed_at: string | null;
+        };
+        /**
+         * BatchSource
+         * @enum {string}
+         */
+        BatchSource: "manual" | "csv" | "document" | "sample";
+        /**
+         * BatchStatus
+         * @enum {string}
+         */
+        BatchStatus: "extracting" | "review" | "committed" | "discarded" | "failed";
         /** Body_login_v1_auth_login_post */
         Body_login_v1_auth_login_post: {
             /** Grant Type */
@@ -1062,6 +1318,16 @@ export interface components {
             /** Title */
             title?: string | null;
         };
+        /** Body_upload_v1_imports_file_post */
+        Body_upload_v1_imports_file_post: {
+            /** Record Type */
+            record_type: string;
+            /**
+             * File
+             * @description CSV, or a PDF / text report (10 MB)
+             */
+            file: string;
+        };
         /**
          * BusinessProfile
          * @description What the company told us at signup. Sizes the ROI numbers and tailors the setup.
@@ -1078,6 +1344,11 @@ export interface components {
              * @default PKR
              */
             currency: string;
+            /**
+             * Timezone
+             * @default Asia/Karachi
+             */
+            timezone: string;
             /**
              * Customers
              * @default 10k_100k
@@ -1114,6 +1385,18 @@ export interface components {
              * @default 1500
              */
             agent_cost_per_hour: number;
+        };
+        /**
+         * Capabilities
+         * @description What an industry switches on.
+         */
+        Capabilities: {
+            /** Money Tools */
+            money_tools: boolean;
+            /** Trips */
+            trips: boolean;
+            /** Record Types */
+            record_types: string[];
         };
         /**
          * CardStatus
@@ -1183,6 +1466,31 @@ export interface components {
             section: string | null;
             /** Excerpt */
             excerpt: string;
+        };
+        /** CommitOut */
+        CommitOut: {
+            /** Committed */
+            committed: boolean;
+            /**
+             * Blocked
+             * @default 0
+             */
+            blocked: number;
+            /**
+             * Created
+             * @default 0
+             */
+            created: number;
+            /**
+             * Updated
+             * @default 0
+             */
+            updated: number;
+            /**
+             * Skipped Duplicates
+             * @default 0
+             */
+            skipped_duplicates: number;
         };
         /**
          * ConversationKind
@@ -1385,6 +1693,11 @@ export interface components {
              * @default 0
              */
             recent_requests_72h: number;
+            /**
+             * Trips
+             * @default []
+             */
+            trips: components["schemas"]["TripOut"][];
         };
         /** ExecutionResult */
         ExecutionResult: {
@@ -1411,6 +1724,21 @@ export interface components {
              * @default false
              */
             replayed: boolean;
+        };
+        /** FieldOut */
+        FieldOut: {
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+            /** Kind */
+            kind: string;
+            /** Required */
+            required: boolean;
+            /** Choices */
+            choices: string[];
+            /** Hint */
+            hint: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1443,12 +1771,13 @@ export interface components {
         };
         /**
          * Industry
-         * @description Who AgentFlow is for: companies that move customers' money. Its tools (ledger
-         *     research, reversals, card freeze) and policies (maker-checker, reversal limits) are built
-         *     for regulated money movement; other businesses are out of scope by design.
+         * @description The company's industry decides its data (record types to import) and the agents'
+         *     tools: money-moving companies get ledger research, reversals, card freeze and dispute
+         *     intelligence; transport companies get trips (schedules, seats, fares). Verticals are
+         *     configuration (`capabilities`, `datasets.templates`), not code forks.
          * @enum {string}
          */
-        Industry: "commercial_bank" | "microfinance_bank" | "digital_wallet" | "digital_lender";
+        Industry: "commercial_bank" | "microfinance_bank" | "digital_wallet" | "digital_lender" | "transport";
         /** Insights */
         Insights: {
             /** Days */
@@ -1560,6 +1889,18 @@ export interface components {
             /** Code */
             code: string;
         };
+        /** ManualIn */
+        ManualIn: {
+            /** Record Type */
+            record_type: string;
+            /**
+             * Rows
+             * @default []
+             */
+            rows: {
+                [key: string]: unknown;
+            }[];
+        };
         /** MeResponse */
         MeResponse: {
             user: components["schemas"]["UserOut"];
@@ -1643,6 +1984,7 @@ export interface components {
             /** Name */
             name: string;
             profile: components["schemas"]["BusinessProfile"] | null;
+            capabilities: components["schemas"]["Capabilities"];
         };
         /**
          * Outcome
@@ -1710,6 +2052,36 @@ export interface components {
          * @enum {string}
          */
         Role: "owner" | "admin" | "member";
+        /** RowIn */
+        RowIn: {
+            /** Data */
+            data: {
+                [key: string]: unknown;
+            };
+        };
+        /** RowOut */
+        RowOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Position */
+            position: number;
+            /** Data */
+            data: {
+                [key: string]: unknown;
+            };
+            /** Errors */
+            errors: {
+                [key: string]: string;
+            };
+        };
+        /** SampleIn */
+        SampleIn: {
+            /** Record Type */
+            record_type: string;
+        };
         /** SearchHit */
         SearchHit: {
             /**
@@ -1780,6 +2152,17 @@ export interface components {
          * @enum {string}
          */
         StepStatus: "completed" | "failed";
+        /** TemplateOut */
+        TemplateOut: {
+            /** Name */
+            name: string;
+            /** Label */
+            label: string;
+            /** Description */
+            description: string;
+            /** Fields */
+            fields: components["schemas"]["FieldOut"][];
+        };
         /** TextIn */
         TextIn: {
             /** Text */
@@ -1959,6 +2342,45 @@ export interface components {
              */
             reasoning: string;
         };
+        /** TripOut */
+        TripOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Trip Ref */
+            trip_ref: string;
+            /** Origin */
+            origin: string;
+            /** Destination */
+            destination: string;
+            /**
+             * Departs At
+             * Format: date-time
+             */
+            departs_at: string;
+            /** Arrives At */
+            arrives_at: string | null;
+            /** Fare */
+            fare: string;
+            /** Currency */
+            currency: string;
+            /** Seats Total */
+            seats_total: number | null;
+            /** Seats Available */
+            seats_available: number;
+            status: components["schemas"]["TripStatus"];
+            /** Vehicle */
+            vehicle: string | null;
+            /** Notes */
+            notes: string | null;
+        };
+        /**
+         * TripStatus
+         * @enum {string}
+         */
+        TripStatus: "scheduled" | "delayed" | "cancelled" | "departed";
         /**
          * Urgency
          * @enum {string}
@@ -3645,6 +4067,390 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Accepted"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    templates_v1_imports_templates_get: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TemplateOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    manual_v1_imports_manual_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_v1_imports_file_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_v1_imports_file_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    sample_v1_imports_sample_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SampleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_imports_v1_imports_get: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_import_v1_imports__batch_id__get: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path: {
+                batch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_row_v1_imports__batch_id__rows_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path: {
+                batch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RowIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_row_v1_imports__batch_id__rows__row_id__delete: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path: {
+                batch_id: string;
+                row_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_row_v1_imports__batch_id__rows__row_id__patch: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path: {
+                batch_id: string;
+                row_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RowIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RowOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    commit_v1_imports__batch_id__commit_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path: {
+                batch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CommitOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    discard_v1_imports__batch_id__discard_post: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Organization this request acts in */
+                "x-org-id": string;
+            };
+            path: {
+                batch_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BatchOut"];
                 };
             };
             /** @description Validation Error */

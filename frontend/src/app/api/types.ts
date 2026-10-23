@@ -42,6 +42,12 @@ export type Industry = Schemas['Industry'];
 export type OrgProfile = Schemas['OrgProfileOut'];
 export type InboundAddress = Schemas['InboundAddress'];
 export type DisputeAssessment = Schemas['DisputeAssessment'];
+export type ImportTemplate = Schemas['TemplateOut'];
+export type ImportField = Schemas['FieldOut'];
+export type ImportBatch = Schemas['BatchOut'];
+export type ImportBatchDetail = Schemas['BatchDetail'];
+export type ImportRow = Schemas['RowOut'];
+export type ImportCommit = Schemas['CommitOut'];
 
 /** Error body FastAPI returns for HTTPException: {"detail": "..."} */
 export interface ApiError {

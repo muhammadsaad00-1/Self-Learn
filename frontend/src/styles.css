@@ -1691,3 +1691,35 @@ app-customer-chat {
   color: var(--brand);
   background: var(--brand-soft);
 }
+
+/* Data imports */
+.type-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 12px;
+}
+table.grid td {
+  padding: 6px 8px;
+  vertical-align: top;
+}
+table.grid input,
+table.grid select {
+  width: 100%;
+  min-width: 150px;
+  height: 32px;
+  padding: 0 8px;
+  box-shadow: none;
+}
+table.grid td.bad input,
+table.grid td.bad select {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+}
+table.grid tr.has-errors td:first-child {
+  box-shadow: inset 3px 0 0 var(--danger);
+}
+.cell-error {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+}

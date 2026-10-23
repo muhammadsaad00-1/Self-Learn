@@ -55,6 +55,11 @@ const COUNTS_POLL_MS = 15000;
         <a class="nav-link" routerLink="/knowledge" routerLinkActive="active">
           <app-icon name="book" /> Knowledge
         </a>
+        @if (auth.isAdmin()) {
+          <a class="nav-link" routerLink="/data" routerLinkActive="active">
+            <app-icon name="database" /> Data
+          </a>
+        }
 
         <div class="nav-group">Company</div>
         <a class="nav-link" routerLink="/members" routerLinkActive="active">

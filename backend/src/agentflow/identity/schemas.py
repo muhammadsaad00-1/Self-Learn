@@ -5,6 +5,7 @@ import uuid
 from datetime import datetime
 from enum import StrEnum
 from typing import Annotated, Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, Field
 
@@ -16,14 +17,47 @@ Email = Annotated[EmailStr, AfterValidator(str.lower)]
 
 
 class Industry(StrEnum):
-    """Who AgentFlow is for: companies that move customers' money. Its tools (ledger
-    research, reversals, card freeze) and policies (maker-checker, reversal limits) are built
-    for regulated money movement; other businesses are out of scope by design."""
+    """The company's industry decides its data (record types to import) and the agents'
+    tools: money-moving companies get ledger research, reversals, card freeze and dispute
+    intelligence; transport companies get trips (schedules, seats, fares). Verticals are
+    configuration (`capabilities`, `datasets.templates`), not code forks."""
 
     COMMERCIAL_BANK = "commercial_bank"
     MICROFINANCE_BANK = "microfinance_bank"
     DIGITAL_WALLET = "digital_wallet"  # wallets, payment service providers
     DIGITAL_LENDER = "digital_lender"
+    TRANSPORT = "transport"  # intercity bus / coach operators
+
+
+FINANCIAL = {
+    Industry.COMMERCIAL_BANK,
+    Industry.MICROFINANCE_BANK,
+    Industry.DIGITAL_WALLET,
+    Industry.DIGITAL_LENDER,
+}
+
+
+class Capabilities(BaseModel):
+    """What an industry switches on."""
+
+    money_tools: bool  # ledger, reversals, refunds, card freeze, disputes, approvals
+    trips: bool  # schedules, seats and fares the agents answer from
+    record_types: list[str]  # what the company can import (datasets.templates)
+
+
+def capabilities_of(industry: Industry | None) -> Capabilities:
+    if industry == Industry.TRANSPORT:
+        return Capabilities(money_tools=False, trips=True, record_types=["customers", "trips"])
+    # Financial, or no profile yet (companies from before the wizard were banks).
+    return Capabilities(money_tools=True, trips=False, record_types=["customers", "transactions"])
+
+
+def _valid_zone(zone: str) -> str:
+    try:
+        ZoneInfo(zone)
+    except (ZoneInfoNotFoundError, ValueError):
+        raise ValueError("Unknown time zone (use an IANA name like Asia/Karachi)") from None
+    return zone
 
 
 Channel = Literal["app_chat", "email", "whatsapp", "phone", "branch"]
@@ -36,6 +70,9 @@ class BusinessProfile(BaseModel):
     industry: Industry
     country: str = Field(default="PK", min_length=2, max_length=2)  # ISO 3166-1 alpha-2
     currency: str = Field(default="PKR", min_length=3, max_length=3)  # ISO 4217
+    # IANA zone: imported times without a zone are read in it, and customers hear times in it
+    # (QA: a 5 pm bus was announced as "17:00 UTC").
+    timezone: Annotated[str, AfterValidator(_valid_zone)] = "Asia/Karachi"
     customers: Literal["under_10k", "10k_100k", "100k_1m", "over_1m"] = "10k_100k"
     monthly_queries: int = Field(default=5000, ge=0, le=10_000_000)  # support volume today
     channels: list[Channel] = ["app_chat"]
@@ -58,6 +95,7 @@ class OrgProfileOut(BaseModel):
     org_id: uuid.UUID
     name: str
     profile: BusinessProfile | None
+    capabilities: Capabilities
 
 
 class TokenResponse(BaseModel):

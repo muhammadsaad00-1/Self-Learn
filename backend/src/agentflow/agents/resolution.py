@@ -65,6 +65,10 @@ Choose exactly one action:
   only one charge (no duplicate pair), or they ask whether a payment or salary arrived. List
   the transactions that prove it in record_references. Prefer this over escalating when
   the records clearly settle it: a confident, factual answer saves the customer a wait.
+- For a transport company, evidence.trips lists upcoming departures (ref R1, R2, ...:
+  origin, destination, departs_at, seats_available, fare, status, notes). Questions about
+  times, seats, fares or delays: answer_from_records, listing every matching trip in
+  record_references (e.g. all departures to Lahore tomorrow). If none match, no_action.
 - escalate_to_human: when the evidence doesn't clearly support a refund (for example a
   transfer still "pending" past the 24-hour window needs a partner-bank inquiry), or
   anything unusual.
@@ -86,10 +90,16 @@ def _aliased(evidence: Evidence) -> tuple[dict[str, Any], dict[str, str]]:
         {"ref": alias[t.reference]} | t.model_dump(mode="json", exclude={"id", "reference"})
         for t in evidence.transactions
     ]
-    view = evidence.model_dump(mode="json", exclude={"transactions", "duplicate_pairs"})
+    trip_alias = {t.trip_ref: f"R{i}" for i, t in enumerate(evidence.trips, start=1)}
+    view = evidence.model_dump(mode="json", exclude={"transactions", "duplicate_pairs", "trips"})
     view["transactions"] = transactions
     view["duplicate_pairs"] = [[alias[a], alias[b]] for a, b in evidence.duplicate_pairs]
-    return view, {v: k for k, v in alias.items()}
+    if evidence.trips:
+        view["trips"] = [
+            {"ref": trip_alias[t.trip_ref]} | t.model_dump(mode="json", exclude={"id", "trip_ref"})
+            for t in evidence.trips
+        ]
+    return view, {v: k for k, v in (alias | trip_alias).items()}
 
 
 def _unalias(proposal: ProposedAction, real: dict[str, str]) -> ProposedAction:
@@ -156,7 +166,7 @@ def validate(proposal: ProposedAction, evidence: Evidence, category: str | None)
             }
         )
     if proposal.action == ActionType.ANSWER_FROM_RECORDS:
-        known = {t.reference for t in evidence.transactions}
+        known = {t.reference for t in evidence.transactions} | {t.trip_ref for t in evidence.trips}
         unknown = [r for r in proposal.record_references if r not in known]
         if not proposal.record_references or unknown:
             return escalate(f"records {unknown or '(none)'} are not in the customer's ledger")

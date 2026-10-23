@@ -27,6 +27,7 @@ Sign up at http://localhost:4200/signup.
 2. Customers sign in at /customer/login with phone + username (demo: `0300 1234504` + `usman.tariq`; others: ayesha.khan, bilal.ahmed, hina.raza, zainab.ali, faraz.hussain for 01–06), or staff use Inbox → **Open**. Try a failed transfer (CUST-1004), *"my 3000 to Sara never arrived"* (CUST-1004), genuine fraud (CUST-1003) and a **false fraud claim** (CUST-1006: no freeze, the facts shown, a case for review).
 3. Settings → **Load a sample inbox**: 8 emails through the same agents, including an injection attempt.
 4. Tickets (hand off, resolve with a message), Approvals (maker-checker), Requests (the decision trail), Overview (ROI).
+5. **Data** (admins): import customers, transactions (banks) or trips (transport) by hand, CSV, or a PDF report; review the rows in the grid, fix what's flagged, commit. Try "Try a sample" on each card. For a transport company, sign up with industry *Transport*, import the sample trips, then ask in the customer app: *"Is there a seat to Lahore tomorrow evening?"*
 
 `make help` lists every command. `make down` stops the stack.
 

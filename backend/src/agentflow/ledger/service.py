@@ -5,6 +5,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -271,7 +272,9 @@ DEMO_CUSTOMERS: list[tuple[str, str, str, list[Demo]]] = [
 ]
 
 
-async def seed_demo_data(session: AsyncSession, org_id: uuid.UUID) -> list[Account]:
+async def seed_demo_data(
+    session: AsyncSession, org_id: uuid.UUID, *, with_transactions: bool = True
+) -> list[Account]:
     """Demo customers that exercise every policy path (idempotent: skips existing ones).
 
     CUST-1001  PKR 5,000 charged twice       -> refund above PKR 2,000: needs approval
@@ -305,7 +308,7 @@ async def seed_demo_data(session: AsyncSession, org_id: uuid.UUID) -> list[Accou
         )
         session.add(account)
         await session.flush()
-        for i, t in enumerate(txns):
+        for i, t in enumerate(txns if with_transactions else []):
             session.add(
                 Transaction(
                     org_id=org_id,
@@ -381,3 +384,83 @@ async def get_account_by_phone(
     return await session.scalar(
         select(Account).where(Account.org_id == org_id, Account.phone == phone)
     )
+
+
+async def upsert_customer(session: AsyncSession, org_id: uuid.UUID, data: dict[str, Any]) -> bool:
+    """Insert, or update the customer with the same `customer_ref`. True if it was new.
+    Fields absent from `data` are left as they are (an import can add phones later)."""
+    account = await session.scalar(
+        select(Account).where(
+            Account.org_id == org_id, Account.customer_ref == data["customer_ref"]
+        )
+    )
+    created = account is None
+    if account is None:
+        account = Account(
+            org_id=org_id,
+            customer_ref=data["customer_ref"],
+            customer_name=data["customer_name"],
+            currency=data.get("currency") or "PKR",
+        )
+        session.add(account)
+    account.customer_name = data["customer_name"]
+    for field in ("phone", "username", "email"):
+        if data.get(field):
+            setattr(account, field, data[field])
+    await session.flush()
+    return created
+
+
+class UnknownCustomerError(Exception):
+    pass
+
+
+async def insert_transaction(
+    session: AsyncSession, org_id: uuid.UUID, data: dict[str, Any]
+) -> bool:
+    """Record one transaction. False if its reference already exists (a re-imported
+    statement must not double the money). Raises UnknownCustomerError."""
+    account = await session.scalar(
+        select(Account).where(
+            Account.org_id == org_id, Account.customer_ref == data["customer_ref"]
+        )
+    )
+    if account is None:
+        raise UnknownCustomerError(data["customer_ref"])
+    exists = await session.scalar(
+        select(Transaction.id).where(
+            Transaction.org_id == org_id, Transaction.reference == data["reference"]
+        )
+    )
+    if exists:
+        return False
+    session.add(
+        Transaction(
+            org_id=org_id,
+            account_id=account.id,
+            reference=data["reference"],
+            kind=TransactionKind(data["direction"]),
+            amount=Decimal(data["amount"]),
+            currency=data.get("currency") or account.currency,
+            merchant=data["description"],
+            transfer_status=TransferStatus(data["transfer_status"])
+            if data.get("transfer_status")
+            else None,
+            channel=data.get("channel"),
+            device=data.get("device"),
+            device_known=data.get("device_known"),
+            verified=data.get("verified"),
+            occurred_at=data["occurred_at"],
+        )
+    )
+    await session.flush()
+    return True
+
+
+async def existing_customer_refs(
+    session: AsyncSession, org_id: uuid.UUID, refs: set[str]
+) -> set[str]:
+    rows = await session.scalars(
+        select(Account.customer_ref).where(Account.org_id == org_id, Account.customer_ref.in_(refs))
+    )
+    return set(rows)

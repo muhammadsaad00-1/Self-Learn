@@ -23,6 +23,7 @@ from agentflow.identity.schemas import (
     MembershipOut,
     OrgProfileOut,
     SignupRequest,
+    capabilities_of,
 )
 from agentflow.identity.security import hash_password, verify_password
 
@@ -325,10 +326,12 @@ async def get_profile(session: AsyncSession, org_id: uuid.UUID) -> OrgProfileOut
     org = await session.get(Organization, org_id)
     if org is None:
         raise OrgNotFoundError
+    profile = BusinessProfile.model_validate(org.profile) if org.profile else None
     return OrgProfileOut(
         org_id=org.id,
         name=org.name,
-        profile=BusinessProfile.model_validate(org.profile) if org.profile else None,
+        profile=profile,
+        capabilities=capabilities_of(profile.industry if profile else None),
     )
 
 

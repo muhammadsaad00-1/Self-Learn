@@ -14,6 +14,7 @@ const INDUSTRIES: BusinessProfile['industry'][] = [
   'microfinance_bank',
   'digital_wallet',
   'digital_lender',
+  'transport',
 ];
 
 /** Company settings (admins): the business profile from signup, the support email inbox and
@@ -98,6 +99,13 @@ const INDUSTRIES: BusinessProfile['industry'][] = [
               <input [(ngModel)]="draft.monthly_queries" name="mq" type="number" min="0"
             /></label>
           </div>
+          <label>
+            Time zone
+            <input [(ngModel)]="draft.timezone" name="tz" placeholder="Asia/Karachi" />
+            <span class="field-hint"
+              >Imported times without a zone are read in it; customers hear times in it.</span
+            >
+          </label>
           <div class="row" style="flex-wrap: nowrap">
             <label class="grow"
               >Minutes a person spends per query
@@ -139,6 +147,7 @@ export class SettingsPage {
     industry: 'commercial_bank',
     country: 'PK',
     currency: 'PKR',
+    timezone: 'Asia/Karachi',
     customers: '10k_100k',
     monthly_queries: 5000,
     channels: ['app_chat'],

@@ -5,6 +5,7 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict
 
 from agentflow.ledger.models import CardStatus, TransactionKind, TransactionStatus, TransferStatus
+from agentflow.transport.schemas import TripOut
 
 
 class AccountOut(BaseModel):
@@ -47,3 +48,5 @@ class Evidence(BaseModel):
     # Earlier requests from this customer in 72h (set by the worker from the workflow
     # module): repeat contact is a criticality signal.
     recent_requests_72h: int = 0
+    # Transport companies: upcoming departures the agents answer schedule questions from.
+    trips: list[TripOut] = []

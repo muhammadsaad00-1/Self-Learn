@@ -44,14 +44,15 @@ import { Icon } from '../layout/icon';
               <li>
                 <span class="num">1</span>
                 <div class="grow">
-                  <strong>Add your customers' accounts</strong>
+                  <strong>Add your customers and records</strong>
                   <div class="muted">
-                    Demo: six customers with real-looking histories, failed transfers and a disputed
-                    payment.
+                    Import a CSV or PDF report and review it before it's saved, or load six demo
+                    customers.
                   </div>
                 </div>
                 @if (auth.isAdmin()) {
-                  <button class="secondary" (click)="setup('demo')" [disabled]="busy()">
+                  <a class="button secondary" routerLink="/data">Import data</a>
+                  <button class="ghost" (click)="setup('demo')" [disabled]="busy()">
                     Load demo customers
                   </button>
                 }

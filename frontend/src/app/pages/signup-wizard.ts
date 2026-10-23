@@ -27,6 +27,7 @@ const INDUSTRIES: { id: Industry; label: string; hint: string; icon: string }[] 
   },
   { id: 'digital_wallet', label: 'Wallet or payments', hint: 'Mobile wallets, PSPs', icon: 'zap' },
   { id: 'digital_lender', label: 'Digital lender', hint: 'App-based lending', icon: 'money' },
+  { id: 'transport', label: 'Transport', hint: 'Bus and coach operators', icon: 'clock' },
 ];
 
 const CHANNELS: { id: Channel; label: string }[] = [
@@ -70,7 +71,9 @@ const VOLUMES = [1000, 5000, 20000, 100000];
             }
           </div>
         </div>
-        <small style="color: rgb(236 253 245 / 0.6)">Built for companies that move money.</small>
+        <small style="color: rgb(236 253 245 / 0.6)"
+          >For banks, microfinance, wallets and transport.</small
+        >
       </section>
 
       <section class="auth-panel">
@@ -287,6 +290,7 @@ export class SignupWizard {
           industry: this.industry!,
           country: 'PK',
           currency: 'PKR',
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Karachi',
           // ponytail: a rough size from the message volume; ask explicitly if it ever matters
           customers:
             this.monthlyQueries >= 100000

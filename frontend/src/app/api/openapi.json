@@ -1269,7 +1269,7 @@
           "ledger"
         ],
         "summary": "Seed Demo Data",
-        "description": "Demo customers covering every policy path, plus the customer help guide (cheques,\ntransfers, fraud, ...) queued for ingestion (admins; never in production).",
+        "description": "Demo customers (for banks: with histories covering every policy path), plus a help\nguide for the industry queued for ingestion (admins; never in production).",
         "operationId": "seed_demo_data_v1_ledger_demo_data_post",
         "security": [
           {
@@ -2635,6 +2635,688 @@
         }
       }
     },
+    "/v1/imports/templates": {
+      "get": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "Templates",
+        "operationId": "templates_v1_imports_templates_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-org-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Organization this request acts in",
+              "title": "X-Org-Id"
+            },
+            "description": "Organization this request acts in"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TemplateOut"
+                  },
+                  "title": "Response Templates V1 Imports Templates Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/imports/manual": {
+      "post": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "Manual",
+        "operationId": "manual_v1_imports_manual_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-org-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Organization this request acts in",
+              "title": "X-Org-Id"
+            },
+            "description": "Organization this request acts in"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManualIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/imports/file": {
+      "post": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "Upload",
+        "description": "CSV is parsed at once. A PDF or text report is read by the extraction agent in the\nbackground: poll until the status is `review`.",
+        "operationId": "upload_v1_imports_file_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-org-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Organization this request acts in",
+              "title": "X-Org-Id"
+            },
+            "description": "Organization this request acts in"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_v1_imports_file_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/imports/sample": {
+      "post": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "Sample",
+        "description": "A realistic sample file through the CSV path (never in production).",
+        "operationId": "sample_v1_imports_sample_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-org-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Organization this request acts in",
+              "title": "X-Org-Id"
+            },
+            "description": "Organization this request acts in"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SampleIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/imports": {
+      "get": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "List Imports",
+        "operationId": "list_imports_v1_imports_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "x-org-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Organization this request acts in",
+              "title": "X-Org-Id"
+            },
+            "description": "Organization this request acts in"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BatchOut"
+                  },
+                  "title": "Response List Imports V1 Imports Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/imports/{batch_id}": {
+      "get": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "Get Import",
+        "operationId": "get_import_v1_imports__batch_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "batch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Batch Id"
+            }
+          },
+          {
+            "name": "x-org-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Organization this request acts in",
+              "title": "X-Org-Id"
+            },
+            "description": "Organization this request acts in"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/imports/{batch_id}/rows": {
+      "post": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "Add Row",
+        "operationId": "add_row_v1_imports__batch_id__rows_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "batch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Batch Id"
+            }
+          },
+          {
+            "name": "x-org-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Organization this request acts in",
+              "title": "X-Org-Id"
+            },
+            "description": "Organization this request acts in"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RowIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/imports/{batch_id}/rows/{row_id}": {
+      "patch": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "Edit Row",
+        "operationId": "edit_row_v1_imports__batch_id__rows__row_id__patch",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "batch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Batch Id"
+            }
+          },
+          {
+            "name": "row_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Row Id"
+            }
+          },
+          {
+            "name": "x-org-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Organization this request acts in",
+              "title": "X-Org-Id"
+            },
+            "description": "Organization this request acts in"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RowIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RowOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "Delete Row",
+        "operationId": "delete_row_v1_imports__batch_id__rows__row_id__delete",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "batch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Batch Id"
+            }
+          },
+          {
+            "name": "row_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Row Id"
+            }
+          },
+          {
+            "name": "x-org-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Organization this request acts in",
+              "title": "X-Org-Id"
+            },
+            "description": "Organization this request acts in"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/imports/{batch_id}/commit": {
+      "post": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "Commit",
+        "description": "Write the reviewed rows to the real tables, once. Refused (committed=false) while rows\nhave problems; nothing is half-imported.",
+        "operationId": "commit_v1_imports__batch_id__commit_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "batch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Batch Id"
+            }
+          },
+          {
+            "name": "x-org-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Organization this request acts in",
+              "title": "X-Org-Id"
+            },
+            "description": "Organization this request acts in"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommitOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/imports/{batch_id}/discard": {
+      "post": {
+        "tags": [
+          "imports"
+        ],
+        "summary": "Discard",
+        "operationId": "discard_v1_imports__batch_id__discard_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "batch_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Batch Id"
+            }
+          },
+          {
+            "name": "x-org-id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Organization this request acts in",
+              "title": "X-Org-Id"
+            },
+            "description": "Organization this request acts in"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -3101,6 +3783,227 @@
         ],
         "title": "BankOption"
       },
+      "BatchDetail": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "record_type": {
+            "type": "string",
+            "title": "Record Type"
+          },
+          "source": {
+            "$ref": "#/components/schemas/BatchSource"
+          },
+          "filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filename"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BatchStatus"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "committed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Committed At"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/RowOut"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "row_count": {
+            "type": "integer",
+            "title": "Row Count"
+          },
+          "error_count": {
+            "type": "integer",
+            "title": "Error Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "record_type",
+          "source",
+          "filename",
+          "status",
+          "notes",
+          "error",
+          "summary",
+          "created_at",
+          "committed_at",
+          "rows",
+          "row_count",
+          "error_count"
+        ],
+        "title": "BatchDetail"
+      },
+      "BatchOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "record_type": {
+            "type": "string",
+            "title": "Record Type"
+          },
+          "source": {
+            "$ref": "#/components/schemas/BatchSource"
+          },
+          "filename": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Filename"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BatchStatus"
+          },
+          "notes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Notes"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "committed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Committed At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "record_type",
+          "source",
+          "filename",
+          "status",
+          "notes",
+          "error",
+          "summary",
+          "created_at",
+          "committed_at"
+        ],
+        "title": "BatchOut"
+      },
+      "BatchSource": {
+        "type": "string",
+        "enum": [
+          "manual",
+          "csv",
+          "document",
+          "sample"
+        ],
+        "title": "BatchSource"
+      },
+      "BatchStatus": {
+        "type": "string",
+        "enum": [
+          "extracting",
+          "review",
+          "committed",
+          "discarded",
+          "failed"
+        ],
+        "title": "BatchStatus"
+      },
       "Body_login_v1_auth_login_post": {
         "properties": {
           "grant_type": {
@@ -3202,6 +4105,26 @@
         ],
         "title": "Body_upload_document_v1_knowledge_documents_post"
       },
+      "Body_upload_v1_imports_file_post": {
+        "properties": {
+          "record_type": {
+            "type": "string",
+            "title": "Record Type"
+          },
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "description": "CSV, or a PDF / text report (10 MB)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "record_type",
+          "file"
+        ],
+        "title": "Body_upload_v1_imports_file_post"
+      },
       "BusinessProfile": {
         "properties": {
           "industry": {
@@ -3220,6 +4143,11 @@
             "minLength": 3,
             "title": "Currency",
             "default": "PKR"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone",
+            "default": "Asia/Karachi"
           },
           "customers": {
             "type": "string",
@@ -3293,6 +4221,33 @@
         ],
         "title": "BusinessProfile",
         "description": "What the company told us at signup. Sizes the ROI numbers and tailors the setup."
+      },
+      "Capabilities": {
+        "properties": {
+          "money_tools": {
+            "type": "boolean",
+            "title": "Money Tools"
+          },
+          "trips": {
+            "type": "boolean",
+            "title": "Trips"
+          },
+          "record_types": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Record Types"
+          }
+        },
+        "type": "object",
+        "required": [
+          "money_tools",
+          "trips",
+          "record_types"
+        ],
+        "title": "Capabilities",
+        "description": "What an industry switches on."
       },
       "CardStatus": {
         "type": "string",
@@ -3478,6 +4433,39 @@
           "excerpt"
         ],
         "title": "Citation"
+      },
+      "CommitOut": {
+        "properties": {
+          "committed": {
+            "type": "boolean",
+            "title": "Committed"
+          },
+          "blocked": {
+            "type": "integer",
+            "title": "Blocked",
+            "default": 0
+          },
+          "created": {
+            "type": "integer",
+            "title": "Created",
+            "default": 0
+          },
+          "updated": {
+            "type": "integer",
+            "title": "Updated",
+            "default": 0
+          },
+          "skipped_duplicates": {
+            "type": "integer",
+            "title": "Skipped Duplicates",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "committed"
+        ],
+        "title": "CommitOut"
       },
       "ConversationKind": {
         "type": "string",
@@ -4003,6 +4991,14 @@
             "type": "integer",
             "title": "Recent Requests 72H",
             "default": 0
+          },
+          "trips": {
+            "items": {
+              "$ref": "#/components/schemas/TripOut"
+            },
+            "type": "array",
+            "title": "Trips",
+            "default": []
           }
         },
         "type": "object",
@@ -4083,6 +5079,47 @@
         ],
         "title": "ExecutionResult"
       },
+      "FieldOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required"
+          },
+          "choices": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Choices"
+          },
+          "hint": {
+            "type": "string",
+            "title": "Hint"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "label",
+          "kind",
+          "required",
+          "choices",
+          "hint"
+        ],
+        "title": "FieldOut"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -4162,10 +5199,11 @@
           "commercial_bank",
           "microfinance_bank",
           "digital_wallet",
-          "digital_lender"
+          "digital_lender",
+          "transport"
         ],
         "title": "Industry",
-        "description": "Who AgentFlow is for: companies that move customers' money. Its tools (ledger\nresearch, reversals, card freeze) and policies (maker-checker, reversal limits) are built\nfor regulated money movement; other businesses are out of scope by design."
+        "description": "The company's industry decides its data (record types to import) and the agents'\ntools: money-moving companies get ledger research, reversals, card freeze and dispute\nintelligence; transport companies get trips (schedules, seats, fares). Verticals are\nconfiguration (`capabilities`, `datasets.templates`), not code forks."
       },
       "Insights": {
         "properties": {
@@ -4469,6 +5507,29 @@
         ],
         "title": "LoginVerifyIn"
       },
+      "ManualIn": {
+        "properties": {
+          "record_type": {
+            "type": "string",
+            "title": "Record Type"
+          },
+          "rows": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "maxItems": 1000,
+            "title": "Rows",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "record_type"
+        ],
+        "title": "ManualIn"
+      },
       "MeResponse": {
         "properties": {
           "user": {
@@ -4654,13 +5715,17 @@
                 "type": "null"
               }
             ]
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/Capabilities"
           }
         },
         "type": "object",
         "required": [
           "org_id",
           "name",
-          "profile"
+          "profile",
+          "capabilities"
         ],
         "title": "OrgProfileOut"
       },
@@ -4823,6 +5888,66 @@
           "member"
         ],
         "title": "Role"
+      },
+      "RowIn": {
+        "properties": {
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "title": "RowIn"
+      },
+      "RowOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "data": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Data"
+          },
+          "errors": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Errors"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "position",
+          "data",
+          "errors"
+        ],
+        "title": "RowOut"
+      },
+      "SampleIn": {
+        "properties": {
+          "record_type": {
+            "type": "string",
+            "title": "Record Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "record_type"
+        ],
+        "title": "SampleIn"
       },
       "SearchHit": {
         "properties": {
@@ -5007,6 +6132,37 @@
           "failed"
         ],
         "title": "StepStatus"
+      },
+      "TemplateOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/FieldOut"
+            },
+            "type": "array",
+            "title": "Fields"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "label",
+          "description",
+          "fields"
+        ],
+        "title": "TemplateOut"
       },
       "TextIn": {
         "properties": {
@@ -5489,6 +6645,120 @@
           "reasoning"
         ],
         "title": "TriageResult"
+      },
+      "TripOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "trip_ref": {
+            "type": "string",
+            "title": "Trip Ref"
+          },
+          "origin": {
+            "type": "string",
+            "title": "Origin"
+          },
+          "destination": {
+            "type": "string",
+            "title": "Destination"
+          },
+          "departs_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Departs At"
+          },
+          "arrives_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arrives At"
+          },
+          "fare": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Fare"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "seats_total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seats Total"
+          },
+          "seats_available": {
+            "type": "integer",
+            "title": "Seats Available"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TripStatus"
+          },
+          "vehicle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vehicle"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "trip_ref",
+          "origin",
+          "destination",
+          "departs_at",
+          "arrives_at",
+          "fare",
+          "currency",
+          "seats_total",
+          "seats_available",
+          "status",
+          "vehicle",
+          "notes"
+        ],
+        "title": "TripOut"
+      },
+      "TripStatus": {
+        "type": "string",
+        "enum": [
+          "scheduled",
+          "delayed",
+          "cancelled",
+          "departed"
+        ],
+        "title": "TripStatus"
       },
       "Urgency": {
         "type": "string",
