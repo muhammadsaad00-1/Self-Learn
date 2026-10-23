@@ -40,6 +40,7 @@ class Account(Base):
         UniqueConstraint("org_id", "customer_ref"),
         UniqueConstraint("org_id", "phone"),
         UniqueConstraint("org_id", "email"),
+        UniqueConstraint("org_id", "username"),
         enum_check("card_status", CardStatus),
     )
 
@@ -49,6 +50,9 @@ class Account(Base):
     customer_name: Mapped[str] = mapped_column(String(200))
     # Mobile number the customer logs in with (E.164 digits, e.g. 923001234501).
     phone: Mapped[str | None] = mapped_column(String(20))
+    # Username the bank gave the customer (lowercase): with the phone, it identifies the
+    # customer at login when they don't come through their bank's own link.
+    username: Mapped[str | None] = mapped_column(String(64))
     # Email the customer writes from (the email channel matches senders to customers).
     email: Mapped[str | None] = mapped_column(String(320))
     currency: Mapped[str] = mapped_column(String(3))

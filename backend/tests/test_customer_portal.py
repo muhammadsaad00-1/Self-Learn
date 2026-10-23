@@ -134,8 +134,23 @@ async def test_critical_risk_opens_a_ticket_even_when_triage_says_normal(
 # --- Customer login and dashboard ------------------------------------------------------------
 
 
+USERNAMES = {
+    "1": "ayesha.khan",
+    "2": "bilal.ahmed",
+    "3": "hina.raza",
+    "4": "usman.tariq",
+    "5": "zainab.ali",
+    "6": "faraz.hussain",
+}
+
+
 def login(client: TestClient, bank_id: str, phone: str) -> dict[str, str]:
-    start = client.post("/v1/customer/login/start", json={"bank_id": bank_id, "phone": phone})
+    """Demo customers: phone 92300123450N, username from USERNAMES[N]."""
+    username = USERNAMES[phone[-1]]
+    start = client.post(
+        "/v1/customer/login/start",
+        json={"bank_id": bank_id, "phone": phone, "username": username},
+    )
     code = start.json()["dev_code"]
     resp = client.post(
         "/v1/customer/login/verify", json={"bank_id": bank_id, "phone": phone, "code": code}
@@ -172,17 +187,20 @@ def test_login_codes_resist_enumeration_and_guessing(client_for: Any) -> None:
         bank = owner.org_id
 
         unknown = client.post(
-            "/v1/customer/login/start", json={"bank_id": bank, "phone": "923009999999"}
+            "/v1/customer/login/start",
+            json={"bank_id": bank, "phone": "923009999999", "username": "nobody"},
         )
-        assert unknown.json() == {"sent": True, "dev_code": None}  # same shape, nothing leaks
+        assert unknown.json() == {"sent": True, "bank": None, "banks": [], "dev_code": None}
         other_bank = str(uuid.uuid4())
         resp = client.post(
-            "/v1/customer/login/start", json={"bank_id": other_bank, "phone": "923001234501"}
+            "/v1/customer/login/start",
+            json={"bank_id": other_bank, "phone": "923001234501", "username": "ayesha.khan"},
         )
         assert resp.json()["dev_code"] is None
 
         code = client.post(
-            "/v1/customer/login/start", json={"bank_id": bank, "phone": "923001234501"}
+            "/v1/customer/login/start",
+            json={"bank_id": bank, "phone": "923001234501", "username": "ayesha.khan"},
         ).json()["dev_code"]
         wrong = f"{(int(code) + 1) % 10**6:06d}"
         verify = {"bank_id": bank, "phone": "923001234501"}
@@ -198,7 +216,8 @@ def test_login_codes_resist_enumeration_and_guessing(client_for: Any) -> None:
         )
 
         code = client.post(
-            "/v1/customer/login/start", json={"bank_id": bank, "phone": "923001234501"}
+            "/v1/customer/login/start",
+            json={"bank_id": bank, "phone": "923001234501", "username": "ayesha.khan"},
         ).json()["dev_code"]
         assert (
             client.post("/v1/customer/login/verify", json=verify | {"code": code}).status_code
@@ -285,3 +304,44 @@ async def test_model_sees_short_refs_and_code_maps_them_back() -> None:
     [call] = llm.calls
     assert '"ref": "T1"' in call["user"]
     assert "TXN-1" not in call["user"]  # the model never sees the long id
+
+
+def test_customer_signs_in_with_phone_and_username_without_a_bank_link(client_for: Any) -> None:
+    with client_for(FakeLLM()) as client:
+        first, second = (
+            signup(client, org_name="First Microfinance"),
+            signup(client, org_name="Second Bank"),
+        )
+        for bank in (first, second):
+            client.post("/v1/ledger/demo-data", headers=bank.headers())
+        creds = {"phone": "0300 1234504", "username": "Usman.Tariq"}  # any case
+
+        # Same customer at two banks: they choose (only bank names, nothing about accounts).
+        choose = client.post("/v1/customer/login/start", json=creds).json()
+        assert choose["sent"] is False
+        assert {b["name"] for b in choose["banks"]} >= {"First Microfinance", "Second Bank"}
+        assert "dev_code" not in choose or choose["dev_code"] is None
+
+        picked = client.post(
+            "/v1/customer/login/start", json=creds | {"bank_id": second.org_id}
+        ).json()
+        assert (picked["sent"], picked["bank"]["name"]) == (True, "Second Bank")
+        token = client.post(
+            "/v1/customer/login/verify",
+            json={"bank_id": second.org_id, "phone": creds["phone"], "code": picked["dev_code"]},
+        ).json()["customer_token"]
+        me = client.get("/v1/customer/me", headers={"Authorization": f"Bearer {token}"}).json()
+        assert (me["bank_name"], me["customer_ref"]) == ("Second Bank", "CUST-1004")
+
+        wrong_user = client.post(
+            "/v1/customer/login/start", json=creds | {"username": "ayesha.khan"}
+        )
+        assert wrong_user.json() == {"sent": True, "bank": None, "banks": [], "dev_code": None}
+
+
+def test_login_lookups_are_rate_limited(client_for: Any) -> None:
+    with client_for(FakeLLM()) as client:
+        creds = {"phone": "923001239999", "username": "someone"}
+        codes = [client.post("/v1/customer/login/start", json=creds).status_code for _ in range(11)]
+        assert codes[:10] == [200] * 10
+        assert codes[10] == 429

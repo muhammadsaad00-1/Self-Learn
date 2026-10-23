@@ -37,7 +37,7 @@ from agentflow.knowledge.runtime import KnowledgeRuntime, build_runtime
 from agentflow.knowledge.storage import S3ObjectStore
 from agentflow.ledger import service as ledger
 from agentflow.ledger.schemas import Evidence
-from agentflow.llm import build_llm
+from agentflow.llm import ProviderUnavailableError, build_llm
 from agentflow.observability import configure_logging, org_id_var, request_id_var, workflow_id_var
 from agentflow.policy.engine import Outcome
 from agentflow.tools import card as card_tool
@@ -292,6 +292,7 @@ async def process_next(
                     claim,
                     f"{type(e).__name__}: {e}"[:2000],
                     max_attempts=settings.workflow_max_attempts,
+                    outage=isinstance(e, ProviderUnavailableError),
                 )
                 if locked.status == WorkflowStatus.FAILED:
                     await dead_lettered(session, locked, f"{type(e).__name__}: {e}")

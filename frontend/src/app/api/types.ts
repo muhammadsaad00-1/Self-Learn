@@ -34,6 +34,7 @@ export type OpenedChat = Schemas['OpenedChat'];
 export type Insights = Schemas['Insights'];
 export type CustomerMe = Schemas['CustomerMe'];
 export type LoginStartOut = Schemas['LoginStartOut'];
+export type BankOption = Schemas['BankOption'];
 export type CustomerSession = Schemas['CustomerSession'];
 export type RiskAssessment = Schemas['RiskAssessment'];
 export type BusinessProfile = Schemas['BusinessProfile'];
@@ -44,5 +45,5 @@ export type DisputeAssessment = Schemas['DisputeAssessment'];
 
 /** Error body FastAPI returns for HTTPException: {"detail": "..."} */
 export interface ApiError {
-  detail: string | { msg: string }[];
+  detail: string | { msg: string; loc?: (string | number)[] }[];
 }

@@ -15,6 +15,7 @@ ponytail: replies are drafted, not sent; an SMTP/provider "send" tool is the nex
 import hashlib
 import hmac
 import uuid
+from typing import Annotated
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
 from pydantic import BaseModel, EmailStr, Field
@@ -25,6 +26,7 @@ from agentflow.db import SessionDep, set_tenant_context
 from agentflow.identity.deps import AdminContextDep, SettingsDep
 from agentflow.ledger import service as ledger
 from agentflow.observability import request_id_var
+from agentflow.validation import non_blank
 from agentflow.workflow import service as workflows
 from agentflow.workflow.schemas import CreateWorkflowRequest
 
@@ -34,7 +36,7 @@ router = APIRouter(prefix="/v1/inbound", tags=["email"])
 class InboundEmail(BaseModel):
     from_address: EmailStr
     subject: str = Field(default="", max_length=500)
-    text: str = Field(min_length=1, max_length=7000)
+    text: Annotated[str, non_blank(7000)]
     message_id: str | None = Field(default=None, max_length=300)  # dedupes provider retries
 
 

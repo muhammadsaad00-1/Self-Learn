@@ -95,7 +95,9 @@ class Settings(BaseSettings):
     s3_region: str = "us-east-1"
 
     # --- Workflow worker ---
-    workflow_max_attempts: int = 3  # then the workflow is failed (dead-lettered)
+    # Then the workflow is failed (dead-lettered, and a ticket opened). With the outage
+    # backoff (~20, 40, 80, 160 s) five attempts ride out a provider's per-minute limits.
+    workflow_max_attempts: int = 5
     workflow_lease_seconds: int = 120  # a crashed worker's job is reclaimed after this
     workflow_timeout_seconds: float = 90  # wall-clock budget for one graph run
 

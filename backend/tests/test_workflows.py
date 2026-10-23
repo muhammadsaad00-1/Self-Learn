@@ -6,6 +6,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from agentflow.config import Settings
@@ -125,22 +126,26 @@ async def test_failure_retries_with_backoff_then_dead_letters(
     wf_id = submit(client, owner).json()["id"]
     broken = FakeLLM(LLMError("all models down"))
 
-    for attempt in (1, 2, 3):
+    last = settings.workflow_max_attempts
+    for attempt in range(1, last + 1):
         assert await run_once(sessions, settings, broken) is True
         wf = client.get(f"/v1/workflows/{wf_id}", headers=owner.headers()).json()
-        if attempt < 3:
+        if attempt < last:
             assert wf["status"] == "queued"  # waiting for its backoff delay
             assert await run_once(sessions, settings, broken) is False  # not due yet
             await exec_sql("UPDATE workflows SET available_at = now() WHERE id = :i", {"i": wf_id})
 
     assert wf["status"] == "failed"
-    assert wf["attempts"] == 3
+    assert wf["attempts"] == last
     assert "all models down" in wf["error"]
-    assert [s["status"] for s in wf["steps"]] == ["completed", "failed"] * 3  # intake, attempt
+    assert [s["status"] for s in wf["steps"]] == ["completed", "failed"] * last  # intake, attempt
     # A human owns it now: a ticket, so nothing falls through the cracks.
     [ticket] = client.get("/v1/tickets", headers=owner.headers()).json()
     assert (ticket["workflow_id"], ticket["priority"]) == (wf_id, "high")
-    assert "Automation failed after 3 attempts: LLMError: all models down" in ticket["description"]
+    assert (
+        f"Automation failed after {last} attempts: LLMError: all models down"
+        in (ticket["description"])
+    )
 
 
 async def test_crashed_worker_lease_is_reclaimed(
@@ -199,3 +204,26 @@ async def test_concurrent_workers_claim_different_workflows(
         assert claim_a is not None
         assert claim_b is not None
         assert claim_a.workflow_id != claim_b.workflow_id
+
+
+async def test_provider_outage_retries_later_than_other_failures(
+    client: TestClient,
+    settings: Settings,
+    sessions: Sessions,
+    exec_sql: Callable[[str, dict[str, object]], Awaitable[None]],
+) -> None:
+    """QA finding: a per-minute rate limit used up all attempts within ~20 s."""
+    from agentflow.llm import ProviderUnavailableError
+
+    owner = signup(client)
+    down = submit(client, owner).json()["id"]
+    assert await run_once(sessions, settings, FakeLLM(ProviderUnavailableError("429"))) is True
+    wf = client.get(f"/v1/workflows/{down}", headers=owner.headers()).json()
+    assert wf["status"] == "queued"
+    async with sessions() as s, s.begin():
+        await set_tenant_context(s, org_id=uuid.UUID(owner.org_id))
+        delay = await s.scalar(
+            text("SELECT extract(epoch FROM available_at - now()) FROM workflows WHERE id = :i"),
+            {"i": down},
+        )
+    assert delay >= 9  # outage backoff (>= 10 s with jitter), not the ~2.5-5 s of a bug retry

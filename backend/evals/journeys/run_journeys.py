@@ -31,6 +31,14 @@ API = "http://localhost:8000"
 HERE = Path(__file__).parent
 PASSWORD = "journeys-password-1"  # noqa: S105 (throwaway local test accounts)
 TIMEOUT_S = 180
+USERNAMES = {
+    "CUST-1001": "ayesha.khan",
+    "CUST-1002": "bilal.ahmed",
+    "CUST-1003": "hina.raza",
+    "CUST-1004": "usman.tariq",
+    "CUST-1005": "zainab.ali",
+    "CUST-1006": "faraz.hussain",
+}
 
 
 @dataclass
@@ -90,7 +98,8 @@ class Bank:
         if ref not in self.customers:
             phone = f"9230012345{ref[-2:]}"
             start = self.http.post(
-                "/v1/customer/login/start", json={"bank_id": self.org_id, "phone": phone}
+                "/v1/customer/login/start",
+                json={"bank_id": self.org_id, "phone": phone, "username": USERNAMES[ref]},
             ).json()
             token = self.http.post(
                 "/v1/customer/login/verify",

@@ -24,7 +24,7 @@ Sign up at http://localhost:4200/signup.
 
 **Demo (≈5 min):** the script, the pitch and the competitor comparison are in [`docs/PITCH.md`](docs/PITCH.md) §7. In short:
 1. Sign up at /signup (3-step wizard) → Overview → **Load demo customers**.
-2. Inbox → **Open** the customer app as a customer (phones 0300 1234501–06). Try a failed transfer (CUST-1004), *"my 3000 to Sara never arrived"* (CUST-1004), genuine fraud (CUST-1003) and a **false fraud claim** (CUST-1006: no freeze, the facts shown, a case for review).
+2. Customers sign in at /customer/login with phone + username (demo: `0300 1234504` + `usman.tariq`; others: ayesha.khan, bilal.ahmed, hina.raza, zainab.ali, faraz.hussain for 01–06), or staff use Inbox → **Open**. Try a failed transfer (CUST-1004), *"my 3000 to Sara never arrived"* (CUST-1004), genuine fraud (CUST-1003) and a **false fraud claim** (CUST-1006: no freeze, the facts shown, a case for review).
 3. Settings → **Load a sample inbox**: 8 emails through the same agents, including an injection attempt.
 4. Tickets (hand off, resolve with a message), Approvals (maker-checker), Requests (the decision trail), Overview (ROI).
 

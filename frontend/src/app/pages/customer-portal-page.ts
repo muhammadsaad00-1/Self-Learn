@@ -215,7 +215,9 @@ export class CustomerPortalPage implements OnInit {
       const open = this.issues().find((i) => i.id === this.openIssue());
       return open ? (open.subject ?? 'Issue') : 'Your issues';
     }
-    return this.tab() === 'activity' ? 'Activity' : (this.me.value()?.bank_name ?? 'Your bank');
+    return this.tab() === 'activity'
+      ? 'Activity'
+      : (this.me.value()?.bank_name ?? this.session.bankName() ?? 'Your bank');
   });
 
   ngOnInit(): void {

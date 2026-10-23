@@ -1,6 +1,7 @@
 import { Injectable, computed, signal } from '@angular/core';
 
 const TOKEN_KEY = 'agentflow.customer-token';
+const BANK_KEY = 'agentflow.customer-bank';
 
 /**
  * The customer's session in the customer app: a customer token (from the OTP login or a
@@ -10,16 +11,24 @@ const TOKEN_KEY = 'agentflow.customer-token';
 @Injectable({ providedIn: 'root' })
 export class CustomerSession {
   private readonly token = signal<string | null>(sessionStorage.getItem(TOKEN_KEY));
+  /** The bank's name from the login step: shown at once, before the profile loads. */
+  readonly bankName = signal<string | null>(sessionStorage.getItem(BANK_KEY));
   readonly loggedIn = computed(() => !!this.token());
 
-  start(token: string): void {
+  start(token: string, bankName?: string): void {
     sessionStorage.setItem(TOKEN_KEY, token);
     this.token.set(token);
+    if (bankName) {
+      sessionStorage.setItem(BANK_KEY, bankName);
+      this.bankName.set(bankName);
+    }
   }
 
   end(): void {
     sessionStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(BANK_KEY);
     this.token.set(null);
+    this.bankName.set(null);
   }
 
   /** The bank (org id) the token belongs to, for the "sign in again" link. Read from the

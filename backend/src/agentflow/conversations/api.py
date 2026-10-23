@@ -19,8 +19,8 @@ from typing import Annotated, Any
 import groq
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import select
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field
+from sqlalchemy import select, text
 from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -44,6 +44,7 @@ from agentflow.ledger.models import Account, CardStatus
 from agentflow.ledger.schemas import TransactionOut
 from agentflow.observability import request_id_var
 from agentflow.tickets import service as tickets
+from agentflow.validation import non_blank
 
 customer_router = APIRouter(prefix="/v1/customer", tags=["customer"])
 staff_router = APIRouter(prefix="/v1/conversations", tags=["conversations"])
@@ -82,7 +83,7 @@ class ChatOut(ConversationOut):
 
 
 class TextIn(BaseModel):
-    text: str = Field(min_length=1, max_length=service.MAX_MESSAGE_CHARS)
+    text: Annotated[str, non_blank(service.MAX_MESSAGE_CHARS)]
 
 
 async def _names(session: AsyncSession, org_id: uuid.UUID, refs: set[str]) -> dict[str, str]:
@@ -345,24 +346,7 @@ async def bank(bank_id: uuid.UUID, session: SessionDep) -> Bank:
 OTP_TTL_SECONDS = 300
 OTP_MAX_TRIES = 5
 OTP_SENDS_PER_10_MIN = 3
-
-
-class LoginStartIn(BaseModel):
-    bank_id: uuid.UUID  # the bank's organization id, from the bank's customer-app link
-    phone: str = Field(min_length=10, max_length=20)
-
-
-class LoginStartOut(BaseModel):
-    sent: bool  # always true: the answer never reveals whether the number is registered
-    dev_code: str | None = None  # outside production only (no SMS provider yet)
-
-
-class LoginVerifyIn(LoginStartIn):
-    code: str = Field(pattern=r"^\d{6}$")
-
-
-class CustomerSession(BaseModel):
-    customer_token: str
+LOOKUPS_PER_10_MIN = 10
 
 
 def _normalize_phone(phone: str) -> str:
@@ -371,29 +355,88 @@ def _normalize_phone(phone: str) -> str:
     return "92" + digits[1:] if digits.startswith("0") else digits
 
 
+def _valid_phone(phone: str) -> str:
+    """A mobile number has 11-13 digits once normalized; "abcdefghijk" is not one (QA)."""
+    if not 11 <= len(_normalize_phone(phone)) <= 13:
+        raise ValueError("Enter a mobile number like 0300 1234567")
+    return phone
+
+
+Phone = Annotated[str, Field(min_length=10, max_length=20), AfterValidator(_valid_phone)]
+
+
+class LoginStartIn(BaseModel):
+    phone: Phone
+    username: Annotated[str, non_blank(64)]
+    # Preselected by the bank's own app link, or chosen when the customer banks with several.
+    bank_id: uuid.UUID | None = None
+
+
+class BankOption(BaseModel):
+    id: uuid.UUID
+    name: str
+
+
+class LoginStartOut(BaseModel):
+    # True: if the details match a customer, a code was sent (unknown details look the same).
+    # False: the customer banks with several companies and must choose one (`banks`).
+    sent: bool
+    bank: BankOption | None = None  # the bank the code is for
+    banks: list[BankOption] = []
+    dev_code: str | None = None  # outside production only (no SMS provider yet)
+
+
+class LoginVerifyIn(BaseModel):
+    bank_id: uuid.UUID  # from the start step
+    phone: Phone
+    code: str = Field(pattern=r"^\d{6}$")
+
+
+class CustomerSession(BaseModel):
+    customer_token: str
+
+
 def _otp_hash(code: str) -> str:
     return hashlib.sha256(code.encode()).hexdigest()
+
+
+async def _throttle(request: Request, key: str, limit: int, message: str) -> None:
+    redis = request.app.state.redis
+    await redis.set(key, 0, ex=600, nx=True)
+    if await redis.incr(key) > limit:
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, message)
 
 
 @customer_router.post("/login/start")
 async def login_start(
     body: LoginStartIn, request: Request, session: SessionDep, settings: SettingsDep
 ) -> LoginStartOut:
-    """Send a 6-digit one-time code to the customer's registered mobile number."""
-    redis = request.app.state.redis
-    phone = _normalize_phone(body.phone)
-    sends = f"otp-sends:{body.bank_id}:{phone}"
-    await redis.set(sends, 0, ex=600, nx=True)
-    if await redis.incr(sends) > OTP_SENDS_PER_10_MIN:
-        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Too many codes, try later")
-    await set_tenant_context(session, org_id=body.bank_id)
-    account = await ledger.get_account_by_phone(session, body.bank_id, phone)
-    if account is None:
-        return LoginStartOut(sent=True)  # same answer as success: no number enumeration
+    """Phone + username identify the customer and their bank; a 6-digit one-time code goes
+    to the registered mobile. Works with or without the bank's own link."""
+    phone, username = _normalize_phone(body.phone), body.username.strip().lower()
+    await _throttle(
+        request, f"login-lookups:{phone}", LOOKUPS_PER_10_MIN, "Too many attempts, try later"
+    )
+    rows = await session.execute(
+        text("SELECT bank_id, bank_name FROM customer_login_banks(:phone, :username)"),
+        {"phone": phone, "username": username},
+    )
+    banks = [BankOption(id=i, name=n) for i, n in rows]
+    if body.bank_id is not None:
+        banks = [b for b in banks if b.id == body.bank_id]
+    if not banks:
+        return LoginStartOut(sent=True)  # same as success: no account enumeration
+    if len(banks) > 1:
+        return LoginStartOut(sent=False, banks=banks)  # they know both: let them choose
+    bank = banks[0]
+    await _throttle(
+        request, f"otp-sends:{bank.id}:{phone}", OTP_SENDS_PER_10_MIN, "Too many codes, try later"
+    )
     code = f"{secrets.randbelow(10**6):06d}"
-    await redis.set(f"otp:{body.bank_id}:{phone}", _otp_hash(code), ex=OTP_TTL_SECONDS)
-    await redis.delete(f"otp-tries:{body.bank_id}:{phone}")
-    return LoginStartOut(sent=True, dev_code=code if settings.env != "prod" else None)
+    redis = request.app.state.redis
+    await redis.set(f"otp:{bank.id}:{phone}", _otp_hash(code), ex=OTP_TTL_SECONDS)
+    await redis.delete(f"otp-tries:{bank.id}:{phone}")
+    return LoginStartOut(sent=True, bank=bank, dev_code=code if settings.env != "prod" else None)
 
 
 @customer_router.post("/login/verify")
@@ -436,7 +479,7 @@ async def login_verify(
 
 
 class OpenChatIn(BaseModel):
-    customer_ref: str = Field(min_length=1, max_length=100)
+    customer_ref: Annotated[str, non_blank(100)]
 
 
 class OpenedChat(BaseModel):

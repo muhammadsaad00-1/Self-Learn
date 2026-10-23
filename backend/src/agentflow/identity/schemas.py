@@ -9,6 +9,7 @@ from typing import Annotated, Literal
 from pydantic import AfterValidator, BaseModel, ConfigDict, EmailStr, Field
 
 from agentflow.identity.models import Role
+from agentflow.validation import non_blank
 
 # Lowercased here to satisfy the users.email CHECK constraint.
 Email = Annotated[EmailStr, AfterValidator(str.lower)]
@@ -48,8 +49,8 @@ class SignupRequest(BaseModel):
     email: Email
     # Length over complexity rules (NIST SP 800-63B). Max bounds hashing cost per request.
     password: str = Field(min_length=12, max_length=128)
-    full_name: str = Field(min_length=1, max_length=200)
-    org_name: str = Field(min_length=1, max_length=200)
+    full_name: Annotated[str, non_blank(200)]
+    org_name: Annotated[str, non_blank(200)]
     profile: BusinessProfile | None = None  # the signup wizard always sends it
 
 
@@ -115,5 +116,5 @@ class AddCompanyRequest(BaseModel):
     """Create another company for the logged-in user. Name, email and password stay the same;
     the password is asked again to confirm it's really them."""
 
-    org_name: str = Field(min_length=1, max_length=200)
+    org_name: Annotated[str, non_blank(200)]
     password: str = Field(min_length=1, max_length=128)

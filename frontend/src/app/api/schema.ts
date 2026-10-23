@@ -704,7 +704,8 @@ export interface paths {
         put?: never;
         /**
          * Login Start
-         * @description Send a 6-digit one-time code to the customer's registered mobile number.
+         * @description Phone + username identify the customer and their bank; a 6-digit one-time code goes
+         *     to the registered mobile. Works with or without the bank's own link.
          */
         post: operations["login_start_v1_customer_login_start_post"];
         delete?: never;
@@ -1006,6 +1007,16 @@ export interface components {
         };
         /** Bank */
         Bank: {
+            /** Name */
+            name: string;
+        };
+        /** BankOption */
+        BankOption: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
             /** Name */
             name: string;
         };
@@ -1517,18 +1528,23 @@ export interface components {
         };
         /** LoginStartIn */
         LoginStartIn: {
-            /**
-             * Bank Id
-             * Format: uuid
-             */
-            bank_id: string;
             /** Phone */
             phone: string;
+            /** Username */
+            username: string;
+            /** Bank Id */
+            bank_id?: string | null;
         };
         /** LoginStartOut */
         LoginStartOut: {
             /** Sent */
             sent: boolean;
+            bank?: components["schemas"]["BankOption"] | null;
+            /**
+             * Banks
+             * @default []
+             */
+            banks: components["schemas"]["BankOption"][];
             /** Dev Code */
             dev_code?: string | null;
         };

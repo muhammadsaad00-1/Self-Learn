@@ -2,11 +2,12 @@
 
 import uuid
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from agentflow.knowledge.models import DocumentStatus
+from agentflow.validation import non_blank
 
 
 class DocumentOut(BaseModel):
@@ -62,7 +63,7 @@ class KnowledgeAnswer(BaseModel):
 
 
 class SearchRequest(BaseModel):
-    query: str = Field(min_length=1, max_length=500)
+    query: Annotated[str, non_blank(500)]
 
 
 class SearchHit(BaseModel):
@@ -78,4 +79,4 @@ class SearchHit(BaseModel):
 
 
 class AskRequest(BaseModel):
-    question: str = Field(min_length=1, max_length=2000)
+    question: Annotated[str, non_blank(2000)]

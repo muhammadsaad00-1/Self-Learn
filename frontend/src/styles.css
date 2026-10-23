@@ -1595,6 +1595,7 @@ app-customer-chat {
 .choice {
   display: grid;
   justify-items: start;
+  justify-content: stretch; /* not the base button's centering: content starts left */
   gap: 4px;
   height: auto;
   padding: 14px;

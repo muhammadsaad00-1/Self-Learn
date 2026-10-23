@@ -14,6 +14,7 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from fastapi.testclient import TestClient
+from redis.asyncio import Redis
 from sqlalchemy import make_url, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool
@@ -109,7 +110,22 @@ async def app_session(app_database_url: str) -> AsyncGenerator[AsyncSession]:
 def settings(database_url: str, app_database_url: str) -> Iterator[Settings]:
     """Settings for tests that go through the real app, which really commits. Afterwards every
     table is emptied, so committed rows never leak into the next test."""
-    yield Settings(env="test", database_url=app_database_url, migration_database_url=database_url)
+    # Redis: a database of their own (never the dev stack's db 0), emptied before every test,
+    # so rate-limit and one-time-code keys can't leak between tests or from manual runs.
+    redis_url = Settings().redis_url.unicode_string().rsplit("/", 1)[0] + "/15"
+
+    async def flush() -> None:
+        redis = Redis.from_url(redis_url)
+        await redis.flushdb()
+        await redis.aclose()
+
+    asyncio.run(flush())
+    yield Settings(
+        env="test",
+        database_url=app_database_url,
+        migration_database_url=database_url,
+        redis_url=redis_url,
+    )
 
     async def truncate() -> None:
         tables = ", ".join(t.name for t in Base.metadata.sorted_tables)
@@ -125,8 +141,7 @@ def settings(database_url: str, app_database_url: str) -> Iterator[Settings]:
 def client(settings: Settings) -> Iterator[TestClient]:
     """HTTP client for the real app (lifespan runs, real commits to the test DB).
 
-    Tables are cleaned by `settings`, but Redis is not: login rate-limit counters outlive the
-    test, so API tests use unique emails (`new_email`).
+    Tables are cleaned by `settings`, and Redis (db 15) is emptied before each test.
     """
     with TestClient(create_app(settings)) as c:
         yield c

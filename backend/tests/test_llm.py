@@ -129,3 +129,13 @@ def test_cerebras_joins_the_routes_only_with_a_key() -> None:
     with_key = build_llm(Settings(groq_api_key=SecretStr("g"), cerebras_api_key=SecretStr("c")))
     strong = with_key._routes[TaskType.GROUNDED_ANSWER]
     assert strong[:2] == ["openai/gpt-oss-120b", "cerebras:gpt-oss-120b"]
+
+
+async def test_all_rate_limited_is_a_provider_outage_not_a_bad_task() -> None:
+    from agentflow.llm import ProviderUnavailableError
+
+    with pytest.raises(ProviderUnavailableError):
+        await generate(router(a=ScriptedModel(rate_limited()), b=ScriptedModel(rate_limited())))
+    with pytest.raises(LLMError) as bad:
+        await generate(router(a=ScriptedModel(invalid(), invalid())))
+    assert not isinstance(bad.value, ProviderUnavailableError)

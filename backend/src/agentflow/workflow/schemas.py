@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -13,13 +13,14 @@ from agentflow.policy.engine import PolicyDecision
 from agentflow.policy.risk import RiskAssessment
 from agentflow.tools.refund import ExecutionResult
 from agentflow.tools.tickets import TicketRef
+from agentflow.validation import non_blank
 from agentflow.workflow.models import StepStatus, WorkflowStatus
 
 
 class CreateWorkflowRequest(BaseModel):
     """A customer request entering the system (from a support inbox, chat, or the dashboard)."""
 
-    message: str = Field(min_length=1, max_length=8000)
+    message: Annotated[str, non_blank(8000)]
     # Earlier turns of a conversation, for the agents only: never shown as the customer's
     # message (the dashboard and tickets show `message`, what the customer actually wrote).
     context: str | None = Field(default=None, max_length=6000)

@@ -101,7 +101,10 @@ import { Icon } from '../layout/icon';
             @if (isSignup()) {
               Already have an account? <a routerLink="/login">Sign in</a>
             } @else {
-              New here? <a routerLink="/signup">Create a company</a>
+              New here? <a routerLink="/signup">Create a company</a> <br /><small
+                >Are you a bank customer?
+                <a routerLink="/customer/login">Sign in to your bank</a></small
+              >
             }
           </p>
         </form>

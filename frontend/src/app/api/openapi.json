@@ -2338,7 +2338,7 @@
           "customer"
         ],
         "summary": "Login Start",
-        "description": "Send a 6-digit one-time code to the customer's registered mobile number.",
+        "description": "Phone + username identify the customer and their bank; a 6-digit one-time code goes\nto the registered mobile. Works with or without the bank's own link.",
         "operationId": "login_start_v1_customer_login_start_post",
         "requestBody": {
           "content": {
@@ -3081,6 +3081,25 @@
           "name"
         ],
         "title": "Bank"
+      },
+      "BankOption": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "BankOption"
       },
       "Body_login_v1_auth_login_post": {
         "properties": {
@@ -4349,22 +4368,35 @@
       },
       "LoginStartIn": {
         "properties": {
-          "bank_id": {
-            "type": "string",
-            "format": "uuid",
-            "title": "Bank Id"
-          },
           "phone": {
             "type": "string",
             "maxLength": 20,
             "minLength": 10,
             "title": "Phone"
+          },
+          "username": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Username"
+          },
+          "bank_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bank Id"
           }
         },
         "type": "object",
         "required": [
-          "bank_id",
-          "phone"
+          "phone",
+          "username"
         ],
         "title": "LoginStartIn"
       },
@@ -4373,6 +4405,24 @@
           "sent": {
             "type": "boolean",
             "title": "Sent"
+          },
+          "bank": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BankOption"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "banks": {
+            "items": {
+              "$ref": "#/components/schemas/BankOption"
+            },
+            "type": "array",
+            "title": "Banks",
+            "default": []
           },
           "dev_code": {
             "anyOf": [

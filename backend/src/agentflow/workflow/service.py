@@ -227,7 +227,13 @@ async def complete(session: AsyncSession, wf: Workflow, result: dict[str, Any]) 
 
 
 async def fail_attempt(
-    session: AsyncSession, wf: Workflow, claim: Claim, error: str, *, max_attempts: int
+    session: AsyncSession,
+    wf: Workflow,
+    claim: Claim,
+    error: str,
+    *,
+    max_attempts: int,
+    outage: bool = False,
 ) -> None:
     """Record a failed attempt: retry later with backoff, or give up (dead-letter)."""
     session.add(
@@ -256,7 +262,10 @@ async def fail_attempt(
         )
     else:
         wf.status = WorkflowStatus.QUEUED
-        wf.available_at = datetime.now(UTC) + backoff(claim.attempt)
+        # A provider outage (rate limit) clears in a minute or more; retrying after a few
+        # seconds just burns the attempts (found in QA: 3 attempts in ~20 s, then dead).
+        delay = backoff(claim.attempt, base_seconds=20) if outage else backoff(claim.attempt)
+        wf.available_at = datetime.now(UTC) + delay
 
 
 async def count_recent_for_customer(

@@ -280,7 +280,8 @@ async def seed_demo_data(session: AsyncSession, org_id: uuid.UUID) -> list[Accou
     CUST-1004  PKR 5,000 transfer rejected   -> network-confirmed failure: reversed at once
     CUST-1005  PKR 15,000 transfer stuck 27h -> partner-bank inquiry ticket
     CUST-1006  "never made" PKR 18,500 Daraz -> looks customer-made: no freeze, reviewed
-    Phones 923001234501..06 log in to the customer app (OTP); emails
+    Phones 923001234501..06 + usernames ayesha.khan, bilal.ahmed, hina.raza, usman.tariq,
+    zainab.ali, faraz.hussain log in to the customer app (OTP); emails
     cust1001@example.com..cust1006@example.com write to the support inbox.
     """
     now = datetime.now(UTC)
@@ -298,6 +299,7 @@ async def seed_demo_data(session: AsyncSession, org_id: uuid.UUID) -> list[Accou
             customer_ref=ref,
             customer_name=name,
             phone=phone,
+            username=name.lower().replace(" ", "."),  # "usman.tariq"
             email=f"{ref.lower().replace('-', '')}@example.com",
             currency="PKR",
         )

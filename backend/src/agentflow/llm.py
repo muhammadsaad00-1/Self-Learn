@@ -40,6 +40,10 @@ class LLMError(Exception):
     """No model produced a valid answer."""
 
 
+class ProviderUnavailableError(LLMError):
+    """Every model was rate-limited or unreachable: retry later, not "the task is broken"."""
+
+
 @dataclass(frozen=True)
 class LLMResult[T: BaseModel]:
     value: T
@@ -109,6 +113,7 @@ class RoutedLLM:
         self, task: TaskType, schema: type[T], *, system: str, user: str
     ) -> LLMResult[T]:
         failures: list[str] = []
+        invalid_output = False  # any model answered, just not to the schema
         for model_name in self._order(task):
             model = self._make_model(model_name, schema)
             # User text goes in its own message, never into the system instructions, so a
@@ -151,6 +156,7 @@ class RoutedLLM:
                         latency_ms=round((time.perf_counter() - start) * 1000),
                     )
                 failures.append(f"{model_name}: invalid output ({out['parsing_error']})")
+                invalid_output = True
                 messages = [
                     *messages,
                     HumanMessage(
@@ -158,7 +164,10 @@ class RoutedLLM:
                         f"({str(out['parsing_error'])[:300]}). Answer again with valid JSON only."
                     ),
                 ]
-        raise LLMError("; ".join(failures) or f"no models configured for {task}")
+        message = "; ".join(failures) or f"no models configured for {task}"
+        if failures and not invalid_output:
+            raise ProviderUnavailableError(message)
+        raise LLMError(message)
 
 
 def build_llm(settings: Settings) -> RoutedLLM:
